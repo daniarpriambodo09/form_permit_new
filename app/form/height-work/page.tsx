@@ -1,0 +1,711 @@
+// app/form/height-work/page.tsx
+"use client";
+
+import { useState } from "react";
+import Link from "next/link";
+import { ChevronDown, ChevronUp, Home, AlertCircle, Save, Send } from "lucide-react";
+
+interface FormData {
+  // Bagian 1: Informasi Petugas Ketinggian
+  tipePerusahaan: "eksternal" | "internal";
+  deskripsiPekerjaan: string;
+  lokasi: string;
+  tanggal: string;
+  waktuMulai: string;
+  waktuSelesai: string;
+  namaPengawasKontraktor: string;
+  namaPetugas: string[];
+  berbadanSehat: string[];
+
+  // Bagian 2: Peminjaman Tangga Listrik
+  kunceePagar: boolean;
+  rompiKetinggian: boolean;
+  rompiAngka: string;
+  safetyHelmetCount: string;
+  fullBodyHarnessCount: string;
+
+  // Bagian 3: Pekerjaan Beresiko Tinggi
+  areaKerjaAman: "ya" | "tidak" | "";
+  kebakaranProcedure: "ya" | "tidak" | "";
+  pekerjaanListrik: "ya" | "tidak" | "";
+  prosedurLoto: "ya" | "tidak" | "";
+  perisakArea: "ya" | "tidak" | "";
+  safetyLineLine: "ya" | "tidak" | "";
+  alatBantuKerja: "ya" | "tidak" | "";
+  rompiSaatBekerja: "ya" | "tidak" | "";
+
+  // Bagian 4: Alat Pelindung Diri
+  bebanBeratTubuh: "ya" | "tidak" | "";
+  helmStandar: "ya" | "tidak" | "";
+  rambuSafetyWarning: "ya" | "tidak" | "";
+  bodyHarnessWebbing: "ya" | "tidak" | "";
+  bodyHarnessDRing: "ya" | "tidak" | "";
+  bodyHarnessAdjustment: "ya" | "tidak" | "";
+  lanyardAbsorber: "ya" | "tidak" | "";
+  lanyardSnapHook: "ya" | "tidak" | "";
+  lanyardRope: "ya" | "tidak" | "";
+
+  // Bagian 5: Point Pengecekan
+  kuncePagarAngka: string;
+  helmetAngka: string;
+  harnessAngka: string;
+
+  // Persetujuan
+  persetujuan: {
+    spvNama: string;
+    kontraktorNama: string;
+    sfoNama: string;
+    mrPgaNama: string;
+  };
+}
+
+const Section = ({ title, section, children, description, expanded, toggle }: any) => (
+  <div className="bg-white rounded-xl shadow-md overflow-hidden mb-6 border border-slate-200">
+    <button
+      onClick={() => toggle(section)}
+      className="w-full flex items-center justify-between cursor-pointer bg-gradient-to-r from-orange-50 to-orange-100 px-6 py-4 border-b border-slate-200 hover:from-orange-100 hover:to-orange-100 transition-colors"
+    >
+      <div className="text-left">
+        <h3 className="font-bold text-slate-900 text-sm uppercase tracking-wide">{title}</h3>
+        {description && <p className="text-xs text-slate-600 mt-1">{description}</p>}
+      </div>
+      {expanded ? (
+        <ChevronUp className="w-5 h-5 text-orange-600 flex-shrink-0" />
+      ) : (
+        <ChevronDown className="w-5 h-5 text-orange-600 flex-shrink-0" />
+      )}
+    </button>
+    {expanded && <div className="p-6">{children}</div>}
+  </div>
+);
+
+const CheckboxGroup = ({ labelKiri, labelKanan, count, items, onChange }: any) => (
+  <div className="space-y-3">
+    <div className="flex items-center gap-3">
+      <label className="flex-1 text-sm font-semibold text-slate-700">{labelKiri}</label>
+      <label className="min-w-[120px] text-sm font-semibold text-slate-700 text-center">{labelKanan}</label>
+    </div>
+    {Array.from({ length: count }).map((_, index) => (
+      <div key={index} className="flex items-center gap-3">
+        <input
+          type="text"
+          placeholder={`${labelKiri} ${index + 1}`}
+          className="flex-1 px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent outline-none"
+          value={items[index] || ""}
+          onChange={(e) => {
+            const newItems = [...items];
+            newItems[index] = e.target.value;
+            onChange(newItems);
+          }}
+        />
+        <div className="flex items-center justify-center gap-4 min-w-[120px]">
+          <label className="flex items-center gap-1 text-sm font-medium">
+            <input type="checkbox" className="w-4 h-4" />
+            YA
+          </label>
+          <label className="flex items-center gap-1 text-sm font-medium">
+            <input type="checkbox" className="w-4 h-4" />
+            TIDAK
+          </label>
+        </div>
+      </div>
+    ))}
+  </div>
+);
+
+const YesNoCheckbox = ({ label, value, onChange }: any) => (
+  <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-200">
+    <label className="text-sm font-medium text-slate-700">{label}</label>
+    <div className="flex items-center gap-4">
+      <label className="flex items-center gap-1 cursor-pointer">
+        <input
+          type="radio"
+          name={label}
+          value="ya"
+          checked={value === "ya"}
+          onChange={(e) => onChange(e.target.value)}
+          className="w-4 h-4 text-orange-600"
+        />
+        <span className="text-sm">YA</span>
+      </label>
+      <label className="flex items-center gap-1 cursor-pointer">
+        <input
+          type="radio"
+          name={label}
+          value="tidak"
+          checked={value === "tidak"}
+          onChange={(e) => onChange(e.target.value)}
+          className="w-4 h-4 text-orange-600"
+        />
+        <span className="text-sm">TIDAK</span>
+      </label>
+    </div>
+  </div>
+);
+
+const SignatureBox = ({ label, name, onChange }: any) => (
+  <div className="space-y-3">
+    <label className="block text-sm font-semibold text-slate-700">{label}</label>
+    <input
+      type="text"
+      placeholder="Nama"
+      className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent outline-none"
+      value={name}
+      onChange={(e) => onChange(e.target.value)}
+    />
+    <div className="border-2 border-dashed border-slate-300 rounded-lg h-32 flex items-center justify-center bg-slate-50">
+      <span className="text-slate-400 text-sm">[Tanda Tangan]</span>
+    </div>
+  </div>
+);
+
+export default function HeightWorkPermitForm() {
+  const [formData, setFormData] = useState<FormData>({
+    tipePerusahaan: "internal",
+    deskripsiPekerjaan: "",
+    lokasi: "",
+    tanggal: "",
+    waktuMulai: "",
+    waktuSelesai: "",
+    namaPengawasKontraktor: "",
+    namaPetugas: ["", "", "", "", ""],
+    berbadanSehat: ["", "", "", "", "", "", "", "", "", ""],
+
+    kunceePagar: false,
+    rompiKetinggian: false,
+    rompiAngka: "",
+    safetyHelmetCount: "",
+    fullBodyHarnessCount: "",
+
+    areaKerjaAman: "",
+    kebakaranProcedure: "",
+    pekerjaanListrik: "",
+    prosedurLoto: "",
+    perisakArea: "",
+    safetyLineLine: "",
+    alatBantuKerja: "",
+    rompiSaatBekerja: "",
+
+    bebanBeratTubuh: "",
+    helmStandar: "",
+    rambuSafetyWarning: "",
+    bodyHarnessWebbing: "",
+    bodyHarnessDRing: "",
+    bodyHarnessAdjustment: "",
+    lanyardAbsorber: "",
+    lanyardSnapHook: "",
+    lanyardRope: "",
+
+    kuncePagarAngka: "",
+    helmetAngka: "",
+    harnessAngka: "",
+
+    persetujuan: {
+      spvNama: "",
+      kontraktorNama: "",
+      sfoNama: "",
+      mrPgaNama: "",
+    },
+  });
+
+  const [expanded, setExpanded] = useState({
+    bagian1: true,
+    bagian2: true,
+    bagian3: true,
+    bagian4: true,
+    bagian5: true,
+    persetujuan: true,
+  });
+
+  const toggle = (section: string) =>
+    setExpanded((prev) => ({ ...prev, [section]: !prev[section as keyof typeof prev] }));
+
+  const handleSave = () => {
+    const drafts = JSON.parse(localStorage.getItem("permitDrafts") || "[]");
+    drafts.push({
+      ...formData,
+      id: Date.now(),
+      status: "draft",
+      jenisForm: "height-work",
+      createdAt: new Date().toISOString(),
+    });
+    localStorage.setItem("permitDrafts", JSON.stringify(drafts));
+    alert("Draft berhasil disimpan!");
+  };
+
+  const handleSubmit = () => {
+    const permits = JSON.parse(localStorage.getItem("permits") || "[]");
+    permits.push({
+      ...formData,
+      id: Date.now(),
+      status: "submitted",
+      jenisForm: "height-work",
+      submittedAt: new Date().toISOString(),
+    });
+    localStorage.setItem("permits", JSON.stringify(permits));
+    alert("Izin berhasil diajukan!");
+    window.location.href = "/history";
+  };
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
+      {/* Header */}
+      <div className="bg-white shadow-sm border-b border-slate-200 sticky top-0 z-50">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-5">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              <Link href="/" className="p-2 hover:bg-slate-100 rounded-lg transition-colors">
+                <Home className="w-5 h-5 text-slate-600" />
+              </Link>
+              <div className="flex items-center space-x-3">
+                <div className="p-2 bg-orange-100 rounded-lg">
+                  <AlertCircle className="w-5 h-5 text-orange-600" />
+                </div>
+                <div>
+                  <h1 className="text-xl font-bold text-slate-900">FORM IZIN KERJA DI KETINGGIAN</h1>
+                  <p className="text-xs text-slate-600">(WORK AT HEIGHT PERMIT) - PT JATIM AUTOCOMP INDONESIA</p>
+                </div>
+              </div>
+            </div>
+            <Link
+              href="/history"
+              className="px-4 py-2 text-sm font-medium text-orange-600 hover:text-orange-700 hover:bg-orange-50 rounded-lg transition-colors"
+            >
+              Lihat Riwayat →
+            </Link>
+          </div>
+        </div>
+      </div>
+
+      {/* Main Content */}
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-6 flex items-start space-x-3">
+          <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+          <div>
+            <h3 className="font-semibold text-amber-900 text-sm">Perhatian: Keselamatan Adalah Prioritas Utama</h3>
+            <p className="text-sm text-amber-800 mt-1">
+              Form ini harus diselesaikan sebelum memulai pekerjaan di ketinggian. Pastikan semua bagian terisi dengan benar dan mendapat persetujuan dari pihak yang berwenang.
+            </p>
+          </div>
+        </div>
+
+        {/* Bagian 1 */}
+        <Section
+          title="BAGIAN 1: INFORMASI PETUGAS KETINGGIAN"
+          section="bagian1"
+          description="Data registrasi, identitas, dan informasi dasar pekerjaan"
+          expanded={expanded.bagian1}
+          toggle={toggle}
+        >
+          <div className="space-y-6">
+            {/* Tipe Perusahaan */}
+            <div>
+              <label className="block text-sm font-semibold text-slate-700 mb-3">Informasi Petugas Ketinggian</label>
+              <div className="flex gap-6">
+                <label className="text-black flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    checked={formData.tipePerusahaan === "eksternal"}
+                    onChange={() => setFormData({ ...formData, tipePerusahaan: "eksternal" })}
+                    className="text-black w-4 h-4"
+                  />
+                  <span className="text-black text-sm">Eksternal / Subkontraktor</span>
+                </label>
+                <label className="text-black flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    checked={formData.tipePerusahaan === "internal"}
+                    onChange={() => setFormData({ ...formData, tipePerusahaan: "internal" })}
+                    className="text-black w-4 h-4"
+                  />
+                  <span className="text-black text-sm">Internal / Karyawan PT.JAI</span>
+                </label>
+              </div>
+            </div>
+
+            {/* Grid 2 Kolom */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">Deskripsi Pekerjaan *</label>
+                <textarea
+                  className="text-black w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent outline-none"
+                  rows={1}
+                  placeholder="Jelaskan jenis dan deskripsi pekerjaan"
+                  value={formData.deskripsiPekerjaan}
+                  onChange={(e) => setFormData({ ...formData, deskripsiPekerjaan: e.target.value })}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">Lokasi *</label>
+                <input
+                  type="text"
+                  placeholder="Lokasi pekerjaan"
+                  className="text-black w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent outline-none"
+                  value={formData.lokasi}
+                  onChange={(e) => setFormData({ ...formData, lokasi: e.target.value })}
+                />
+              </div>
+            </div>
+
+            {/* Tanggal & Waktu */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">Tanggal *</label>
+                <input
+                  type="date"
+                  className="text-black w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent outline-none"
+                  value={formData.tanggal}
+                  onChange={(e) => setFormData({ ...formData, tanggal: e.target.value })}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">Waktu Mulai (Pukul) *</label>
+                <input
+                  type="time"
+                  className="text-black w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent outline-none"
+                  value={formData.waktuMulai}
+                  onChange={(e) => setFormData({ ...formData, waktuMulai: e.target.value })}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">Waktu Selesai *</label>
+                <input
+                  type="time"
+                  className="text-black w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent outline-none"
+                  value={formData.waktuSelesai}
+                  onChange={(e) => setFormData({ ...formData, waktuSelesai: e.target.value })}
+                />
+              </div>
+            </div>
+
+            {/* Nama Pengawas Kontraktor */}
+            <div>
+              <label className="block text-sm font-semibold text-slate-700 mb-2">Nama Pengawas Kontraktor *</label>
+              <input
+                type="text"
+                placeholder="Nama Pengawas Kontraktor"
+                className="text-black w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent outline-none"
+                value={formData.namaPengawasKontraktor}
+                onChange={(e) => setFormData({ ...formData, namaPengawasKontraktor: e.target.value })}
+              />
+            </div>
+
+            {/* Nama Petugas dan Berbadan Sehat */}
+            <div className="md:col-span-2">
+              <CheckboxGroup
+                labelKiri="Nama Petugas Ketinggian"
+                labelKanan="Berbadan Sehat"
+                count={10}
+                items={formData.namaPetugas}
+                onChange={(newItems: string[]) => setFormData({ ...formData, namaPetugas: newItems })}
+              />
+            </div>
+          </div>
+        </Section>
+
+        {/* Bagian 2 */}
+        <Section
+          title="BAGIAN 2: PEMINJAMAN TANGGA LISTRIK / AWP"
+          section="bagian2"
+          description="Informasi peralatan dan perlengkapan yang digunakan"
+          expanded={expanded.bagian2}
+          toggle={toggle}
+        >
+          <div className="space-y-6">
+            {/* Input Vertikal Sesuai Gambar */}
+            <div className="space-y-4">
+              <div className="flex items-center gap-4">
+                <input
+                  type="checkbox"
+                  checked={formData.kunceePagar}
+                  onChange={(e) => setFormData({ ...formData, kunceePagar: e.target.checked })}
+                  className="w-5 h-5 text-orange-600 rounded border-slate-300 focus:ring-2 focus:ring-orange-500"
+                />
+                <span className="text-sm font-medium">Kunci Pagar Tangga Listrik</span>
+              </div>
+
+              <div className="flex items-center gap-4">
+                <input
+                  type="checkbox"
+                  checked={formData.rompiKetinggian}
+                  onChange={(e) => setFormData({ ...formData, rompiKetinggian: e.target.checked })}
+                  className="w-5 h-5 text-orange-600 rounded border-slate-300 focus:ring-2 focus:ring-orange-500"
+                />
+                <span className="text-sm font-medium">Rompi Ketinggian</span>
+                <span className="text-xs text-slate-500 ml-2">(No. Rompi:)</span>
+                <input
+                  type="text"
+                  placeholder="No. Rompi"
+                  className="ml-2 w-20 px-2 py-1 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                  value={formData.rompiAngka}
+                  onChange={(e) => setFormData({ ...formData, rompiAngka: e.target.value })}
+                />
+              </div>
+
+              <div className="flex items-center gap-4">
+                <input
+                  type="checkbox"
+                  checked={formData.safetyHelmetCount !== ""}
+                  onChange={(e) => {
+                    if (e.target.checked) {
+                      setFormData({ ...formData, safetyHelmetCount: "1" });
+                    } else {
+                      setFormData({ ...formData, safetyHelmetCount: "" });
+                    }
+                  }}
+                  className="w-5 h-5 text-orange-600 rounded border-slate-300 focus:ring-2 focus:ring-orange-500"
+                />
+                <span className="text-sm font-medium">Safety Helmet</span>
+                <span className="text-xs text-slate-500 ml-2">(Jumlah:)</span>
+                <input
+                  type="text"
+                  placeholder="Jumlah"
+                  className="ml-2 w-20 px-2 py-1 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                  value={formData.safetyHelmetCount}
+                  onChange={(e) => setFormData({ ...formData, safetyHelmetCount: e.target.value })}
+                />
+              </div>
+
+              <div className="flex items-center gap-4">
+                <input
+                  type="checkbox"
+                  checked={formData.fullBodyHarnessCount !== ""}
+                  onChange={(e) => {
+                    if (e.target.checked) {
+                      setFormData({ ...formData, fullBodyHarnessCount: "1" });
+                    } else {
+                      setFormData({ ...formData, fullBodyHarnessCount: "" });
+                    }
+                  }}
+                  className="w-5 h-5 text-orange-600 rounded border-slate-300 focus:ring-2 focus:ring-orange-500"
+                />
+                <span className="text-sm font-medium">Full Body Harness</span>
+                <span className="text-xs text-slate-500 ml-2">(Jumlah:)</span>
+                <input
+                  type="text"
+                  placeholder="Jumlah"
+                  className="ml-2 w-20 px-2 py-1 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                  value={formData.fullBodyHarnessCount}
+                  onChange={(e) => setFormData({ ...formData, fullBodyHarnessCount: e.target.value })}
+                />
+              </div>
+            </div>
+
+            <div className="bg-orange-50 border border-orange-200 rounded-lg p-4 space-y-2 text-sm text-slate-700">
+              <p className="font-semibold">Point Penting:</p>
+              <ul className="list-disc list-inside space-y-1">
+                <li>Tangga listrik / AWP tidak bisa digunakan diluar di gedung saat hujan</li>
+                <li>Setelah penggunaan tangga listrik selesai, segera mengembalikan kunci pagar tangga listrik dan APD</li>
+                <li>Harap menjaga kebersihan tangga listrik setelah pemakaian</li>
+                <li>pastikan beban tidak melebihi kapasitas maksimal safety line = 150 kg</li>
+                <li>penggunaan tangga listrik / AWP harus sesuai operasion standart dan wajib mengenakan APD</li>
+              </ul>
+            </div>
+          </div>
+        </Section>
+
+        {/* Bagian 3 */}
+        <Section
+          title="BAGIAN 3: PEKERJAAN BERESIKO TINGGI"
+          section="bagian3"
+          description="Checklist keselamatan untuk area kerja di ketinggian"
+          expanded={expanded.bagian3}
+          toggle={toggle}
+        >
+          <div className="space-y-4">
+            <YesNoCheckbox
+              label="Apakah area kerja telah diperiksa dan aman untuk digunakan"
+              value={formData.areaKerjaAman}
+              onChange={(val: string) => setFormData({ ...formData, areaKerjaAman: val as "ya" | "tidak" | "" })}
+            />
+            <YesNoCheckbox
+              label="Jika Terjadi Kebakaran, apakah pahami cara menggunakan alat pemadam kebakaran"
+              value={formData.kebakaranProcedure}
+              onChange={(val: string) => setFormData({ ...formData, kebakaranProcedure: val as "ya" | "tidak" | "" })}
+            />
+            <YesNoCheckbox
+              label="Apakah Ada pekerjaan Listrik"
+              value={formData.pekerjaanListrik}
+              onChange={(val: string) => setFormData({ ...formData, pekerjaanListrik: val as "ya" | "tidak" | "" })}
+            />
+            <YesNoCheckbox
+              label="Melakukan prosedur LOTO"
+              value={formData.prosedurLoto}
+              onChange={(val: string) => setFormData({ ...formData, prosedurLoto: val as "ya" | "tidak" | "" })}
+            />
+            <YesNoCheckbox
+              label="Menutupi area dibawah dan sekitar dengan perisai yang tidak mudah dibakar"
+              value={formData.perisakArea}
+              onChange={(val: string) => setFormData({ ...formData, perisakArea: val as "ya" | "tidak" | "" })}
+            />
+            <YesNoCheckbox
+              label="Apakah safety / lfl line tersedia dan dalam keadaan baik"
+              value={formData.safetyLineLine}
+              onChange={(val: string) => setFormData({ ...formData, safetyLineLine: val as "ya" | "tidak" | "" })}
+            />
+            <YesNoCheckbox
+              label="Apakah alat bantu Kerja (Tangga, Scaffolding) yang akan digunakan dalam keadaan aman"
+              value={formData.alatBantuKerja}
+              onChange={(val: string) => setFormData({ ...formData, alatBantuKerja: val as "ya" | "tidak" | "" })}
+            />
+            <YesNoCheckbox
+              label="Menggunakan rompi saat bekerja di Ketinggian"
+              value={formData.rompiSaatBekerja}
+              onChange={(val: string) => setFormData({ ...formData, rompiSaatBekerja: val as "ya" | "tidak" | "" })}
+            />
+          </div>
+        </Section>
+
+        {/* Bagian 4 */}
+        <Section
+          title="BAGIAN 4: ALAT PELINDUNG DIRI"
+          section="bagian4"
+          description="Pengecekan APD sebelum bekerja di ketinggian"
+          expanded={expanded.bagian4}
+          toggle={toggle}
+        >
+          <div className="space-y-4">
+            <YesNoCheckbox
+              label="Beban yang dibawa saat naik tidak boleh lebih dari 5 kg (diluar beban berat tubuh dan APD)"
+              value={formData.bebanBeratTubuh}
+              onChange={(val: string) => setFormData({ ...formData, bebanBeratTubuh: val as "ya" | "tidak" | "" })}
+            />
+            <YesNoCheckbox
+              label="Apakah Helm sudah sesuai standar"
+              value={formData.helmStandar}
+              onChange={(val: string) => setFormData({ ...formData, helmStandar: val as "ya" | "tidak" | "" })}
+            />
+            <YesNoCheckbox
+              label="Rambu-rambu / safety warning apakah sudah tersedia"
+              value={formData.rambuSafetyWarning}
+              onChange={(val: string) => setFormData({ ...formData, rambuSafetyWarning: val as "ya" | "tidak" | "" })}
+            />
+          </div>
+        </Section>
+
+        {/* Bagian 5 */}
+        <Section
+          title="BAGIAN 5: POINT PENGECEKAN BODY HARNESS SEBELUM DIGUNAKAN"
+          section="bagian5"
+          description="Verifikasi kondisi harness dan perlengkapan safety"
+          expanded={expanded.bagian5}
+          toggle={toggle}
+        >
+          <div className="space-y-6">
+            <div>
+              <h4 className="font-semibold text-slate-800 mb-4">Body Harness</h4>
+              <div className="space-y-3">
+                <YesNoCheckbox
+                  label="1. Webbing - Kondisi jahitan baik (tidak lepas, tidak berserabut)"
+                  value={formData.bodyHarnessWebbing}
+                  onChange={(val: string) => setFormData({ ...formData, bodyHarnessWebbing: val as "ya" | "tidak" | "" })}
+                />
+                <YesNoCheckbox
+                  label="2. D-Ring - Kondisi baik (tidak retak/bengkok/berkarat, dapat diputar bebas/fleksibel)"
+                  value={formData.bodyHarnessDRing}
+                  onChange={(val: string) => setFormData({ ...formData, bodyHarnessDRing: val as "ya" | "tidak" | "" })}
+                />
+                <YesNoCheckbox
+                  label="3. Adjustment Buckle (Gesper) - Kondisi baik (tidak retak/bengkok/berkarat, dapat mengunci sempurna)"
+                  value={formData.bodyHarnessAdjustment}
+                  onChange={(val: string) => setFormData({ ...formData, bodyHarnessAdjustment: val as "ya" | "tidak" | "" })}
+                />
+              </div>
+            </div>
+
+            <div>
+              <h4 className="font-semibold text-slate-800 mb-4">Lanyard</h4>
+              <div className="space-y-3">
+                <YesNoCheckbox
+                  label="1. Absorber & Timbes - Kondisi jahitan baik (tidak lepas, tidak berserabut)"
+                  value={formData.lanyardAbsorber}
+                  onChange={(val: string) => setFormData({ ...formData, lanyardAbsorber: val as "ya" | "tidak" | "" })}
+                />
+                <YesNoCheckbox
+                  label="2. Snap Hook - Kondisi baik (tidak retak/bengkok/berkarat, dapat dikunci dengan sempurna)"
+                  value={formData.lanyardSnapHook}
+                  onChange={(val: string) => setFormData({ ...formData, lanyardSnapHook: val as "ya" | "tidak" | "" })}
+                />
+                <YesNoCheckbox
+                  label="3. Rope Lanyard - Kondisi baik (tidak berserabut, fiber tidak aus / terportong)"
+                  value={formData.lanyardRope}
+                  onChange={(val: string) => setFormData({ ...formData, lanyardRope: val as "ya" | "tidak" | "" })}
+                />
+              </div>
+            </div>
+          </div>
+        </Section>
+
+        {/* Persetujuan */}
+        <Section
+          title="PERSETUJUAN"
+          section="persetujuan"
+          description="Tanda tangan dan persetujuan dari pihak yang berwenang"
+          expanded={expanded.persetujuan}
+          toggle={toggle}
+        >
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <SignatureBox
+              label="SPV Terkait"
+              name={formData.persetujuan.spvNama}
+              onChange={(name: string) =>
+                setFormData({
+                  ...formData,
+                  persetujuan: { ...formData.persetujuan, spvNama: name },
+                })
+              }
+            />
+            <SignatureBox
+              label="Kontraktor"
+              name={formData.persetujuan.kontraktorNama}
+              onChange={(name: string) =>
+                setFormData({
+                  ...formData,
+                  persetujuan: { ...formData.persetujuan, kontraktorNama: name },
+                })
+              }
+            />
+            <SignatureBox
+              label="SFO"
+              name={formData.persetujuan.sfoNama}
+              onChange={(name: string) =>
+                setFormData({
+                  ...formData,
+                  persetujuan: { ...formData.persetujuan, sfoNama: name },
+                })
+              }
+            />
+            <SignatureBox
+              label="MR/PGA MGR"
+              name={formData.persetujuan.mrPgaNama}
+              onChange={(name: string) =>
+                setFormData({
+                  ...formData,
+                  persetujuan: { ...formData.persetujuan, mrPgaNama: name },
+                })
+              }
+            />
+          </div>
+        </Section>
+
+        {/* Action Buttons */}
+        <div className="flex justify-between items-center gap-4 bg-white p-6 rounded-xl shadow-md sticky bottom-4 border border-slate-200">
+          <button
+            onClick={handleSave}
+            className="px-6 py-3 border-2 border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 font-semibold flex items-center space-x-2 transition-colors"
+          >
+            <Save className="w-5 h-5" />
+            <span>Simpan Draft</span>
+          </button>
+          <button
+            onClick={handleSubmit}
+            className="px-8 py-3 bg-gradient-to-r from-orange-600 to-orange-700 hover:from-orange-700 hover:to-orange-800 text-white rounded-lg font-semibold flex items-center space-x-2 transition-colors shadow-lg"
+          >
+            <Send className="w-5 h-5" />
+            <span>Ajukan Izin</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
