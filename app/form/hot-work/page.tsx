@@ -3,16 +3,21 @@
 import { useState } from "react";
 import Link from "next/link";
 import { ChevronDown, ChevronUp, Home, Flame, Save, Send, AlertCircle } from "lucide-react";
+import { supabase } from "@/lib/supabase";
 
-// ✅ Perbarui interface: ubah cutting, grinding, welding, painting jadi objek
+// Helper: Konversi string waktu kosong → null
+const cleanTime = (timeStr: string): string | null => {
+  return timeStr === "" ? null : timeStr;
+};
+
 interface FormData {
   noRegistrasi: string;
   namaKontraktor: string;
-  namaNIK: string;
+  namaPekerjaNIK: string;
   namaFireWatch: string;
   namaNIKFireWatch: string;
   lokasi: string;
-  tanggal: string;
+  tanggalPelaksanaan: string;
   waktuPukul: string;
   jabaranPemberiIzin: string;
   namaNIKPemberiIzin: string;
@@ -20,7 +25,6 @@ interface FormData {
     preventive: boolean;
     tangki: boolean;
     panel: boolean;
-    // ✅ Ubah dari string → objek
     cutting: { detail: string; mulai: string; selesai: string };
     grinding: { detail: string; mulai: string; selesai: string };
     welding: { detail: string; mulai: string; selesai: string };
@@ -116,11 +120,11 @@ export default function HotWorkPermitForm() {
   const [formData, setFormData] = useState<FormData>({
     noRegistrasi: "",
     namaKontraktor: "",
-    namaNIK: "",
+    namaPekerjaNIK: "",
     namaFireWatch: "",
     namaNIKFireWatch: "",
     lokasi: "",
-    tanggal: "",
+    tanggalPelaksanaan: "",
     waktuPukul: "",
     jabaranPemberiIzin: "",
     namaNIKPemberiIzin: "",
@@ -128,7 +132,6 @@ export default function HotWorkPermitForm() {
       preventive: false,
       tangki: false,
       panel: false,
-      // ✅ Inisialisasi sebagai objek
       cutting: { detail: "", mulai: "", selesai: "" },
       grinding: { detail: "", mulai: "", selesai: "" },
       welding: { detail: "", mulai: "", selesai: "" },
@@ -184,31 +187,135 @@ export default function HotWorkPermitForm() {
   const toggle = (section: string) =>
     setExpanded((prev) => ({ ...prev, [section]: !prev[section as keyof typeof prev] }));
 
-  const handleSave = () => {
-    const drafts = JSON.parse(localStorage.getItem("permitDrafts") || "[]");
-    drafts.push({
-      ...formData,
-      id: Date.now(),
-      status: "draft",
-      jenisForm: "hot-work",
-      createdAt: new Date().toISOString(),
-    });
-    localStorage.setItem("permitDrafts", JSON.stringify(drafts));
-    alert("Draft berhasil disimpan!");
+  const generateIdForm = async (): Promise<string> => {
+    const { data, error } = await supabase
+      .from("form-kerja-panas")
+      .select("id_form", { count: "exact" })
+      .order("id_form", { ascending: false })
+      .limit(1);
+
+    if (error) throw error;
+
+    let nextNumber = 1000;
+    if (data && data.length > 0) {
+      const lastId = data[0].id_form;
+      const num = parseInt(lastId.replace("HOW-", ""), 10);
+      if (!isNaN(num)) nextNumber = num + 1;
+    }
+    return `HOW-${nextNumber}`;
   };
 
-  const handleSubmit = () => {
-    const permits = JSON.parse(localStorage.getItem("permits") || "[]");
-    permits.push({
-      ...formData,
-      id: Date.now(),
-      status: "submitted",
-      jenisForm: "hot-work",
-      submittedAt: new Date().toISOString(),
-    });
-    localStorage.setItem("permits", JSON.stringify(permits));
-    alert("Izin berhasil diajukan!");
-    window.location.href = "/history";
+  const buildRecord = (idForm: string) => {
+    const now = new Date().toISOString();
+    const pelaksanaan = formData.tanggalPelaksanaan
+      ? new Date(formData.tanggalPelaksanaan).toISOString()
+      : null;
+
+    return {
+      id_form: idForm,
+      tanggal: now,
+      tanggal_pelaksanaan: pelaksanaan,
+      no_registrasi: formData.noRegistrasi,
+      nama_kontraktor_nik: formData.namaKontraktor,
+      nama_pekerja_nik: formData.namaPekerjaNIK,
+      lokasi_pekerjaan: formData.lokasi,
+      waktu_pukul: cleanTime(formData.waktuPukul),
+
+      nama_fire_watch: formData.namaFireWatch,
+      nik_fire_watch: formData.namaNIKFireWatch,
+      tanda_tangan_fw: "",
+
+      jabatan_pemberi_izin: formData.jabaranPemberiIzin,
+      nik_pemberi_ijin: formData.namaNIKPemberiIzin,
+
+      preventive_genset_pump_room: formData.jenisPekerjaan.preventive,
+      tangki_solar: formData.jenisPekerjaan.tangki,
+      panel_listrik: formData.jenisPekerjaan.panel,
+
+      detail_cutting: formData.jenisPekerjaan.cutting.detail,
+      t_mulai_cutting: cleanTime(formData.jenisPekerjaan.cutting.mulai),
+      t_selesai_cutting: cleanTime(formData.jenisPekerjaan.cutting.selesai),
+
+      detail_grinding: formData.jenisPekerjaan.grinding.detail,
+      t_mulai_grinding: cleanTime(formData.jenisPekerjaan.grinding.mulai),
+      t_selesai_grinding: cleanTime(formData.jenisPekerjaan.grinding.selesai),
+
+      detail_welding: formData.jenisPekerjaan.welding.detail,
+      t_mulai_welding: cleanTime(formData.jenisPekerjaan.welding.mulai),
+      t_selesai_welding: cleanTime(formData.jenisPekerjaan.welding.selesai),
+
+      detail_painting: formData.jenisPekerjaan.painting.detail,
+      t_mulai_painting: cleanTime(formData.jenisPekerjaan.painting.mulai),
+      t_selesai_painting: cleanTime(formData.jenisPekerjaan.painting.selesai),
+
+      ada_kerja_lainnya: formData.jenisPekerjaan.lainnya,
+      jenis_kerjaan_lainnya: formData.jenisPekerjaan.lainnyaKeterangan,
+
+      ruang_tertutup: formData.areaBerisiko.ruangTertutup,
+      bahan_mudah_terbakar: formData.areaBerisiko.bahanMudah,
+      gas_bejana_tangki: formData.areaBerisiko.gas,
+      height_work: formData.areaBerisiko.ketinggian,
+      cairan_gas_bertekan: formData.areaBerisiko.cairan,
+      cairan_hydrocarbon: formData.areaBerisiko.hydrocarbon,
+      bahaya_lain: formData.areaBerisiko.lain,
+
+      kondisi_tools_baik: formData.pencegahan.equipment === "ya",
+      tersedia_apar_hydrant: formData.pencegahan.apar === "ya",
+      sensor_smoke_detector_non_aktif: formData.pencegahan.sensor === "ya",
+      apd_lengkap: formData.pencegahan.apd === "ya",
+
+      tidak_ada_cairan_mudah_terbakar: formData.pencegahan.meter11_cairan === "ya",
+      lantai_bersih: formData.pencegahan.lantai === "ya",
+      lantai_sudah_dibasahi: formData.pencegahan.lantaiBasah === "ya",
+      cairan_mudah_tebakar_tertutup: formData.pencegahan.cairan_diproteksi === "ya",
+      lembaran_dibawah_pekerjaan: formData.pencegahan.lembaran === "ya",
+      lindungi_conveyor_dll: formData.pencegahan.lindungi_conveyor === "ya",
+
+      alat_telah_bersih: formData.pencegahan.ruang_tertutup_dibersihkan === "ya",
+      uap_menyala_telah_dibuang: formData.pencegahan.uap_dibuang === "ya",
+
+      kerja_pada_dinding_lagit: formData.pencegahan.dinding_konstruksi === "ya",
+      bahan_mudah_terbakar_dipindahkan_dari_dinding: formData.pencegahan.bahan_dipindahkan === "ya",
+
+      fire_watch_memastikan_area_aman: formData.pencegahan.firewatch_ada === "ya",
+      firwatch_terlatih: formData.pencegahan.firewatch_pelatihan === "ya",
+
+      kondisi_fire_blanket: formData.pencegahan.fireblank === "layak",
+      jumlah_fire_blanket: formData.pencegahan.fireblank_jumlah ? Number(formData.pencegahan.fireblank_jumlah) : null,
+      permintaan_tambahan: formData.pencegahan.permintaan_tambahan,
+
+      spv_terkait: formData.persetujuan.spvNama,
+      kontraktor: formData.persetujuan.kontraktorNama,
+      sfo: formData.persetujuan.sfoNama,
+      pga: formData.persetujuan.pgaNama,
+    };
+  };
+
+  const handleSave = async () => {
+    try {
+      const idForm = await generateIdForm();
+      const record = buildRecord(idForm);
+      const { error } = await supabase.from("form-kerja-panas").insert([record]);
+      if (error) throw error;
+      alert(`Draft berhasil disimpan! ID: ${idForm}`);
+    } catch (err: any) {
+      console.error("Error menyimpan ke Supabase:", err);
+      alert("Gagal menyimpan draft: " + (err.message || "Coba lagi nanti."));
+    }
+  };
+
+  const handleSubmit = async () => {
+    try {
+      const idForm = await generateIdForm();
+      const record = buildRecord(idForm);
+      const { error } = await supabase.from("form-kerja-panas").insert([record]);
+      if (error) throw error;
+      alert(`Izin berhasil diajukan! ID: ${idForm}`);
+      window.location.href = "/history";
+    } catch (err: any) {
+      console.error("Error submit ke Supabase:", err);
+      alert("Gagal mengajukan izin: " + (err.message || "Coba lagi nanti."));
+    }
   };
 
   return (
@@ -257,11 +364,10 @@ export default function HotWorkPermitForm() {
         <Section
           title="BAGIAN 1: INFORMASI REGISTRASI & IDENTITAS PEKERJAAN"
           section="bagian1"
-          description="Data registrasi, kontraktor, lokasi, dan waktu pekerjaan"
+          description="Data registrasi, kontraktor, pekerja, lokasi, dan jadwal"
           expanded={expanded}
           toggle={toggle}
         >
-          {/* ... (sama seperti file Anda, tidak diubah) ... */}
           <div className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
@@ -274,26 +380,33 @@ export default function HotWorkPermitForm() {
                   placeholder="HWP-2024-001"
                 />
               </div>
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2">Nama Kontraktor *</label>
-                <input
-                  type="text"
-                  value={formData.namaKontraktor}
-                  onChange={(e) => setFormData({ ...formData, namaKontraktor: e.target.value })}
-                  className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all text-black"
-                />
-              </div>
             </div>
+
+            {/* Nama Kontraktor */}
+            <div>
+              <label className="block text-sm font-semibold text-slate-700 mb-2">Nama Kontraktor *</label>
+              <input
+                type="text"
+                value={formData.namaKontraktor}
+                onChange={(e) => setFormData({ ...formData, namaKontraktor: e.target.value })}
+                className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all text-black"
+                placeholder="Contoh: PT ABC Konstruksi"
+              />
+            </div>
+
+            {/* Nama Pekerja / NIK */}
+            <div>
+              <label className="block text-sm font-semibold text-slate-700 mb-2">Nama Pekerja / NIK *</label>
+              <input
+                type="text"
+                value={formData.namaPekerjaNIK}
+                onChange={(e) => setFormData({ ...formData, namaPekerjaNIK: e.target.value })}
+                className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all text-black"
+                placeholder="Nama lengkap atau NIK pekerja"
+              />
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2">Nama / NIK *</label>
-                <input
-                  type="text"
-                  value={formData.namaNIK}
-                  onChange={(e) => setFormData({ ...formData, namaNIK: e.target.value })}
-                  className="text-black w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all"
-                />
-              </div>
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-2">Lokasi Pekerjaan *</label>
                 <input
@@ -303,49 +416,52 @@ export default function HotWorkPermitForm() {
                   className="text-black w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all"
                 />
               </div>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2">Tanggal *</label>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">Tanggal Pelaksanaan *</label>
                 <input
                   type="date"
-                  value={formData.tanggal}
-                  onChange={(e) => setFormData({ ...formData, tanggal: e.target.value })}
-                  className="text-black w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2">Waktu (Pukul) *</label>
-                <input
-                  type="time"
-                  value={formData.waktuPukul}
-                  onChange={(e) => setFormData({ ...formData, waktuPukul: e.target.value })}
+                  value={formData.tanggalPelaksanaan}
+                  onChange={(e) => setFormData({ ...formData, tanggalPelaksanaan: e.target.value })}
                   className="text-black w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all"
                 />
               </div>
             </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-slate-700 mb-2">Waktu (Pukul)</label>
+              <input
+                type="time"
+                value={formData.waktuPukul}
+                onChange={(e) => setFormData({ ...formData, waktuPukul: e.target.value })}
+                className="text-black w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all"
+              />
+            </div>
+
+            {/* Fire Watch - Responsive Layout (Stacked) */}
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mt-4">
               <h4 className="font-bold text-blue-900 text-sm mb-4">Fire Watch (Pengawas Api)</h4>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="text-black block text-sm font-semibold text-slate-700 mb-2">Nama Fire Watch *</label>
-                  <input
-                    type="text"
-                    value={formData.namaFireWatch}
-                    onChange={(e) => setFormData({ ...formData, namaFireWatch: e.target.value })}
-                    className="text-black w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                  />
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <label className="text-black block text-sm font-semibold text-slate-700 mb-2">Nama Fire Watch *</label>
+                    <input
+                      type="text"
+                      value={formData.namaFireWatch}
+                      onChange={(e) => setFormData({ ...formData, namaFireWatch: e.target.value })}
+                      className="text-black w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-700 mb-2">Nama / NIK Fire Watch *</label>
+                    <input
+                      type="text"
+                      value={formData.namaNIKFireWatch}
+                      onChange={(e) => setFormData({ ...formData, namaNIKFireWatch: e.target.value })}
+                      className="text-black w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                    />
+                  </div>
                 </div>
                 <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-2">Nama / NIK Fire Watch *</label>
-                  <input
-                    type="text"
-                    value={formData.namaNIKFireWatch}
-                    onChange={(e) => setFormData({ ...formData, namaNIKFireWatch: e.target.value })}
-                    className="text-black w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                  />
-                </div>
-                <div className="col-span-2">
                   <label className="block text-sm font-semibold text-slate-700 mb-2">Tanda Tangan Fire Watch</label>
                   <div className="bg-slate-50 border-2 border-dashed border-slate-300 rounded-lg p-6 text-center text-xs text-slate-600 min-h-24 flex items-center justify-center">
                     [Tanda Tangan]
@@ -353,9 +469,12 @@ export default function HotWorkPermitForm() {
                 </div>
               </div>
             </div>
+
+            {/* Pemberi Izin - Responsive Layout (Stacked) */}
             <div className="bg-green-50 border border-green-200 rounded-lg p-4">
               <h4 className="font-bold text-green-900 text-sm mb-4">Pemberi Izin</h4>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                   <label className="block text-sm font-semibold text-slate-700 mb-2">Jabatan Pemberi Izin *</label>
                   <input
@@ -375,7 +494,9 @@ export default function HotWorkPermitForm() {
                     className="text-black w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all"
                   />
                 </div>
-                <div className="col-span-2">
+              </div>
+
+                <div>
                   <label className="block text-sm font-semibold text-slate-700 mb-2">Tanda Tangan Pemberi Izin</label>
                   <div className="bg-slate-50 border-2 border-dashed border-slate-300 rounded-lg p-6 text-center text-xs text-slate-600 min-h-24 flex items-center justify-center">
                     [Tanda Tangan]
@@ -424,7 +545,7 @@ export default function HotWorkPermitForm() {
               </div>
             </div>
 
-            {/* ✅ B. Detail Pekerjaan Panas — DIPERBAIKI */}
+            {/* B. Detail Pekerjaan Panas — WAKTU TIDAK WAJIB */}
             <div>
               <h4 className="font-bold text-slate-900 text-base mb-4 pb-3 border-b border-slate-200">
                 B. Detail Pekerjaan Panas (Jelaskan & Waktu Pukul)
@@ -598,7 +719,7 @@ export default function HotWorkPermitForm() {
           </div>
         </Section>
 
-        {/* BAGIAN 3: UPAYA PENCEGAHAN — SAMA SEPERTI FILE ANDA */}
+        {/* BAGIAN 3: UPAYA PENCEGAHAN */}
         <Section
           title="BAGIAN 3: HAL-HAL YANG PERLU DIPERHATIKAN SEBAGAI UPAYA PENCEGAHAN"
           section="bagian3"

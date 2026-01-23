@@ -29,15 +29,15 @@ import {
   ResponsiveContainer,
   Cell,
 } from "recharts";
+import { supabase } from "@/lib/supabase";
 
 interface Permit {
-  id: number;
+  id: string;
   noRegistrasi?: string;
   status: "draft" | "submitted" | "approved" | "rejected";
-  jenisForm?: "hot-work" | "workshop" | "height-work";
-  tanggal?: string;
-  submittedAt?: string;
-  [key: string]: any;
+  jenisForm: "hot-work" | "workshop" | "height-work";
+  tanggal: string; // ✅ INI adalah timestamp saat form disimpan (pengisian)
+  // submittedAt tidak digunakan untuk grafik
 }
 
 type Period = "daily" | "weekly" | "monthly" | "yearly";
@@ -45,49 +45,91 @@ type JenisForm = "hot-work" | "height-work" | "workshop" | null;
 
 export default function DashboardPage() {
   const [permits, setPermits] = useState<Permit[]>([]);
-  const [allSubmittedPermits, setAllSubmittedPermits] = useState<Permit[]>([]);
   const [selectedYear, setSelectedYear] = useState<string>("");
   const [selectedMonth, setSelectedMonth] = useState<string>("");
   const [selectedDay, setSelectedDay] = useState<string>("");
   const [period, setPeriod] = useState<Period>("monthly");
   const [availableYears, setAvailableYears] = useState<string[]>([]);
-  const [selectedJenisForm, setSelectedJenisForm] = useState<JenisForm>(null); // 🔹 State baru
+  const [selectedJenisForm, setSelectedJenisForm] = useState<JenisForm>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     loadPermits();
   }, []);
 
-  const loadPermits = () => {
-    const storedPermits = JSON.parse(localStorage.getItem("permits") || "[]");
-    const storedDrafts = JSON.parse(localStorage.getItem("permitDrafts") || "[]");
-    const allPermits = [...storedPermits, ...storedDrafts];
+  const loadPermits = async () => {
+    setLoading(true);
+    try {
+      const { data: hotWorkData, error: hotWorkError } = await supabase
+        .from("form-kerja-panas")
+        .select("*");
 
-    const filteredAll = allPermits.filter((p: Permit) => p.status !== "draft");
-    setPermits(filteredAll);
-    setAllSubmittedPermits(filteredAll);
+      const { data: workshopData, error: workshopError } = await supabase
+        .from("form_kerja_workshop")
+        .select("*");
 
-    const years = new Set<string>();
-    filteredAll.forEach((p) => {
-      const dateStr = p.submittedAt || p.tanggal;
-      if (dateStr) {
-        const date = new Date(dateStr);
-        if (!isNaN(date.getTime())) {
-          years.add(date.getFullYear().toString());
-        }
+      const { data: heightWorkData, error: heightWorkError } = await supabase
+        .from("form-kerja-ketinggian")
+        .select("*");
+
+      if (hotWorkError || workshopError || heightWorkError) {
+        console.error("Error fetching permits:", { hotWorkError, workshopError, heightWorkError });
+        alert("Gagal memuat data dashboard.");
+        return;
       }
-    });
 
-    const sortedYears = Array.from(years).sort().reverse();
-    setAvailableYears(sortedYears);
-    if (sortedYears.length > 0) {
-      setSelectedYear(sortedYears[0]);
+      const mappedHotWork = (hotWorkData || []).map((item) => ({
+        ...item,
+        id: item.id_form,
+        jenisForm: "hot-work" as const,
+        status: "submitted" as const,
+      }));
+
+      const mappedWorkshop = (workshopData || []).map((item) => ({
+        ...item,
+        id: item.id_form,
+        jenisForm: "workshop" as const,
+        status: "submitted" as const,
+      }));
+
+      const mappedHeightWork = (heightWorkData || []).map((item) => ({
+        ...item,
+        id: item.id_form,
+        jenisForm: "height-work" as const,
+        status: "submitted" as const,
+      }));
+
+      const allPermits = [...mappedHotWork, ...mappedWorkshop, ...mappedHeightWork];
+      setPermits(allPermits);
+
+      // Ekstrak tahun dari kolom `tanggal`
+      const years = new Set<string>();
+      allPermits.forEach((p) => {
+        if (p.tanggal) {
+          const date = new Date(p.tanggal);
+          if (!isNaN(date.getTime())) {
+            years.add(date.getFullYear().toString());
+          }
+        }
+      });
+
+      const sortedYears = Array.from(years).sort().reverse();
+      setAvailableYears(sortedYears);
+      if (sortedYears.length > 0) {
+        setSelectedYear(sortedYears[0]);
+      }
+    } catch (err) {
+      console.error("Unexpected error:", err);
+      alert("Terjadi kesalahan saat memuat data.");
+    } finally {
+      setLoading(false);
     }
   };
 
+  // ✅ Gunakan hanya `tanggal` (waktu pengisian)
   const getPermitDate = (permit: Permit): Date | null => {
-    const dateStr = permit.submittedAt || permit.tanggal;
-    if (!dateStr) return null;
-    const date = new Date(dateStr);
+    if (!permit.tanggal) return null;
+    const date = new Date(permit.tanggal);
     return isNaN(date.getTime()) ? null : date;
   };
 
@@ -96,10 +138,8 @@ export default function DashboardPage() {
     return day === 0 ? 6 : day - 1;
   };
 
-  // 🔹 Filter berdasarkan waktu DAN jenis izin
   const filteredPermits = useMemo(() => {
     return permits.filter((p) => {
-      // Filter by time
       const date = getPermitDate(p);
       if (!date || !selectedYear) return false;
 
@@ -120,7 +160,6 @@ export default function DashboardPage() {
         }
       }
 
-      // 🔹 Filter by jenisForm
       if (selectedJenisForm && p.jenisForm !== selectedJenisForm) {
         return false;
       }
@@ -212,7 +251,6 @@ export default function DashboardPage() {
     return data;
   }, [filteredPermits, period, selectedMonth, selectedYear]);
 
-  // 🔹 Bar chart now uses filteredPermits instead of allSubmittedPermits
   const getBarChartData = useMemo(() => {
     const hotWorkCount = filteredPermits.filter(
       (p) => p.jenisForm === "hot-work"
@@ -283,14 +321,23 @@ export default function DashboardPage() {
     "Juli", "Agustus", "September", "Oktober", "November", "Desember"
   ];
 
-  // 🔹 Toggle function for card click
   const toggleJenisForm = (jenis: "hot-work" | "height-work" | "workshop") => {
     setSelectedJenisForm(selectedJenisForm === jenis ? null : jenis);
   };
 
-  // 🔹 Helper to check if a card is active
   const isActive = (jenis: "hot-work" | "height-work" | "workshop") =>
     selectedJenisForm === jenis;
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-100">
+        <div className="text-center">
+          <div className="inline-block animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-orange-600"></div>
+          <p className="mt-4 text-gray-600">Memuat data dashboard...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-100">
@@ -424,7 +471,6 @@ export default function DashboardPage() {
 
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-10">
-          {/* Total Permintaan Izin */}
           <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
             <div className="flex items-start justify-between">
               <div>
@@ -438,7 +484,6 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* Hot Work */}
           <div
             onClick={() => toggleJenisForm("hot-work")}
             className={`bg-white rounded-lg shadow-sm p-6 border cursor-pointer transition-all ${
@@ -461,7 +506,6 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* Height Work */}
           <div
             onClick={() => toggleJenisForm("height-work")}
             className={`bg-white rounded-lg shadow-sm p-6 border cursor-pointer transition-all ${
@@ -484,7 +528,6 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* Workshop */}
           <div
             onClick={() => toggleJenisForm("workshop")}
             className={`bg-white rounded-lg shadow-sm p-6 border cursor-pointer transition-all ${
@@ -510,10 +553,9 @@ export default function DashboardPage() {
 
         {/* Charts Grid */}
         <div className="grid grid-cols-1 gap-6 mb-10">
-          {/* Line Chart - Full Width */}
           <div className="lg:col-span-1 bg-white rounded-lg shadow-sm p-6 border border-gray-200">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">
-              Tren Permintaan Izin
+              Tren Permintaan Izin (Berdasarkan Tanggal Pengisian)
             </h3>
             <div className="h-72">
               <ResponsiveContainer width="100%" height="100%">
@@ -568,13 +610,10 @@ export default function DashboardPage() {
           </div>
         </div>
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-10">
-          {/* Pie Chart */}
           <div className="lg:col-span-1 bg-white rounded-lg shadow-sm p-6 border border-gray-200 h-full flex flex-col">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">
               Distribusi Jenis Izin
             </h3>
-
-            {/* Chart */}
             <div className="flex-1 min-h-[260px]">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
@@ -600,8 +639,6 @@ export default function DashboardPage() {
                 </PieChart>
               </ResponsiveContainer>
             </div>
-
-            {/* Legend */}
             <div className="mt-4 space-y-2">
               <div className="flex items-center justify-between text-sm">
                 <span className="text-gray-600">Hot Work</span>
@@ -618,12 +655,10 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* Bar Chart */}
           <div className="lg:col-span-2 bg-white rounded-lg shadow-sm p-6 border border-gray-200 h-full flex flex-col">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">
               Perbandingan Jenis Izin
             </h3>
-
             <div className="flex-1 min-h-[260px]">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={getBarChartData}>

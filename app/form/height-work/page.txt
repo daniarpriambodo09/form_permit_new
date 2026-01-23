@@ -1,66 +1,54 @@
 // app/form/height-work/page.tsx
 "use client";
+
 import { useState } from "react";
 import Link from "next/link";
-import {
-  ChevronDown,
-  ChevronUp,
-  Home,
-  AlertCircle,
-  Save,
-  Send,
-} from "lucide-react";
-import { supabase } from "@/lib/supabase";
-
-// Helper: Konversi string waktu/angka kosong → null
-const cleanTime = (timeStr: string): string | null => {
-  return timeStr === "" ? null : timeStr;
-};
-
-const cleanNumber = (numStr: string): number | null => {
-  const num = parseFloat(numStr);
-  return isNaN(num) ? null : num;
-};
+import { ChevronDown, ChevronUp, Home, AlertCircle, Save, Send } from "lucide-react";
 
 interface FormData {
-  // Bagian 1
+  // Bagian 1: Informasi Petugas Ketinggian
   tipePerusahaan: "eksternal" | "internal";
   deskripsiPekerjaan: string;
   lokasi: string;
-  tanggalPelaksanaan: string;
+  tanggal: string;
   waktuMulai: string;
   waktuSelesai: string;
   namaPengawasKontraktor: string;
   namaPetugas: string[];
-  berbadanSehat: boolean[];
+  berbadanSehat: string[];
 
-  // Bagian 2
+  // Bagian 2: Peminjaman Tangga Listrik
   kunceePagar: boolean;
   rompiKetinggian: boolean;
   rompiAngka: string;
   safetyHelmetCount: string;
   fullBodyHarnessCount: string;
 
-  // Bagian 3
-  areaKerjaAman: boolean;
-  kebakaranProcedure: boolean;
-  pekerjaanListrik: boolean;
-  prosedurLoto: boolean;
-  perisakArea: boolean;
-  safetyLineLine: boolean;
-  alatBantuKerja: boolean;
-  rompiSaatBekerja: boolean;
+  // Bagian 3: Pekerjaan Beresiko Tinggi
+  areaKerjaAman: "ya" | "tidak" | "";
+  kebakaranProcedure: "ya" | "tidak" | "";
+  pekerjaanListrik: "ya" | "tidak" | "";
+  prosedurLoto: "ya" | "tidak" | "";
+  perisakArea: "ya" | "tidak" | "";
+  safetyLineLine: "ya" | "tidak" | "";
+  alatBantuKerja: "ya" | "tidak" | "";
+  rompiSaatBekerja: "ya" | "tidak" | "";
 
-  // Bagian 4 & 5
-  bebanBeratTubuh: boolean;
-  helmStandar: boolean;
-  rambuSafetyWarning: boolean;
-  bodyHarnessWebbing: boolean;
-  bodyHarnessDRing: boolean;
-  bodyHarnessAdjustment: boolean;
-  lanyardAbsorber: boolean;
-  lanyardSnapHook: boolean;
-  lanyardRope: boolean;
+  // Bagian 4: Alat Pelindung Diri
+  bebanBeratTubuh: "ya" | "tidak" | "";
+  helmStandar: "ya" | "tidak" | "";
+  rambuSafetyWarning: "ya" | "tidak" | "";
+  bodyHarnessWebbing: "ya" | "tidak" | "";
+  bodyHarnessDRing: "ya" | "tidak" | "";
+  bodyHarnessAdjustment: "ya" | "tidak" | "";
+  lanyardAbsorber: "ya" | "tidak" | "";
+  lanyardSnapHook: "ya" | "tidak" | "";
+  lanyardRope: "ya" | "tidak" | "";
+
+  // Bagian 5: Point Pengecekan
+  kuncePagarAngka: string;
+  helmetAngka: string;
+  harnessAngka: string;
 
   // Persetujuan
   persetujuan: {
@@ -91,27 +79,35 @@ const Section = ({ title, section, children, description, expanded, toggle }: an
   </div>
 );
 
-const CheckboxGroup = ({ labelKiri, count, items, onChangeName, onChangeSehat }: any) => (
+const CheckboxGroup = ({ labelKiri, labelKanan, count, items, onChange }: any) => (
   <div className="space-y-3">
-    <label className="block text-sm font-semibold text-slate-700 mb-2">{labelKiri}</label>
+    <div className="flex items-center gap-3">
+      <label className="flex-1 text-sm font-semibold text-slate-700">{labelKiri}</label>
+      <label className="min-w-[120px] text-sm font-semibold text-slate-700 text-center">{labelKanan}</label>
+    </div>
     {Array.from({ length: count }).map((_, index) => (
       <div key={index} className="flex items-center gap-3">
         <input
           type="text"
-          placeholder={`Nama Petugas ${index + 1}`}
+          placeholder={`${labelKiri} ${index + 1}`}
           className="flex-1 px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent outline-none"
-          value={items[index]?.name || ""}
-          onChange={(e) => onChangeName(index, e.target.value)}
+          value={items[index] || ""}
+          onChange={(e) => {
+            const newItems = [...items];
+            newItems[index] = e.target.value;
+            onChange(newItems);
+          }}
         />
-        <label className="flex items-center gap-2 text-sm">
-          <input
-            type="checkbox"
-            checked={items[index]?.sehat || false}
-            onChange={(e) => onChangeSehat(index, e.target.checked)}
-            className="w-4 h-4 text-orange-600 rounded border-slate-400 focus:ring-2 focus:ring-orange-500"
-          />
-          Berbadan Sehat
-        </label>
+        <div className="flex items-center justify-center gap-4 min-w-[120px]">
+          <label className="flex items-center gap-1 text-sm font-medium">
+            <input type="checkbox" className="w-4 h-4" />
+            YA
+          </label>
+          <label className="flex items-center gap-1 text-sm font-medium">
+            <input type="checkbox" className="w-4 h-4" />
+            TIDAK
+          </label>
+        </div>
       </div>
     ))}
   </div>
@@ -119,15 +115,15 @@ const CheckboxGroup = ({ labelKiri, count, items, onChangeName, onChangeSehat }:
 
 const YesNoCheckbox = ({ label, value, onChange }: any) => (
   <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-200">
-    <span className="text-sm font-medium text-slate-700">{label}</span>
+    <label className="text-sm font-medium text-slate-700">{label}</label>
     <div className="flex items-center gap-4">
       <label className="flex items-center gap-1 cursor-pointer">
         <input
           type="radio"
           name={label}
           value="ya"
-          checked={value === true}
-          onChange={() => onChange(true)}
+          checked={value === "ya"}
+          onChange={(e) => onChange(e.target.value)}
           className="w-4 h-4 text-orange-600"
         />
         <span className="text-sm">YA</span>
@@ -137,8 +133,8 @@ const YesNoCheckbox = ({ label, value, onChange }: any) => (
           type="radio"
           name={label}
           value="tidak"
-          checked={value === false}
-          onChange={() => onChange(false)}
+          checked={value === "tidak"}
+          onChange={(e) => onChange(e.target.value)}
           className="w-4 h-4 text-orange-600"
         />
         <span className="text-sm">TIDAK</span>
@@ -168,34 +164,42 @@ export default function HeightWorkPermitForm() {
     tipePerusahaan: "internal",
     deskripsiPekerjaan: "",
     lokasi: "",
-    tanggalPelaksanaan: "",
+    tanggal: "",
     waktuMulai: "",
     waktuSelesai: "",
     namaPengawasKontraktor: "",
-    namaPetugas: Array(10).fill(""),
-    berbadanSehat: Array(10).fill(false),
+    namaPetugas: ["", "", "", "", ""],
+    berbadanSehat: ["", "", "", "", "", "", "", "", "", ""],
+
     kunceePagar: false,
     rompiKetinggian: false,
     rompiAngka: "",
     safetyHelmetCount: "",
     fullBodyHarnessCount: "",
-    areaKerjaAman: false,
-    kebakaranProcedure: false,
-    pekerjaanListrik: false,
-    prosedurLoto: false,
-    perisakArea: false,
-    safetyLineLine: false,
-    alatBantuKerja: false,
-    rompiSaatBekerja: false,
-    bebanBeratTubuh: false,
-    helmStandar: false,
-    rambuSafetyWarning: false,
-    bodyHarnessWebbing: false,
-    bodyHarnessDRing: false,
-    bodyHarnessAdjustment: false,
-    lanyardAbsorber: false,
-    lanyardSnapHook: false,
-    lanyardRope: false,
+
+    areaKerjaAman: "",
+    kebakaranProcedure: "",
+    pekerjaanListrik: "",
+    prosedurLoto: "",
+    perisakArea: "",
+    safetyLineLine: "",
+    alatBantuKerja: "",
+    rompiSaatBekerja: "",
+
+    bebanBeratTubuh: "",
+    helmStandar: "",
+    rambuSafetyWarning: "",
+    bodyHarnessWebbing: "",
+    bodyHarnessDRing: "",
+    bodyHarnessAdjustment: "",
+    lanyardAbsorber: "",
+    lanyardSnapHook: "",
+    lanyardRope: "",
+
+    kuncePagarAngka: "",
+    helmetAngka: "",
+    harnessAngka: "",
+
     persetujuan: {
       spvNama: "",
       kontraktorNama: "",
@@ -204,7 +208,6 @@ export default function HeightWorkPermitForm() {
     },
   });
 
-  // ✅ Perbaikan: Gunakan state boolean terpisah untuk setiap bagian
   const [expanded, setExpanded] = useState({
     bagian1: true,
     bagian2: true,
@@ -214,134 +217,34 @@ export default function HeightWorkPermitForm() {
     persetujuan: true,
   });
 
-  const toggle = (section: string) => {
-    setExpanded((prev) => ({
-      ...prev,
-      [section]: !prev[section as keyof typeof prev],
-    }));
+  const toggle = (section: string) =>
+    setExpanded((prev) => ({ ...prev, [section]: !prev[section as keyof typeof prev] }));
+
+  const handleSave = () => {
+    const drafts = JSON.parse(localStorage.getItem("permitDrafts") || "[]");
+    drafts.push({
+      ...formData,
+      id: Date.now(),
+      status: "draft",
+      jenisForm: "height-work",
+      createdAt: new Date().toISOString(),
+    });
+    localStorage.setItem("permitDrafts", JSON.stringify(drafts));
+    alert("Draft berhasil disimpan!");
   };
 
-  // Generate ID: HEW-1000, HEW-1001, ...
-  const generateIdForm = async (): Promise<string> => {
-    const { data, error } = await supabase
-      .from("form-kerja-ketinggian")
-      .select("id_form", { count: "exact" })
-      .order("id_form", { ascending: false })
-      .limit(1);
-
-    if (error) throw error;
-
-    let nextNumber = 1000;
-    if (data && data.length > 0) {
-      const lastId = data[0].id_form;
-      const num = parseInt(lastId.replace("HEW-", ""), 10);
-      if (!isNaN(num)) nextNumber = num + 1;
-    }
-    return `HEW-${nextNumber}`;
-  };
-
-  const buildRecord = (idForm: string) => {
-    const now = new Date().toISOString(); // Waktu saat ini (untuk kolom `tanggal`)
-    const pelaksanaan = formData.tanggalPelaksanaan
-      ? new Date(formData.tanggalPelaksanaan).toISOString()
-      : null;
-
-    return {
-      id_form: idForm,
-      tanggal: now,
-      tanggal_pelaksanaan: pelaksanaan,
-      petugas_ketinggian: formData.tipePerusahaan === "eksternal" ? "Eksternal / Subkontraktor" : "Internal / Karyawan PT.JAI",
-      deskripsi_pekerjaan: formData.deskripsiPekerjaan,
-      lokasi: formData.lokasi,
-      waktu_mulai: cleanTime(formData.waktuMulai),
-      waktu_selesai: cleanTime(formData.waktuSelesai),
-      nama_pengawas_kontraktor: formData.namaPengawasKontraktor,
-
-      // Petugas 1–10
-      nama_petugas_1: formData.namaPetugas[0] || null,
-      petugas_1_sehat: formData.berbadanSehat[0],
-      nama_petugas_2: formData.namaPetugas[1] || null,
-      petugas_2_sehat: formData.berbadanSehat[1],
-      nama_petugas_3: formData.namaPetugas[2] || null,
-      petugas_3_sehat: formData.berbadanSehat[2],
-      nama_petugas_4: formData.namaPetugas[3] || null,
-      petugas_4_sehat: formData.berbadanSehat[3],
-      nama_petugas_5: formData.namaPetugas[4] || null,
-      petugas_5_sehat: formData.berbadanSehat[4],
-      nama_petugas_6: formData.namaPetugas[5] || null,
-      petugas_6_sehat: formData.berbadanSehat[5],
-      nama_petugas_7: formData.namaPetugas[6] || null,
-      petugas_7_sehat: formData.berbadanSehat[6],
-      nama_petugas_8: formData.namaPetugas[7] || null,
-      petugas_8_sehat: formData.berbadanSehat[7],
-      nama_petugas_9: formData.namaPetugas[8] || null,
-      petugas_9_sehat: formData.berbadanSehat[8],
-      nama_petugas_10: formData.namaPetugas[9] || null,
-      petugas_10_sehat: formData.berbadanSehat[9],
-
-      // Peminjaman APD
-      ada_kunci_pagar: formData.kunceePagar,
-      ada_rompi_ketinggian: formData.rompiKetinggian,
-      no_rompi: cleanNumber(formData.rompiAngka),
-      ada_safety_helmet: formData.safetyHelmetCount !== "",
-      jumlah_safety_helmet: cleanNumber(formData.safetyHelmetCount),
-      ada_full_body_harmess: formData.fullBodyHarnessCount !== "",
-      jumlah_full_body_harness: cleanNumber(formData.fullBodyHarnessCount),
-
-      // Pekerjaan Berisiko Tinggi
-      area_diperiksa_aman: formData.areaKerjaAman,
-      paham_cara_menggunakan_alat_pemadam_kebakaran: formData.kebakaranProcedure,
-      ada_kerja_listrik: formData.pekerjaanListrik,
-      prosedur_LOTO: formData.prosedurLoto,
-      menutupi_area_bawah_prisai: formData.perisakArea,
-      safetyline_tersedia: formData.safetyLineLine,
-      alat_bantu_kerja_aman: formData.alatBantuKerja,
-      menggunakan_rompi: formData.rompiSaatBekerja,
-
-      // APD & Pengecekan
-      beban_tidak_5kg: formData.bebanBeratTubuh,
-      helm_sesuai_sop: formData.helmStandar,
-      rambu2_tersedia: formData.rambuSafetyWarning,
-      webbing_kondisi_baik: formData.bodyHarnessWebbing,
-      dring_kondisi_baik: formData.bodyHarnessDRing,
-      gesper_kondisi_baik: formData.bodyHarnessAdjustment,
-      absorter_dan_timbes_kondisi_baik: formData.lanyardAbsorber,
-      snap_hook_kondisi_baik: formData.lanyardSnapHook,
-      rope_lanyard_kondisi_baik: formData.lanyardRope,
-
-      // Persetujuan
-      spv_terkait: formData.persetujuan.spvNama,
-      nama_kontraktor: formData.persetujuan.kontraktorNama,
-      sfo: formData.persetujuan.sfoNama,
-      mr_pga_mgr: formData.persetujuan.mrPgaNama,
-    };
-  };
-
-  const handleSave = async () => {
-    try {
-      const idForm = await generateIdForm();
-      const record = buildRecord(idForm);
-      const { error } = await supabase.from("form-kerja-ketinggian").insert([record]);
-      if (error) throw error;
-      alert(`Draft berhasil disimpan! ID: ${idForm}`);
-    } catch (err: any) {
-      console.error("Error menyimpan ke Supabase:", err);
-      alert("Gagal menyimpan draft: " + (err.message || "Coba lagi nanti."));
-    }
-  };
-
-  const handleSubmit = async () => {
-    try {
-      const idForm = await generateIdForm();
-      const record = buildRecord(idForm);
-      const { error } = await supabase.from("form-kerja-ketinggian").insert([record]);
-      if (error) throw error;
-      alert(`Izin berhasil diajukan! ID: ${idForm}`);
-      window.location.href = "/history";
-    } catch (err: any) {
-      console.error("Error submit ke Supabase:", err);
-      alert("Gagal mengajukan izin: " + (err.message || "Coba lagi nanti."));
-    }
+  const handleSubmit = () => {
+    const permits = JSON.parse(localStorage.getItem("permits") || "[]");
+    permits.push({
+      ...formData,
+      id: Date.now(),
+      status: "submitted",
+      jenisForm: "height-work",
+      submittedAt: new Date().toISOString(),
+    });
+    localStorage.setItem("permits", JSON.stringify(permits));
+    alert("Izin berhasil diajukan!");
+    window.location.href = "/history";
   };
 
   return (
@@ -374,6 +277,7 @@ export default function HeightWorkPermitForm() {
         </div>
       </div>
 
+      {/* Main Content */}
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-6 flex items-start space-x-3">
           <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
@@ -385,7 +289,7 @@ export default function HeightWorkPermitForm() {
           </div>
         </div>
 
-        {/* BAGIAN 1 */}
+        {/* Bagian 1 */}
         <Section
           title="BAGIAN 1: INFORMASI PETUGAS KETINGGIAN"
           section="bagian1"
@@ -394,6 +298,7 @@ export default function HeightWorkPermitForm() {
           toggle={toggle}
         >
           <div className="space-y-6">
+            {/* Tipe Perusahaan */}
             <div>
               <label className="block text-sm font-semibold text-slate-700 mb-3">Informasi Petugas Ketinggian</label>
               <div className="flex gap-6">
@@ -418,6 +323,7 @@ export default function HeightWorkPermitForm() {
               </div>
             </div>
 
+            {/* Grid 2 Kolom */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-2">Deskripsi Pekerjaan *</label>
@@ -441,18 +347,19 @@ export default function HeightWorkPermitForm() {
               </div>
             </div>
 
+            {/* Tanggal & Waktu */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2">Tanggal Pelaksanaan *</label>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">Tanggal *</label>
                 <input
                   type="date"
                   className="text-black w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent outline-none"
-                  value={formData.tanggalPelaksanaan}
-                  onChange={(e) => setFormData({ ...formData, tanggalPelaksanaan: e.target.value })}
+                  value={formData.tanggal}
+                  onChange={(e) => setFormData({ ...formData, tanggal: e.target.value })}
                 />
               </div>
               <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2">Waktu Mulai (Pukul)</label>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">Waktu Mulai (Pukul) *</label>
                 <input
                   type="time"
                   className="text-black w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent outline-none"
@@ -461,7 +368,7 @@ export default function HeightWorkPermitForm() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2">Waktu Selesai</label>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">Waktu Selesai *</label>
                 <input
                   type="time"
                   className="text-black w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent outline-none"
@@ -471,6 +378,7 @@ export default function HeightWorkPermitForm() {
               </div>
             </div>
 
+            {/* Nama Pengawas Kontraktor */}
             <div>
               <label className="block text-sm font-semibold text-slate-700 mb-2">Nama Pengawas Kontraktor *</label>
               <input
@@ -482,30 +390,20 @@ export default function HeightWorkPermitForm() {
               />
             </div>
 
-            <div>
+            {/* Nama Petugas dan Berbadan Sehat */}
+            <div className="md:col-span-2">
               <CheckboxGroup
-                labelKiri="Nama Petugas Ketinggian & Status Kesehatan"
+                labelKiri="Nama Petugas Ketinggian"
+                labelKanan="Berbadan Sehat"
                 count={10}
-                items={formData.namaPetugas.map((name, i) => ({
-                  name,
-                  sehat: formData.berbadanSehat[i],
-                }))}
-                onChangeName={(index: number, name: string) => {
-                  const newNames = [...formData.namaPetugas];
-                  newNames[index] = name;
-                  setFormData({ ...formData, namaPetugas: newNames });
-                }}
-                onChangeSehat={(index: number, sehat: boolean) => {
-                  const newSehat = [...formData.berbadanSehat];
-                  newSehat[index] = sehat;
-                  setFormData({ ...formData, berbadanSehat: newSehat });
-                }}
+                items={formData.namaPetugas}
+                onChange={(newItems: string[]) => setFormData({ ...formData, namaPetugas: newItems })}
               />
             </div>
           </div>
         </Section>
 
-        {/* BAGIAN 2 */}
+        {/* Bagian 2 */}
         <Section
           title="BAGIAN 2: PEMINJAMAN TANGGA LISTRIK / AWP"
           section="bagian2"
@@ -514,6 +412,7 @@ export default function HeightWorkPermitForm() {
           toggle={toggle}
         >
           <div className="space-y-6">
+            {/* Input Vertikal Sesuai Gambar */}
             <div className="space-y-4">
               <div className="flex items-center gap-4">
                 <input
@@ -524,6 +423,7 @@ export default function HeightWorkPermitForm() {
                 />
                 <span className="text-sm font-medium">Kunci Pagar Tangga Listrik</span>
               </div>
+
               <div className="flex items-center gap-4">
                 <input
                   type="checkbox"
@@ -541,6 +441,7 @@ export default function HeightWorkPermitForm() {
                   onChange={(e) => setFormData({ ...formData, rompiAngka: e.target.value })}
                 />
               </div>
+
               <div className="flex items-center gap-4">
                 <input
                   type="checkbox"
@@ -564,6 +465,7 @@ export default function HeightWorkPermitForm() {
                   onChange={(e) => setFormData({ ...formData, safetyHelmetCount: e.target.value })}
                 />
               </div>
+
               <div className="flex items-center gap-4">
                 <input
                   type="checkbox"
@@ -588,20 +490,21 @@ export default function HeightWorkPermitForm() {
                 />
               </div>
             </div>
+
             <div className="bg-orange-50 border border-orange-200 rounded-lg p-4 space-y-2 text-sm text-slate-700">
               <p className="font-semibold">Point Penting:</p>
               <ul className="list-disc list-inside space-y-1">
                 <li>Tangga listrik / AWP tidak bisa digunakan diluar di gedung saat hujan</li>
                 <li>Setelah penggunaan tangga listrik selesai, segera mengembalikan kunci pagar tangga listrik dan APD</li>
                 <li>Harap menjaga kebersihan tangga listrik setelah pemakaian</li>
-                <li>Pastikan beban tidak melebihi kapasitas maksimal safety line = 150 kg</li>
-                <li>Penggunaan tangga listrik / AWP harus sesuai operasional standar dan wajib mengenakan APD</li>
+                <li>pastikan beban tidak melebihi kapasitas maksimal safety line = 150 kg</li>
+                <li>penggunaan tangga listrik / AWP harus sesuai operasion standart dan wajib mengenakan APD</li>
               </ul>
             </div>
           </div>
         </Section>
 
-        {/* BAGIAN 3 */}
+        {/* Bagian 3 */}
         <Section
           title="BAGIAN 3: PEKERJAAN BERESIKO TINGGI"
           section="bagian3"
@@ -613,47 +516,47 @@ export default function HeightWorkPermitForm() {
             <YesNoCheckbox
               label="Apakah area kerja telah diperiksa dan aman untuk digunakan"
               value={formData.areaKerjaAman}
-              onChange={(val : any) => setFormData({ ...formData, areaKerjaAman: val })}
+              onChange={(val: string) => setFormData({ ...formData, areaKerjaAman: val as "ya" | "tidak" | "" })}
             />
             <YesNoCheckbox
-              label="Jika Terjadi Kebakaran, apakah paham cara menggunakan alat pemadam kebakaran"
+              label="Jika Terjadi Kebakaran, apakah pahami cara menggunakan alat pemadam kebakaran"
               value={formData.kebakaranProcedure}
-              onChange={(val : any) => setFormData({ ...formData, kebakaranProcedure: val })}
+              onChange={(val: string) => setFormData({ ...formData, kebakaranProcedure: val as "ya" | "tidak" | "" })}
             />
             <YesNoCheckbox
               label="Apakah Ada pekerjaan Listrik"
               value={formData.pekerjaanListrik}
-              onChange={(val : any) => setFormData({ ...formData, pekerjaanListrik: val })}
+              onChange={(val: string) => setFormData({ ...formData, pekerjaanListrik: val as "ya" | "tidak" | "" })}
             />
             <YesNoCheckbox
               label="Melakukan prosedur LOTO"
               value={formData.prosedurLoto}
-              onChange={(val : any) => setFormData({ ...formData, prosedurLoto: val })}
+              onChange={(val: string) => setFormData({ ...formData, prosedurLoto: val as "ya" | "tidak" | "" })}
             />
             <YesNoCheckbox
               label="Menutupi area dibawah dan sekitar dengan perisai yang tidak mudah dibakar"
               value={formData.perisakArea}
-              onChange={(val : any) => setFormData({ ...formData, perisakArea: val })}
+              onChange={(val: string) => setFormData({ ...formData, perisakArea: val as "ya" | "tidak" | "" })}
             />
             <YesNoCheckbox
               label="Apakah safety / lfl line tersedia dan dalam keadaan baik"
               value={formData.safetyLineLine}
-              onChange={(val : any) => setFormData({ ...formData, safetyLineLine: val })}
+              onChange={(val: string) => setFormData({ ...formData, safetyLineLine: val as "ya" | "tidak" | "" })}
             />
             <YesNoCheckbox
               label="Apakah alat bantu Kerja (Tangga, Scaffolding) yang akan digunakan dalam keadaan aman"
               value={formData.alatBantuKerja}
-              onChange={(val : any) => setFormData({ ...formData, alatBantuKerja: val })}
+              onChange={(val: string) => setFormData({ ...formData, alatBantuKerja: val as "ya" | "tidak" | "" })}
             />
             <YesNoCheckbox
               label="Menggunakan rompi saat bekerja di Ketinggian"
               value={formData.rompiSaatBekerja}
-              onChange={(val : any) => setFormData({ ...formData, rompiSaatBekerja: val })}
+              onChange={(val: string) => setFormData({ ...formData, rompiSaatBekerja: val as "ya" | "tidak" | "" })}
             />
           </div>
         </Section>
 
-        {/* BAGIAN 4 */}
+        {/* Bagian 4 */}
         <Section
           title="BAGIAN 4: ALAT PELINDUNG DIRI"
           section="bagian4"
@@ -665,22 +568,22 @@ export default function HeightWorkPermitForm() {
             <YesNoCheckbox
               label="Beban yang dibawa saat naik tidak boleh lebih dari 5 kg (diluar beban berat tubuh dan APD)"
               value={formData.bebanBeratTubuh}
-              onChange={(val : any) => setFormData({ ...formData, bebanBeratTubuh: val })}
+              onChange={(val: string) => setFormData({ ...formData, bebanBeratTubuh: val as "ya" | "tidak" | "" })}
             />
             <YesNoCheckbox
               label="Apakah Helm sudah sesuai standar"
               value={formData.helmStandar}
-              onChange={(val : any) => setFormData({ ...formData, helmStandar: val })}
+              onChange={(val: string) => setFormData({ ...formData, helmStandar: val as "ya" | "tidak" | "" })}
             />
             <YesNoCheckbox
               label="Rambu-rambu / safety warning apakah sudah tersedia"
               value={formData.rambuSafetyWarning}
-              onChange={(val : any) => setFormData({ ...formData, rambuSafetyWarning: val })}
+              onChange={(val: string) => setFormData({ ...formData, rambuSafetyWarning: val as "ya" | "tidak" | "" })}
             />
           </div>
         </Section>
 
-        {/* BAGIAN 5 */}
+        {/* Bagian 5 */}
         <Section
           title="BAGIAN 5: POINT PENGECEKAN BODY HARNESS SEBELUM DIGUNAKAN"
           section="bagian5"
@@ -695,37 +598,38 @@ export default function HeightWorkPermitForm() {
                 <YesNoCheckbox
                   label="1. Webbing - Kondisi jahitan baik (tidak lepas, tidak berserabut)"
                   value={formData.bodyHarnessWebbing}
-                  onChange={(val : any) => setFormData({ ...formData, bodyHarnessWebbing: val })}
+                  onChange={(val: string) => setFormData({ ...formData, bodyHarnessWebbing: val as "ya" | "tidak" | "" })}
                 />
                 <YesNoCheckbox
                   label="2. D-Ring - Kondisi baik (tidak retak/bengkok/berkarat, dapat diputar bebas/fleksibel)"
                   value={formData.bodyHarnessDRing}
-                  onChange={(val : any) => setFormData({ ...formData, bodyHarnessDRing: val })}
+                  onChange={(val: string) => setFormData({ ...formData, bodyHarnessDRing: val as "ya" | "tidak" | "" })}
                 />
                 <YesNoCheckbox
                   label="3. Adjustment Buckle (Gesper) - Kondisi baik (tidak retak/bengkok/berkarat, dapat mengunci sempurna)"
                   value={formData.bodyHarnessAdjustment}
-                  onChange={(val : any) => setFormData({ ...formData, bodyHarnessAdjustment: val })}
+                  onChange={(val: string) => setFormData({ ...formData, bodyHarnessAdjustment: val as "ya" | "tidak" | "" })}
                 />
               </div>
             </div>
+
             <div>
               <h4 className="font-semibold text-slate-800 mb-4">Lanyard</h4>
               <div className="space-y-3">
                 <YesNoCheckbox
                   label="1. Absorber & Timbes - Kondisi jahitan baik (tidak lepas, tidak berserabut)"
                   value={formData.lanyardAbsorber}
-                  onChange={(val : any) => setFormData({ ...formData, lanyardAbsorber: val })}
+                  onChange={(val: string) => setFormData({ ...formData, lanyardAbsorber: val as "ya" | "tidak" | "" })}
                 />
                 <YesNoCheckbox
                   label="2. Snap Hook - Kondisi baik (tidak retak/bengkok/berkarat, dapat dikunci dengan sempurna)"
                   value={formData.lanyardSnapHook}
-                  onChange={(val : any) => setFormData({ ...formData, lanyardSnapHook: val })}
+                  onChange={(val: string) => setFormData({ ...formData, lanyardSnapHook: val as "ya" | "tidak" | "" })}
                 />
                 <YesNoCheckbox
-                  label="3. Rope Lanyard - Kondisi baik (tidak berserabut, fiber tidak aus / terpotong)"
+                  label="3. Rope Lanyard - Kondisi baik (tidak berserabut, fiber tidak aus / terportong)"
                   value={formData.lanyardRope}
-                  onChange={(val : any) => setFormData({ ...formData, lanyardRope: val })}
+                  onChange={(val: string) => setFormData({ ...formData, lanyardRope: val as "ya" | "tidak" | "" })}
                 />
               </div>
             </div>
@@ -744,7 +648,7 @@ export default function HeightWorkPermitForm() {
             <SignatureBox
               label="SPV Terkait"
               name={formData.persetujuan.spvNama}
-              onChange={(name : any) =>
+              onChange={(name: string) =>
                 setFormData({
                   ...formData,
                   persetujuan: { ...formData.persetujuan, spvNama: name },
@@ -754,7 +658,7 @@ export default function HeightWorkPermitForm() {
             <SignatureBox
               label="Kontraktor"
               name={formData.persetujuan.kontraktorNama}
-              onChange={(name : any) =>
+              onChange={(name: string) =>
                 setFormData({
                   ...formData,
                   persetujuan: { ...formData.persetujuan, kontraktorNama: name },
@@ -764,7 +668,7 @@ export default function HeightWorkPermitForm() {
             <SignatureBox
               label="SFO"
               name={formData.persetujuan.sfoNama}
-              onChange={(name : any) =>
+              onChange={(name: string) =>
                 setFormData({
                   ...formData,
                   persetujuan: { ...formData.persetujuan, sfoNama: name },
@@ -774,7 +678,7 @@ export default function HeightWorkPermitForm() {
             <SignatureBox
               label="MR/PGA MGR"
               name={formData.persetujuan.mrPgaNama}
-              onChange={(name : any) =>
+              onChange={(name: string) =>
                 setFormData({
                   ...formData,
                   persetujuan: { ...formData.persetujuan, mrPgaNama: name },

@@ -16,9 +16,10 @@ import {
   Eye,
   X,
 } from "lucide-react";
+import { supabase } from "@/lib/supabase";
 
 interface Permit {
-  id: number;
+  id: string;
   noRegistrasi?: string;
   namaKontraktor?: string;
   lokasi?: string;
@@ -27,11 +28,7 @@ interface Permit {
   status: "draft" | "submitted" | "approved" | "rejected";
   submittedAt?: string;
   createdAt?: string;
-  jenisForm?: "hot-work" | "workshop" | "height-work";
-
-  // Add these for height-work
-  namaPetugas?: string[];
-  berbadanSehat?: string[];
+  jenisForm: "hot-work" | "workshop" | "height-work";
 
   // Generic fallback
   [key: string]: any;
@@ -39,7 +36,8 @@ interface Permit {
 
 export default function HistoryPage() {
   const [permits, setPermits] = useState<Permit[]>([]);
-  const [filter, setFilter] = useState<"all" | "draft" | "submitted" | "approved" | "rejected">("all");
+  const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState<"all" | "hot-work" | "workshop" | "height-work">("all");
   const [selectedPermit, setSelectedPermit] = useState<Permit | null>(null);
   const [showModal, setShowModal] = useState(false);
 
@@ -47,16 +45,72 @@ export default function HistoryPage() {
     loadPermits();
   }, []);
 
-  const loadPermits = () => {
-    const storedPermits = JSON.parse(localStorage.getItem("permits") || "[]");
-    const storedDrafts = JSON.parse(localStorage.getItem("permitDrafts") || "[]");
-    const allPermits = [...storedPermits, ...storedDrafts].sort((a, b) => b.id - a.id);
-    setPermits(allPermits);
+  const loadPermits = async () => {
+    setLoading(true);
+    try {
+      // Ambil data dari 3 tabel
+      const { data: hotWorkData, error: hotWorkError } = await supabase
+        .from("form-kerja-panas")
+        .select("*");
+
+      const { data: workshopData, error: workshopError } = await supabase
+        .from("form_kerja_workshop")
+        .select("*");
+
+      const { data: heightWorkData, error: heightWorkError } = await supabase
+        .from("form-kerja-ketinggian")
+        .select("*");
+
+      if (hotWorkError || workshopError || heightWorkError) {
+        console.error("Error fetching data:", { hotWorkError, workshopError, heightWorkError });
+        alert("Gagal memuat data riwayat.");
+        return;
+      }
+
+      // Gabungkan dan tandai jenis form
+      const mappedHotWork = (hotWorkData || []).map((item) => ({
+        ...item,
+        id: item.id_form,
+        jenisForm: "hot-work" as const,
+        status: "submitted" as const,
+        submittedAt: item.tanggal_pelaksanaan || item.tanggal,
+        createdAt: item.tanggal,
+      }));
+
+      const mappedWorkshop = (workshopData || []).map((item) => ({
+        ...item,
+        id: item.id_form,
+        jenisForm: "workshop" as const,
+        status: "submitted" as const,
+        submittedAt: item.tanggal_pelaksanaan || item.tanggal,
+        createdAt: item.tanggal,
+      }));
+
+      const mappedHeightWork = (heightWorkData || []).map((item) => ({
+        ...item,
+        id: item.id_form,
+        jenisForm: "height-work" as const,
+        status: "submitted" as const,
+        submittedAt: item.tanggal_pelaksanaan || item.tanggal,
+        createdAt: item.tanggal,
+      }));
+
+      const allPermits = [...mappedHotWork, ...mappedWorkshop, ...mappedHeightWork].sort(
+        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      );
+
+      setPermits(allPermits);
+    } catch (err) {
+      console.error("Unexpected error:", err);
+      alert("Terjadi kesalahan saat memuat data.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const filteredPermits = permits.filter((permit) => {
     if (filter === "all") return true;
-    return permit.status === filter;
+    return permit.jenisForm === filter;
   });
 
   const handleViewPermit = (permit: Permit) => {
@@ -71,7 +125,7 @@ export default function HistoryPage() {
       approved: { bg: "bg-green-100", text: "text-green-700", icon: CheckCircle, label: "Disetujui" },
       rejected: { bg: "bg-red-100", text: "text-red-700", icon: XCircle, label: "Ditolak" },
     };
-    const badge = badges[status as keyof typeof badges] || badges.draft;
+    const badge = badges[status as keyof typeof badges] || badges.submitted;
     const Icon = badge.icon;
     return (
       <span className={`inline-flex items-center space-x-1 px-3 py-1 rounded-full text-xs font-medium ${badge.bg} ${badge.text}`}>
@@ -126,21 +180,23 @@ export default function HistoryPage() {
             {renderSection("BAGIAN 1: INFORMASI PETUGAS KETINGGIAN", (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {[
-                  { key: 'tipePerusahaan', label: 'Tipe Perusahaan' },
-                  { key: 'deskripsiPekerjaan', label: 'Deskripsi Pekerjaan' },
+                  { key: 'petugas_ketinggian', label: 'Tipe Perusahaan' },
+                  { key: 'deskripsi_pekerjaan', label: 'Deskripsi Pekerjaan' },
                   { key: 'lokasi', label: 'Lokasi' },
-                  { key: 'tanggal', label: 'Tanggal' },
-                  { key: 'waktuMulai', label: 'Waktu Mulai' },
-                  { key: 'waktuSelesai', label: 'Waktu Selesai' },
-                  { key: 'namaPengawasKontraktor', label: 'Nama Pengawas Kontraktor' },
+                  { key: 'tanggal_pelaksanaan', label: 'Tanggal Pelaksanaan' },
+                  { key: 'waktu_mulai', label: 'Waktu Mulai' },
+                  { key: 'waktu_selesai', label: 'Waktu Selesai' },
+                  { key: 'nama_pengawas_kontraktor', label: 'Nama Pengawas Kontraktor' },
                 ].map(({ key, label }) => (
                   <div key={key} className="text-sm mb-2">
                     <span className="text-xs text-slate-600 uppercase">{label}</span>
                     <p className="font-medium mt-1">
-                      {key === 'tanggal'
+                      {key === 'petugas_ketinggian'
+                        ? selectedPermit[key] || '-'
+                        : key === 'tanggal_pelaksanaan'
                         ? formatDate(selectedPermit[key])
-                        : key === 'tipePerusahaan'
-                        ? selectedPermit[key] === 'internal' ? 'Internal / Karyawan PT.JAI' : 'Eksternal / Subkontraktor'
+                        : key === 'waktu_mulai' || key === 'waktu_selesai'
+                        ? formatTime(selectedPermit[key])
                         : selectedPermit[key] || '-'}
                     </p>
                   </div>
@@ -151,16 +207,19 @@ export default function HistoryPage() {
             {/* INFORMASI PETUGAS */}
             {renderSection("INFORMASI PETUGAS", (
               <div className="space-y-2">
-                {selectedPermit.namaPetugas
-                  ?.filter((n): n is string => typeof n === 'string' && n.trim() !== '')
-                  .map((n, i) => (
-                    <p key={`petugas-${i}`}>Petugas {i + 1}: {n}</p>
-                  ))}
-                {selectedPermit.berbadanSehat
-                  ?.filter((s): s is string => typeof s === 'string' && s.trim() !== '')
-                  .map((s, i) => (
-                    <p key={`sehat-${i}`}>Sehat {i + 1}: {s}</p>
-                  ))}
+                {Array.from({ length: 10 }).map((_, i) => {
+                  const namaKey = `nama_petugas_${i + 1}`;
+                  const sehatKey = `petugas_${i + 1}_sehat`;
+                  const nama = selectedPermit[namaKey];
+                  const sehat = selectedPermit[sehatKey];
+                  if (!nama) return null;
+                  return (
+                    <div key={i} className="flex justify-between">
+                      <span>Petugas {i + 1}: {nama}</span>
+                      <span>{sehat ? "Sehat" : "Tidak Sehat"}</span>
+                    </div>
+                  );
+                })}
               </div>
             ))}
 
@@ -168,16 +227,16 @@ export default function HistoryPage() {
             {renderSection("PEMINJAMAN PERALATAN", (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {[
-                  { key: 'kunceePagar', label: 'Kunci Pagar Tangga Listrik' },
-                  { key: 'rompiKetinggian', label: 'Rompi Ketinggian' },
-                  { key: 'rompiAngka', label: 'No. Rompi' },
-                  { key: 'safetyHelmetCount', label: 'Jumlah Safety Helmet' },
-                  { key: 'fullBodyHarnessCount', label: 'Jumlah Full Body Harness' },
+                  { key: 'ada_kunci_pagar', label: 'Kunci Pagar Tangga Listrik' },
+                  { key: 'ada_rompi_ketinggian', label: 'Rompi Ketinggian' },
+                  { key: 'no_rompi', label: 'No. Rompi' },
+                  { key: 'jumlah_safety_helmet', label: 'Jumlah Safety Helmet' },
+                  { key: 'jumlah_full_body_harness', label: 'Jumlah Full Body Harness' },
                 ].map(({ key, label }) => (
                   <div key={key} className="text-sm mb-2">
                     <span className="text-xs text-slate-600 uppercase">{label}</span>
                     <p className="font-medium mt-1">
-                      {key === 'kunceePagar' || key === 'rompiKetinggian'
+                      {key === 'ada_kunci_pagar' || key === 'ada_rompi_ketinggian'
                         ? (selectedPermit[key] ? 'Ya' : 'Tidak')
                         : selectedPermit[key] || '-'}
                     </p>
@@ -190,19 +249,19 @@ export default function HistoryPage() {
             {renderSection("PEKERJAAN BERESIKO TINGGI", (
               <div className="space-y-2">
                 {[
-                  { key: 'areaKerjaAman', label: 'Area kerja aman' },
-                  { key: 'kebakaranProcedure', label: 'Prosedur kebakaran dipahami' },
-                  { key: 'pekerjaanListrik', label: 'Ada pekerjaan listrik' },
-                  { key: 'prosedurLoto', label: 'Melakukan prosedur LOTO' },
-                  { key: 'perisakArea', label: 'Area ditutupi perisai tahan api' },
-                  { key: 'safetyLineLine', label: 'Safety line tersedia & baik' },
-                  { key: 'alatBantuKerja', label: 'Alat bantu kerja aman' },
-                  { key: 'rompiSaatBekerja', label: 'Menggunakan rompi saat kerja' },
+                  { key: 'area_diperiksa_aman', label: 'Area kerja aman' },
+                  { key: 'paham_cara_menggunakan_alat_pemadam_kebakaran', label: 'Prosedur kebakaran dipahami' },
+                  { key: 'ada_kerja_listrik', label: 'Ada pekerjaan listrik' },
+                  { key: 'prosedur_LOTO', label: 'Melakukan prosedur LOTO' },
+                  { key: 'menutupi_area_bawah_prisai', label: 'Area ditutupi perisai tahan api' },
+                  { key: 'safetyline_tersedia', label: 'Safety line tersedia & baik' },
+                  { key: 'alat_bantu_kerja_aman', label: 'Alat bantu kerja aman' },
+                  { key: 'menggunakan_rompi', label: 'Menggunakan rompi saat kerja' },
                 ].map(({ key, label }) => (
                   <div key={key} className="text-sm mb-2">
                     <span className="text-xs text-slate-600 uppercase">{label}</span>
                     <p className="font-medium mt-1">
-                      {selectedPermit[key] === "ya" ? "Ya" : selectedPermit[key] === "tidak" ? "Tidak" : "-"}
+                      {selectedPermit[key] ? "Ya" : "Tidak"}
                     </p>
                   </div>
                 ))}
@@ -213,14 +272,14 @@ export default function HistoryPage() {
             {renderSection("ALAT PELINDUNG DIRI", (
               <div className="space-y-2">
                 {[
-                  { key: 'bebanBeratTubuh', label: 'Beban ≤ 5 kg' },
-                  { key: 'helmStandar', label: 'Helm sesuai standar' },
-                  { key: 'rambuSafetyWarning', label: 'Rambu safety tersedia' },
+                  { key: 'beban_tidak_5kg', label: 'Beban ≤ 5 kg' },
+                  { key: 'helm_sesuai_sop', label: 'Helm sesuai standar' },
+                  { key: 'rambu2_tersedia', label: 'Rambu safety tersedia' },
                 ].map(({ key, label }) => (
                   <div key={key} className="text-sm mb-2">
                     <span className="text-xs text-slate-600 uppercase">{label}</span>
                     <p className="font-medium mt-1">
-                      {selectedPermit[key] === "ya" ? "Ya" : selectedPermit[key] === "tidak" ? "Tidak" : "-"}
+                      {selectedPermit[key] ? "Ya" : "Tidak"}
                     </p>
                   </div>
                 ))}
@@ -231,17 +290,17 @@ export default function HistoryPage() {
             {renderSection("POINT PENGECEKAN HARNESS", (
               <div className="space-y-2">
                 {[
-                  { key: 'bodyHarnessWebbing', label: 'Webbing baik' },
-                  { key: 'bodyHarnessDRing', label: 'D-Ring baik' },
-                  { key: 'bodyHarnessAdjustment', label: 'Gesper baik' },
-                  { key: 'lanyardAbsorber', label: 'Absorber baik' },
-                  { key: 'lanyardSnapHook', label: 'Snap Hook baik' },
-                  { key: 'lanyardRope', label: 'Rope baik' },
+                  { key: 'webbing_kondisi_baik', label: 'Webbing baik' },
+                  { key: 'dring_kondisi_baik', label: 'D-Ring baik' },
+                  { key: 'gesper_kondisi_baik', label: 'Gesper baik' },
+                  { key: 'absorter_dan_timbes_kondisi_baik', label: 'Absorber baik' },
+                  { key: 'snap_hook_kondisi_baik', label: 'Snap Hook baik' },
+                  { key: 'rope_lanyard_kondisi_baik', label: 'Rope baik' },
                 ].map(({ key, label }) => (
                   <div key={key} className="text-sm mb-2">
                     <span className="text-xs text-slate-600 uppercase">{label}</span>
                     <p className="font-medium mt-1">
-                      {selectedPermit[key] === "ya" ? "Ya" : selectedPermit[key] === "tidak" ? "Tidak" : "-"}
+                      {selectedPermit[key] ? "Ya" : "Tidak"}
                     </p>
                   </div>
                 ))}
@@ -252,15 +311,15 @@ export default function HistoryPage() {
             {renderSection("PERSETUJUAN", (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {[
-                  { key: 'spvNama', label: 'SPV Terkait' },
-                  { key: 'kontraktorNama', label: 'Kontraktor' },
-                  { key: 'sfoNama', label: 'Safety Officer' },
-                  { key: 'mrPgaNama', label: 'MR/PGA MGR' },
+                  { key: 'spv_terkait', label: 'SPV Terkait' },
+                  { key: 'nama_kontraktor', label: 'Kontraktor' },
+                  { key: 'sfo', label: 'Safety Officer' },
+                  { key: 'mr_pga_mgr', label: 'MR/PGA MGR' },
                 ].map(({ key, label }) => (
                   <div key={key} className="text-sm mb-2">
                     <span className="text-xs text-slate-600 uppercase">{label}</span>
                     <p className="font-medium mt-1">
-                      {selectedPermit.persetujuan?.[key] || "-"}
+                      {selectedPermit[key] || "-"}
                     </p>
                   </div>
                 ))}
@@ -276,21 +335,26 @@ export default function HistoryPage() {
           {/* BAGIAN 1: INFORMASI UMUM */}
           {renderSection("BAGIAN 1: INFORMASI UMUM", (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {['noRegistrasi', 'namaKontraktor', 'namaNIK', 'lokasi', 'tanggal', 'waktuPukul', 'namaFireWatch', 'namaNIKFireWatch', 'jabaranPemberiIzin', 'namaNIKPemberiIzin'].map(field => (
-                <div key={field} className="text-sm mb-2">
-                  <span className="text-xs text-slate-600 uppercase">
-                    {field
-                      .replace(/([A-Z])/g, ' $1')
-                      .replace('NIK', ' / NIK')
-                      .replace('Pukul', '')
-                      .trim()}
-                  </span>
+              {[
+                { key: 'no_registrasi', label: 'No Registrasi' },
+                { key: 'nama_kontraktor_nik', label: 'Nama Kontraktor / NIK' },
+                { key: 'nama_nik', label: 'Nama Pekerja / NIK' },
+                { key: 'lokasi_pekerjaan', label: 'Lokasi' },
+                { key: 'tanggal_pelaksanaan', label: 'Tanggal Pelaksanaan' },
+                { key: 'waktu_pukul', label: 'Waktu Pukul' },
+                { key: 'nama_fire_watch', label: 'Nama Fire Watch' },
+                { key: 'nik_fire_watch', label: 'NIK Fire Watch' },
+                { key: 'jabatan_pemberi_izin', label: 'Jabatan Pemberi Izin' },
+                { key: 'nik_pemberi_ijin', label: 'NIK Pemberi Izin' },
+              ].map(({ key, label }) => (
+                <div key={key} className="text-sm mb-2">
+                  <span className="text-xs text-slate-600 uppercase">{label}</span>
                   <p className="font-medium mt-1">
-                    {field === 'tanggal' 
-                      ? formatDate(selectedPermit[field]) 
-                      : field === 'waktuPukul' 
-                        ? formatTime(selectedPermit[field]) 
-                        : selectedPermit[field] || '-'}
+                    {key === 'tanggal_pelaksanaan'
+                      ? formatDate(selectedPermit[key])
+                      : key === 'waktu_pukul'
+                      ? formatTime(selectedPermit[key])
+                      : selectedPermit[key] || '-'}
                   </p>
                 </div>
               ))}
@@ -303,11 +367,12 @@ export default function HistoryPage() {
               <div>
                 <p className="text-xs text-slate-600 uppercase mb-2">Jenis Pekerjaan</p>
                 <div className="space-y-1">
-                  {selectedPermit.jenisPekerjaan?.preventive && <p key="preventive">✓ Preventive Genset / Pump room</p>}
-                  {selectedPermit.jenisPekerjaan?.tangki && <p key="tangki">✓ Tangki Solar</p>}
-                  {selectedPermit.jenisPekerjaan?.panel && <p key="panel">✓ Panel Listrik</p>}
-                  {selectedPermit.jenisPekerjaan?.lainnya && selectedPermit.jenisPekerjaan.lainnyaKeterangan && (
-                    <p key="lainnya">✓ Lainnya: {selectedPermit.jenisPekerjaan.lainnyaKeterangan}</p>
+                  {selectedPermit.preventive_genset_pump_room && <p key="preventive">✓ Preventive Genset / Pump room</p>}
+                  {selectedPermit.tangki_solar && <p key="tangki">✓ Tangki Solar</p>}
+                  {selectedPermit.panel_listrik && <p key="panel">✓ Panel Listrik</p>}
+                  {selectedPermit.painting_spray && <p key="spray">✓ Painting Spray</p>}
+                  {selectedPermit.ada_kerja_lainnya && selectedPermit.jenis_kerjaan_lainnya && (
+                    <p key="lainnya">✓ Lainnya: {selectedPermit.jenis_kerjaan_lainnya}</p>
                   )}
                 </div>
               </div>
@@ -315,23 +380,23 @@ export default function HistoryPage() {
               <div>
                 <p className="text-xs text-slate-600 uppercase mb-2">Detail Pekerjaan Panas</p>
                 <div className="space-y-1">
-                  {renderPekerjaanPanas(selectedPermit.jenisPekerjaan?.cutting, "Cutting")}
-                  {renderPekerjaanPanas(selectedPermit.jenisPekerjaan?.grinding, "Grinding")}
-                  {renderPekerjaanPanas(selectedPermit.jenisPekerjaan?.welding, "Welding")}
-                  {renderPekerjaanPanas(selectedPermit.jenisPekerjaan?.painting, "Painting")}
+                  {renderPekerjaanPanas({ detail: selectedPermit.detail_cutting, mulai: selectedPermit.t_mulai_cutting, selesai: selectedPermit.t_selesai_cutting }, "Cutting")}
+                  {renderPekerjaanPanas({ detail: selectedPermit.detail_grinding, mulai: selectedPermit.t_mulai_grinding, selesai: selectedPermit.t_selesai_grinding }, "Grinding")}
+                  {renderPekerjaanPanas({ detail: selectedPermit.detail_welding, mulai: selectedPermit.t_mulai_welding, selesai: selectedPermit.t_selesai_welding }, "Welding")}
+                  {renderPekerjaanPanas({ detail: selectedPermit.detail_painting, mulai: selectedPermit.t_mulai_painting, selesai: selectedPermit.t_selesai_painting }, "Painting")}
                 </div>
               </div>
 
               <div>
                 <p className="text-xs text-slate-600 uppercase mb-2">Area Berisiko</p>
                 <div className="space-y-1">
-                  {selectedPermit.areaBerisiko?.ruangTertutup && <p key="ruangTertutup">✓ Ruang tertutup</p>}
-                  {selectedPermit.areaBerisiko?.bahanMudah && <p key="bahanMudah">✓ Bahan mudah terbakar</p>}
-                  {selectedPermit.areaBerisiko?.gas && <p key="gas">✓ Gas</p>}
-                  {selectedPermit.areaBerisiko?.ketinggian && <p key="ketinggian">✓ Ketinggian</p>}
-                  {selectedPermit.areaBerisiko?.cairan && <p key="cairan">✓ Cairan/Gas bertekanan</p>}
-                  {selectedPermit.areaBerisiko?.hydrocarbon && <p key="hydrocarbon">✓ Hydrocarbon</p>}
-                  {selectedPermit.areaBerisiko?.lain && <p key="lain-area">✓ Lain: {selectedPermit.areaBerisiko.lain}</p>}
+                  {selectedPermit.ruang_tertutup && <p key="ruangTertutup">✓ Ruang tertutup</p>}
+                  {selectedPermit.bahan_mudah_terbakar && <p key="bahanMudah">✓ Bahan mudah terbakar</p>}
+                  {selectedPermit.gas_bejana_tangki && <p key="gas">✓ Gas</p>}
+                  {selectedPermit.height_work && <p key="ketinggian">✓ Ketinggian</p>}
+                  {selectedPermit.cairan_gas_bertekan && <p key="cairan">✓ Cairan/Gas bertekanan</p>}
+                  {selectedPermit.cairan_hydrocarbon && <p key="hydrocarbon">✓ Hydrocarbon</p>}
+                  {selectedPermit.bahaya_lain && <p key="lain-area">✓ Lain: {selectedPermit.bahaya_lain}</p>}
                 </div>
               </div>
             </div>
@@ -340,38 +405,41 @@ export default function HistoryPage() {
           {/* BAGIAN 3: UPAYA PENCEGAHAN */}
           {renderSection("BAGIAN 3: UPAYA PENCEGAHAN", (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {Object.entries(selectedPermit.pencegahan || {})
-                .filter(([key]) => !['fireblank_jumlah', 'permintaan_tambahan'].includes(key))
-                .map(([key, value]) => {
-                  const label = key.replace(/([A-Z])/g, ' $1').replace(/_/g, ' ').trim();
-                  return (
-                    <div key={key} className="text-sm mb-2">
-                      <span className="text-xs text-slate-600 uppercase">{label}</span>
-                      <p className="font-medium mt-1">
-                        {typeof value === 'string'
-                          ? value === 'ya'
-                            ? 'Ya'
-                            : value === 'tidak'
-                            ? 'Tidak'
-                            : value
-                          : typeof value === 'boolean'
-                          ? value ? 'Ya' : 'Tidak'
-                          : '-'}
-                      </p>
-                    </div>
-                  );
-                })
-              }
-              {selectedPermit.pencegahan?.fireblank_jumlah && (
-                <div key="fireblank_jumlah" className="text-sm mb-2">
+              {[
+                { key: 'kondisi_tools_baik', label: 'Equipment / Tools kondisi baik' },
+                { key: 'tersedia_apar_hydrant', label: 'APAR / Hydrant tersedia' },
+                { key: 'sensor_smoke_detector_non_aktif', label: 'Sensor Smoke Detector non-aktif' },
+                { key: 'apd_lengkap', label: 'APD lengkap' },
+                { key: 'tidak_ada_cairan_mudah_terbakar', label: 'Tidak ada cairan mudah terbakar' },
+                { key: 'lantai_bersih', label: 'Lantai bersih' },
+                { key: 'lantai_sudah_dibasahi', label: 'Lantai sudah dibasahi' },
+                { key: 'cairan_mudah_tebakar_tertutup', label: 'Cairan mudah terbakar tertutup' },
+                { key: 'lembaran_dibawah_pekerjaan', label: 'Lembaran di bawah pekerjaan' },
+                { key: 'lindungi_conveyor_dll', label: 'Lindungi conveyor dll' },
+                { key: 'alat_telah_bersih', label: 'Alat telah dibersihkan' },
+                { key: 'uap_menyala_telah_dibuang', label: 'Uap menyala telah dibuang' },
+                { key: 'kerja_pada_dinding_lagit', label: 'Kerja pada dinding/langit-langit' },
+                { key: 'bahan_mudah_terbakar_dipindahkan_dari_dinding', label: 'Bahan mudah terbakar dipindahkan' },
+                { key: 'fire_watch_memastikan_area_aman', label: 'Fire watch pastikan area aman' },
+                { key: 'firwatch_terlatih', label: 'Fire watch terlatih' },
+              ].map(({ key, label }) => (
+                <div key={key} className="text-sm mb-2">
+                  <span className="text-xs text-slate-600 uppercase">{label}</span>
+                  <p className="font-medium mt-1">
+                    {selectedPermit[key] ? "Ya" : "Tidak"}
+                  </p>
+                </div>
+              ))}
+              {selectedPermit.jumlah_fire_blanket && (
+                <div key="jumlah_fire_blanket" className="text-sm mb-2">
                   <span className="text-xs text-slate-600 uppercase">Jumlah Fire Blanket</span>
-                  <p className="font-medium mt-1">{selectedPermit.pencegahan.fireblank_jumlah}</p>
+                  <p className="font-medium mt-1">{selectedPermit.jumlah_fire_blanket}</p>
                 </div>
               )}
-              {selectedPermit.pencegahan?.permintaan_tambahan && (
+              {selectedPermit.permintaan_tambahan && (
                 <div key="permintaan_tambahan" className="text-sm mb-2">
                   <span className="text-xs text-slate-600 uppercase">Permintaan Tambahan</span>
-                  <p className="font-medium mt-1">{selectedPermit.pencegahan.permintaan_tambahan}</p>
+                  <p className="font-medium mt-1">{selectedPermit.permintaan_tambahan}</p>
                 </div>
               )}
             </div>
@@ -381,15 +449,15 @@ export default function HistoryPage() {
           {renderSection("PERSETUJUAN", (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {[
-                { key: 'spvNama', label: 'SPV Terkait' },
-                { key: 'kontraktorNama', label: 'Kontraktor' },
-                { key: 'sfoNama', label: 'Safety Officer' },
-                { key: 'pgaNama', label: 'PGA / Dept Head' },
+                { key: 'spv_terkait', label: 'SPV Terkait' },
+                { key: 'kontraktor', label: 'Kontraktor' },
+                { key: 'sfo', label: 'Safety Officer' },
+                { key: 'pga', label: 'PGA / Dept Head' },
               ].map(({ key, label }) => (
                 <div key={key} className="text-sm mb-2">
                   <span className="text-xs text-slate-600 uppercase">{label}</span>
                   <p className="font-medium mt-1">
-                    {selectedPermit.persetujuan?.[key] || "-"}
+                    {selectedPermit[key] || "-"}
                   </p>
                 </div>
               ))}
@@ -412,7 +480,7 @@ export default function HistoryPage() {
                   : "Detail Izin Kerja Panas"}
               </h2>
               <p className="text-sm text-slate-600 mt-1">
-                No. Registrasi: {selectedPermit.noRegistrasi || `#${selectedPermit.id}`}
+                ID Form: {selectedPermit.id}
               </p>
             </div>
             <button onClick={() => setShowModal(false)} className="p-2 hover:bg-orange-200 rounded-lg">
@@ -474,145 +542,92 @@ export default function HistoryPage() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         <div className="bg-white rounded-lg shadow-sm p-4 mb-6 border border-slate-200">
           <div className="flex items-center space-x-2 flex-wrap gap-2">
-            <span className="text-sm font-semibold text-slate-700">Filter:</span>
-            {(["all", "draft", "submitted", "approved", "rejected"] as const).map((status) => (
+            <span className="text-sm font-semibold text-slate-700">Filter Jenis Form:</span>
+            {(["all", "hot-work", "workshop", "height-work"] as const).map((type) => (
               <button
-                key={status}
-                onClick={() => setFilter(status)}
+                key={type}
+                onClick={() => setFilter(type)}
                 className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                  filter === status
+                  filter === type
                     ? "bg-orange-600 text-white shadow-md"
                     : "bg-slate-100 text-slate-700 hover:bg-slate-200"
                 }`}
               >
-                {status === "all"
+                {type === "all"
                   ? "Semua"
-                  : status === "draft"
-                  ? "Draft"
-                  : status === "submitted"
-                  ? "Diajukan"
-                  : status === "approved"
-                  ? "Disetujui"
-                  : "Ditolak"}
+                  : type === "hot-work"
+                  ? "Hot Work"
+                  : type === "workshop"
+                  ? "Workshop"
+                  : "Ketinggian"}
               </button>
             ))}
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-          <div className="bg-white rounded-lg shadow-sm p-4 border border-slate-200">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-slate-600 font-medium">Total Permit</p>
-                <p className="text-3xl font-bold text-slate-900 mt-1">{permits.length}</p>
-              </div>
-              <FileText className="w-8 h-8 text-orange-400" />
-            </div>
+        {loading ? (
+          <div className="text-center py-12">
+            <div className="inline-block animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-orange-600"></div>
+            <p className="mt-4 text-slate-600">Memuat data riwayat...</p>
           </div>
-          <div className="bg-white rounded-lg shadow-sm p-4 border border-slate-200">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-slate-600 font-medium">Draft</p>
-                <p className="text-3xl font-bold text-slate-700 mt-1">
-                  {permits.filter((p) => p.status === "draft").length}
+        ) : (
+          <div className="space-y-4">
+            {filteredPermits.length === 0 ? (
+              <div className="bg-white rounded-lg shadow-sm p-12 text-center border border-slate-200">
+                <FileText className="w-16 h-16 text-slate-300 mx-auto mb-4" />
+                <h3 className="text-lg font-bold text-slate-900 mb-2">Belum ada data</h3>
+                <p className="text-slate-600 mb-6">
+                  Data akan muncul setelah Anda mengajukan izin kerja.
                 </p>
               </div>
-              <AlertCircle className="w-8 h-8 text-slate-400" />
-            </div>
-          </div>
-          <div className="bg-white rounded-lg shadow-sm p-4 border border-slate-200">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-slate-600 font-medium">Diajukan</p>
-                <p className="text-3xl font-bold text-blue-600 mt-1">
-                  {permits.filter((p) => p.status === "submitted").length}
-                </p>
-              </div>
-              <Clock className="w-8 h-8 text-blue-400" />
-            </div>
-          </div>
-          <div className="bg-white rounded-lg shadow-sm p-4 border border-slate-200">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-slate-600 font-medium">Disetujui</p>
-                <p className="text-3xl font-bold text-green-600 mt-1">
-                  {permits.filter((p) => p.status === "approved").length}
-                </p>
-              </div>
-              <CheckCircle className="w-8 h-8 text-green-400" />
-            </div>
-          </div>
-        </div>
-
-        <div className="space-y-4">
-          {filteredPermits.length === 0 ? (
-            <div className="bg-white rounded-lg shadow-sm p-12 text-center border border-slate-200">
-              <FileText className="w-16 h-16 text-slate-300 mx-auto mb-4" />
-              <h3 className="text-lg font-bold text-slate-900 mb-2">Belum ada permit</h3>
-              <p className="text-slate-600 mb-6">
-                Mulai dengan membuat permit baru untuk mengisi formulir izin kerja.
-              </p>
-              <Link
-                href="/form/hot-work"
-                className="inline-block px-6 py-3 bg-orange-600 hover:bg-orange-700 text-white rounded-lg font-medium transition-colors shadow-md"
-              >
-                Buat Permit Baru
-              </Link>
-            </div>
-          ) : (
-            filteredPermits.map((permit) => (
-              <div
-                key={permit.id}
-                className="bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow border border-slate-200 overflow-hidden"
-              >
-                <div className="p-6">
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex-1">
-                      <div className="flex items-center space-x-3 mb-3">
-                        <h3 className="text-lg font-bold text-slate-900">
-                          {permit.noRegistrasi || `Permit #${permit.id}`}
-                        </h3>
-                        {getStatusBadge(permit.status)}
-                      </div>
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-sm text-slate-600">
-                        <div className="flex items-center space-x-2">
-                          <User className="w-4 h-4 flex-shrink-0 text-slate-400" />
-                          <span>{permit.namaKontraktor || "-"}</span>
+            ) : (
+              filteredPermits.map((permit) => (
+                <div
+                  key={permit.id}
+                  className="bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow border border-slate-200 overflow-hidden"
+                >
+                  <div className="p-6">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex-1">
+                        <div className="flex items-center space-x-3 mb-3">
+                          <h3 className="text-lg font-bold text-slate-900">
+                            {permit.id}
+                          </h3>
+                          {getStatusBadge(permit.status)}
                         </div>
-                        <div className="flex items-center space-x-2">
-                          <MapPin className="w-4 h-4 flex-shrink-0 text-slate-400" />
-                          <span>{permit.lokasi || "-"}</span>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <Calendar className="w-4 h-4 flex-shrink-0 text-slate-400" />
-                          <span>{formatDate(permit.tanggal)}</span>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <Clock className="w-4 h-4 flex-shrink-0 text-slate-400" />
-                          <span>{formatTime(permit.waktuPukul)}</span>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-sm text-slate-600">
+                          <div className="flex items-center space-x-2">
+                            <User className="w-4 h-4 flex-shrink-0 text-slate-400" />
+                            <span>{permit.nama_kontraktor_nik || permit.nama_kontraktor || "-"}</span>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <MapPin className="w-4 h-4 flex-shrink-0 text-slate-400" />
+                            <span>{permit.lokasi_pekerjaan || permit.lokasi || "-"}</span>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <Calendar className="w-4 h-4 flex-shrink-0 text-slate-400" />
+                            <span>{formatDate(permit.tanggal_pelaksanaan)}</span>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <Clock className="w-4 h-4 flex-shrink-0 text-slate-400" />
+                            <span>{formatTime(permit.waktu_pukul)}</span>
+                          </div>
                         </div>
                       </div>
+                      <button
+                        onClick={() => handleViewPermit(permit)}
+                        className="p-3 hover:bg-orange-50 rounded-lg transition-colors group"
+                        title="Lihat Detail Form"
+                      >
+                        <Eye className="w-5 h-5 text-orange-600 group-hover:text-orange-700" />
+                      </button>
                     </div>
-                    <button
-                      onClick={() => handleViewPermit(permit)}
-                      className="p-3 hover:bg-orange-50 rounded-lg transition-colors group"
-                      title="Lihat Detail Form"
-                    >
-                      <Eye className="w-5 h-5 text-orange-600 group-hover:text-orange-700" />
-                    </button>
                   </div>
-
-                  {permit.submittedAt && (
-                    <div className="text-xs text-slate-500 mt-4 pt-3 border-t border-slate-200">
-                      Diajukan: {formatDate(permit.submittedAt)} |{" "}
-                      {new Date(permit.submittedAt).toLocaleTimeString("id-ID")}
-                    </div>
-                  )}
                 </div>
-              </div>
-            ))
-          )}
-        </div>
+              ))
+            )}
+          </div>
+        )}
       </div>
 
       {showModal && <DetailModal />}
