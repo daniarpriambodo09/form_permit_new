@@ -4,633 +4,527 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import {
-  Home,
-  FileText,
-  Calendar,
-  Clock,
-  User,
-  MapPin,
-  CheckCircle,
-  XCircle,
-  AlertCircle,
-  Eye,
-  X,
+  Home, FileText, Calendar, Clock, User, MapPin,
+  CheckCircle, XCircle, AlertCircle, Eye, X, RefreshCw,
 } from "lucide-react";
-import { supabase } from "@/lib/supabase";
 
+// ─── Types ────────────────────────────────────────────────────────────────────
 interface Permit {
   id: string;
-  noRegistrasi?: string;
-  namaKontraktor?: string;
-  lokasi?: string;
-  tanggal?: string;
-  waktuPukul?: string;
-  status: "draft" | "submitted" | "approved" | "rejected";
-  submittedAt?: string;
-  createdAt?: string;
   jenisForm: "hot-work" | "workshop" | "height-work";
-
-  // Generic fallback
+  status: "draft" | "submitted" | "approved" | "rejected";
+  tanggal?: string;
+  tanggal_pelaksanaan?: string;
   [key: string]: any;
 }
 
-export default function HistoryPage() {
-  const [permits, setPermits] = useState<Permit[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState<"all" | "hot-work" | "workshop" | "height-work">("all");
-  const [selectedPermit, setSelectedPermit] = useState<Permit | null>(null);
-  const [showModal, setShowModal] = useState(false);
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+const formatDate = (d?: string) => {
+  if (!d) return "-";
+  return new Date(d).toLocaleDateString("id-ID", { day: "2-digit", month: "long", year: "numeric" });
+};
 
-  useEffect(() => {
-    loadPermits();
-  }, []);
+// FIX 1: PostgreSQL TIME bisa datang "08:30:00" → potong jadi "08:30"
+const formatTime = (t?: string | null) => {
+  if (!t) return "-";
+  return String(t).slice(0, 5);
+};
+
+// FIX 2: PostgreSQL boolean bisa datang sebagai true/false ATAU "t"/"f" (tergantung driver)
+const isTruthy = (v: any): boolean =>
+  v === true || v === "t" || v === "true";
+
+// ─── Badge & label ────────────────────────────────────────────────────────────
+const getStatusBadge = (status: string) => {
+  const map: Record<string, { bg: string; text: string; icon: any; label: string }> = {
+    draft:     { bg: "bg-gray-100",  text: "text-gray-700",  icon: AlertCircle, label: "Draft" },
+    submitted: { bg: "bg-blue-100",  text: "text-blue-700",  icon: Clock,       label: "Diajukan" },
+    approved:  { bg: "bg-green-100", text: "text-green-700", icon: CheckCircle, label: "Disetujui" },
+    rejected:  { bg: "bg-red-100",   text: "text-red-700",   icon: XCircle,     label: "Ditolak" },
+  };
+  const b    = map[status] ?? map.submitted;
+  const Icon = b.icon;
+  return (
+    <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium ${b.bg} ${b.text}`}>
+      <Icon className="w-3.5 h-3.5" />{b.label}
+    </span>
+  );
+};
+
+const formTypeLabel: Record<string, string> = {
+  "hot-work":    "Hot Work Permit",
+  "workshop":    "Workshop Permit",
+  "height-work": "Kerja Ketinggian",
+};
+const formTypeBadge: Record<string, string> = {
+  "hot-work":    "bg-red-100 text-red-700",
+  "workshop":    "bg-purple-100 text-purple-700",
+  "height-work": "bg-orange-100 text-orange-700",
+};
+
+// ─── Modal sub-components ─────────────────────────────────────────────────────
+const MS = ({ title, children }: { title: string; children: React.ReactNode }) => (
+  <div className="border border-slate-200 rounded-lg overflow-hidden">
+    <div className="bg-slate-100 px-4 py-2.5">
+      <h3 className="font-bold text-slate-800 text-xs uppercase tracking-wider">{title}</h3>
+    </div>
+    <div className="p-4">{children}</div>
+  </div>
+);
+
+const F = ({ label, value }: { label: string; value?: React.ReactNode }) => (
+  <div className="text-sm">
+    <span className="text-xs text-slate-500 uppercase font-medium">{label}</span>
+    <p className="font-semibold text-slate-800 mt-0.5">{value ?? "-"}</p>
+  </div>
+);
+
+// FIX 2 applied here — handle both boolean and "t"/"f" string from pg
+const BF = ({ label, value }: { label: string; value: any }) => {
+  const yes = isTruthy(value);
+  return (
+    <div className="flex items-center justify-between py-2 border-b border-slate-100 last:border-0">
+      <span className="text-sm text-slate-700 flex-1 pr-4">{label}</span>
+      <span className={`text-sm font-semibold shrink-0 ${yes ? "text-green-600" : "text-red-500"}`}>
+        {yes ? "✓ Ya" : "✗ Tidak"}
+      </span>
+    </div>
+  );
+};
+
+// ─── Detail Modal ─────────────────────────────────────────────────────────────
+const DetailModal = ({ permit, onClose }: { permit: Permit; onClose: () => void }) => {
+  const p = permit;
+
+  const renderHeightWork = () => (
+    <>
+      <MS title="Bagian 1: Informasi Pekerjaan">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <F label="Tipe Petugas"             value={p.petugas_ketinggian} />
+          <F label="Deskripsi Pekerjaan"      value={p.deskripsi_pekerjaan} />
+          <F label="Lokasi"                   value={p.lokasi} />
+          <F label="Tanggal Pelaksanaan"      value={formatDate(p.tanggal_pelaksanaan)} />
+          <F label="Waktu Mulai"              value={formatTime(p.waktu_mulai)} />
+          <F label="Waktu Selesai"            value={formatTime(p.waktu_selesai)} />
+          <F label="Pengawas Kontraktor"      value={p.nama_pengawas_kontraktor} />
+        </div>
+      </MS>
+
+      <MS title="Daftar Petugas">
+        <div className="space-y-1">
+          {Array.from({ length: 10 }).map((_, i) => {
+            const nama = p[`nama_petugas_${i + 1}`];
+            if (!nama) return null;
+            const sehat = isTruthy(p[`petugas_${i + 1}_sehat`]);
+            return (
+              <div key={i} className="flex items-center justify-between py-2 border-b border-slate-100 last:border-0">
+                <span className="text-sm"><span className="font-medium">Petugas {i + 1}:</span> {nama}</span>
+                <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${sehat ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}>
+                  {sehat ? "Sehat" : "Tidak Sehat"}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      </MS>
+
+      <MS title="Bagian 2: Peminjaman APD">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <BF label="Kunci Pagar Tangga Listrik"  value={p.ada_kunci_pagar} />
+          <BF label="Rompi Ketinggian"            value={p.ada_rompi_ketinggian} />
+          <F  label="No. Rompi"                   value={p.no_rompi} />
+          <F  label="Jumlah Safety Helmet"        value={p.jumlah_safety_helmet} />
+          <F  label="Jumlah Full Body Harness"    value={p.jumlah_full_body_harness} />
+        </div>
+      </MS>
+
+      <MS title="Bagian 3: Pekerjaan Beresiko Tinggi">
+        <BF label="Area kerja diperiksa & aman"                          value={p.area_diperiksa_aman} />
+        <BF label="Paham cara menggunakan alat pemadam kebakaran"        value={p.paham_cara_menggunakan_alat_pemadam_kebakaran} />
+        <BF label="Ada pekerjaan listrik"                                value={p.ada_kerja_listrik} />
+        <BF label="Melakukan prosedur LOTO"                              value={p.prosedur_loto} />
+        <BF label="Menutupi area bawah dengan perisai tahan api"         value={p.menutupi_area_bawah_prisai} />
+        <BF label="Safety line tersedia & kondisi baik"                  value={p.safetyline_tersedia} />
+        <BF label="Alat bantu kerja dalam keadaan aman"                  value={p.alat_bantu_kerja_aman} />
+        <BF label="Menggunakan rompi saat bekerja di ketinggian"         value={p.menggunakan_rompi} />
+      </MS>
+
+      <MS title="Bagian 4: Alat Pelindung Diri">
+        <BF label="Beban dibawa ≤ 5 kg"      value={p.beban_tidak_5kg} />
+        <BF label="Helm sesuai standar SOP"  value={p.helm_sesuai_sop} />
+        <BF label="Rambu-rambu safety ada"   value={p.rambu2_tersedia} />
+      </MS>
+
+      <MS title="Bagian 5: Pengecekan Body Harness & Lanyard">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8">
+          <div>
+            <p className="text-xs font-bold text-slate-500 uppercase mb-2">Body Harness</p>
+            <BF label="Webbing — jahitan baik"         value={p.webbing_kondisi_baik} />
+            <BF label="D-Ring — tidak retak/berkarat"  value={p.dring_kondisi_baik} />
+            <BF label="Gesper — mengunci sempurna"     value={p.gesper_kondisi_baik} />
+          </div>
+          <div>
+            <p className="text-xs font-bold text-slate-500 uppercase mb-2">Lanyard</p>
+            <BF label="Absorber & Timbes — baik"   value={p.absorter_dan_timbes_kondisi_baik} />
+            <BF label="Snap Hook — dapat dikunci"  value={p.snap_hook_kondisi_baik} />
+            <BF label="Rope Lanyard — tidak aus"   value={p.rope_lanyard_kondisi_baik} />
+          </div>
+        </div>
+      </MS>
+
+      <MS title="Persetujuan">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <F label="SPV Terkait"   value={p.spv_terkait} />
+          <F label="Kontraktor"    value={p.nama_kontraktor} />
+          <F label="SFO"           value={p.sfo} />
+          <F label="MR / PGA MGR" value={p.mr_pga_mgr} />
+        </div>
+      </MS>
+    </>
+  );
+
+  const renderHotOrWorkshop = () => (
+    <>
+      {/* FIX 3: Fire Watch & Jabatan Pemberi Izin ditampilkan dengan section terpisah */}
+      <MS title="Bagian 1: Informasi Registrasi & Identitas">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+          <F label="No. Registrasi"        value={p.no_registrasi} />
+          <F label="Nama Kontraktor / NIK" value={p.nama_kontraktor_nik} />
+          <F label="Nama Pekerja / NIK"    value={p.nama_pekerja_nik} />
+          <F label="Lokasi Pekerjaan"      value={p.lokasi_pekerjaan} />
+          <F label="Tanggal Pelaksanaan"   value={formatDate(p.tanggal_pelaksanaan)} />
+          {/* FIX 4: waktu_pukul dari Postgres sudah diformat dengan formatTime */}
+          <F label="Waktu Pukul"           value={formatTime(p.waktu_pukul)} />
+        </div>
+        <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg mb-3">
+          <p className="text-xs font-bold text-blue-700 uppercase mb-2">Fire Watch (Pengawas Api)</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <F label="Nama Fire Watch" value={p.nama_fire_watch} />
+            <F label="NIK Fire Watch"  value={p.nik_fire_watch} />
+          </div>
+        </div>
+        <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
+          <p className="text-xs font-bold text-green-700 uppercase mb-2">Pemberi Izin</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <F label="Jabatan Pemberi Izin" value={p.jabatan_pemberi_izin} />
+            <F label="NIK Pemberi Izin"     value={p.nik_pemberi_ijin} />
+          </div>
+        </div>
+      </MS>
+
+      <MS title="Bagian 2A: Jenis Pekerjaan">
+        <div className="space-y-1 mb-4">
+          {isTruthy(p.preventive_genset_pump_room) && <p className="text-sm py-0.5">✓ Preventive Genset / Pump Room</p>}
+          {isTruthy(p.tangki_solar)                && <p className="text-sm py-0.5">✓ Tangki Solar</p>}
+          {isTruthy(p.panel_listrik)               && <p className="text-sm py-0.5">✓ Panel Listrik</p>}
+          {isTruthy(p.ada_kerja_lainnya) && p.jenis_kerjaan_lainnya && (
+            <p className="text-sm py-0.5">✓ Lainnya: {p.jenis_kerjaan_lainnya}</p>
+          )}
+        </div>
+        <p className="text-xs font-bold text-slate-500 uppercase mb-2">Detail Pekerjaan Panas</p>
+        {[
+          { label: "Cutting",  detail: p.detail_cutting,  mulai: p.t_mulai_cutting,  selesai: p.t_selesai_cutting },
+          { label: "Grinding", detail: p.detail_grinding, mulai: p.t_mulai_grinding, selesai: p.t_selesai_grinding },
+          { label: "Welding",  detail: p.detail_welding,  mulai: p.t_mulai_welding,  selesai: p.t_selesai_welding },
+          { label: "Painting", detail: p.detail_painting, mulai: p.t_mulai_painting, selesai: p.t_selesai_painting },
+        ].filter(x => x.detail || x.mulai || x.selesai).map(x => (
+          <div key={x.label} className="flex items-start gap-2 py-1.5 border-b border-slate-100 last:border-0 text-sm">
+            <span className="font-semibold w-20 text-slate-700 shrink-0">{x.label}</span>
+            <span className="text-slate-600 flex-1">{x.detail || "-"}</span>
+            {(x.mulai || x.selesai) && (
+              <span className="text-xs text-slate-500 shrink-0">
+                {formatTime(x.mulai)} – {formatTime(x.selesai)}
+              </span>
+            )}
+          </div>
+        ))}
+        {p.jenisForm === "workshop" && (
+          <div className="mt-3 flex gap-2">
+            {isTruthy(p.painting_spray)     && <span className="px-2 py-1 bg-orange-100 text-orange-700 text-xs rounded-full font-medium">SPRAY</span>}
+            {isTruthy(p.painting_non_spray) && <span className="px-2 py-1 bg-slate-100 text-slate-700 text-xs rounded-full font-medium">NON SPRAY</span>}
+          </div>
+        )}
+      </MS>
+
+      <MS title="Bagian 2B: Area Berisiko Tinggi">
+        <div className="space-y-1">
+          {[
+            { key: "ruang_tertutup",       label: "Ruang tertutup / area pembuangan / container" },
+            { key: "bahan_mudah_terbakar", label: "Bahan mudah terbakar" },
+            { key: "gas_bejana_tangki",    label: "Gas (bekerja dalam bejana / tangki)" },
+            { key: "height_work",          label: "Bekerja di ketinggian" },
+            { key: "cairan_gas_bertekan",  label: "Cairan / Gas bertekanan" },
+            { key: "cairan_hydrocarbon",   label: "Cairan hydrocarbon (minyak, kondensat)" },
+          ].filter(x => isTruthy(p[x.key])).map(x => (
+            <p key={x.key} className="text-sm py-0.5">✓ {x.label}</p>
+          ))}
+          {p.bahaya_lain && <p className="text-sm py-0.5 text-amber-700">⚠ Bahaya lain: {p.bahaya_lain}</p>}
+        </div>
+      </MS>
+
+      <MS title="Bagian 3: Upaya Pencegahan">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8">
+          <div>
+            <p className="text-xs font-bold text-slate-500 uppercase mb-2">1. Umum</p>
+            <BF label="Equipment / Tools kondisi baik"        value={p.kondisi_tools_baik} />
+            <BF label="APAR / Hydrant tersedia"               value={p.tersedia_apar_hydrant} />
+            <BF label="Sensor Smoke Detector non-aktif"       value={p.sensor_smoke_detector_non_aktif} />
+            <BF label="APD lengkap dipakai"                   value={p.apd_lengkap} />
+
+            <p className="text-xs font-bold text-slate-500 uppercase mt-4 mb-2">2. Daerah 11 Meter</p>
+            <BF label="Tidak ada cairan mudah terbakar"       value={p.tidak_ada_cairan_mudah_terbakar} />
+            <BF label="Lantai bersih"                         value={p.lantai_bersih} />
+            <BF label="Lantai dibasahi / pasir basah"         value={p.lantai_sudah_dibasahi} />
+            <BF label="Cairan mudah terbakar tertutup"        value={p.cairan_mudah_tebakar_tertutup} />
+            <BF label="Lembaran di bawah pekerjaan"           value={p.lembaran_dibawah_pekerjaan} />
+            <BF label="Lindungi conveyor, kabel, equipment"   value={p.lindungi_conveyor_dll} />
+          </div>
+          <div>
+            <p className="text-xs font-bold text-slate-500 uppercase mb-2">3. Ruangan Tertutup</p>
+            <BF label="Alat dibersihkan dari bahan terbakar"  value={p.alat_telah_bersih} />
+            <BF label="Uap menyala dibuang dari ruangan"      value={p.uap_menyala_telah_dibuang} />
+
+            <p className="text-xs font-bold text-slate-500 uppercase mt-4 mb-2">4. Dinding / Langit-Langit</p>
+            <BF label="Konstruksi tidak mudah terbakar"       value={p.kerja_pada_dinding_lagit} />
+            <BF label="Bahan mudah terbakar dipindahkan"      value={p.bahan_mudah_terbakar_dipindahkan_dari_dinding} />
+
+            <p className="text-xs font-bold text-slate-500 uppercase mt-4 mb-2">5. Fire Watch</p>
+            <BF label="Fire watch memastikan area aman"       value={p.fire_watch_memastikan_area_aman} />
+            <BF label="Fire watch terlatih pakai APAR"        value={p.firwatch_terlatih} />
+
+            {p.jenisForm === "hot-work" && (
+              <>
+                <p className="text-xs font-bold text-slate-500 uppercase mt-4 mb-2">6. Fire Blanket</p>
+                <BF label="Fire blanket kondisi layak"        value={p.kondisi_fire_blanket} />
+                {p.jumlah_fire_blanket != null && (
+                  <F label="Jumlah Fire Blanket" value={p.jumlah_fire_blanket} />
+                )}
+              </>
+            )}
+          </div>
+        </div>
+        {p.permintaan_tambahan && (
+          <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+            <p className="text-xs font-bold text-amber-700 uppercase mb-1">Permintaan Tambahan</p>
+            <p className="text-sm text-slate-700">{p.permintaan_tambahan}</p>
+          </div>
+        )}
+      </MS>
+
+      <MS title="Persetujuan">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <F label="SPV Terkait / Supervisor"  value={p.spv_terkait} />
+          <F label="Kontraktor"                value={p.kontraktor} />
+          <F label="Safety Fire Officer (SFO)" value={p.sfo} />
+          <F label="PGA / Dept Head"           value={p.pga} />
+        </div>
+      </MS>
+    </>
+  );
+
+  return (
+    <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] flex flex-col">
+        <div className="flex items-center justify-between bg-gradient-to-r from-orange-50 to-orange-100 border-b border-orange-200 px-6 py-5 rounded-t-2xl shrink-0">
+          <div>
+            <div className="flex items-center gap-3 mb-1 flex-wrap">
+              <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${formTypeBadge[p.jenisForm]}`}>
+                {formTypeLabel[p.jenisForm]}
+              </span>
+              {getStatusBadge(p.status)}
+            </div>
+            <h2 className="text-xl font-bold text-slate-900">{p.id}</h2>
+            <p className="text-xs text-slate-500 mt-0.5">Dibuat: {formatDate(p.tanggal)}</p>
+          </div>
+          <button onClick={onClose} className="p-2 hover:bg-orange-200 rounded-lg transition-colors">
+            <X className="w-6 h-6 text-slate-600" />
+          </button>
+        </div>
+
+        <div className="overflow-y-auto p-6 space-y-4 flex-1">
+          {p.jenisForm === "height-work" ? renderHeightWork() : renderHotOrWorkshop()}
+        </div>
+
+        <div className="shrink-0 bg-slate-50 border-t px-6 py-4 flex justify-between items-center rounded-b-2xl">
+          <span className="text-xs text-slate-400">ID: {p.id}</span>
+          <div className="flex gap-3">
+            <button onClick={onClose}
+              className="px-4 py-2 border border-slate-300 text-slate-700 rounded-lg text-sm hover:bg-slate-100 transition-colors"
+            >Tutup</button>
+            <button onClick={() => window.print()}
+              className="px-4 py-2 bg-orange-600 text-white rounded-lg text-sm hover:bg-orange-700 transition-colors"
+            >Print</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ─── Main Page ────────────────────────────────────────────────────────────────
+export default function HistoryPage() {
+  const [permits, setPermits]               = useState<Permit[]>([]);
+  const [loading, setLoading]               = useState(true);
+  const [filter, setFilter]                 = useState<"all"|"hot-work"|"workshop"|"height-work">("all");
+  const [selectedPermit, setSelectedPermit] = useState<Permit | null>(null);
+
+  useEffect(() => { loadPermits(); }, []);
 
   const loadPermits = async () => {
     setLoading(true);
     try {
-      // Ambil data dari 3 tabel
-      const { data: hotWorkData, error: hotWorkError } = await supabase
-        .from("form-kerja-panas")
-        .select("*");
+      // FIX ROOT CAUSE: tambah ?full=1 → API harus query SELECT * bukan SELECT sebagian kolom
+      const [r1, r2, r3] = await Promise.all([
+        fetch("/api/forms/hot-work?limit=200&full=1"),
+        fetch("/api/forms/workshop?limit=200&full=1"),
+        fetch("/api/forms/height-work?limit=200&full=1"),
+      ]);
+      if (!r1.ok || !r2.ok || !r3.ok) throw new Error("Gagal mengambil data dari server");
+      const [j1, j2, j3] = await Promise.all([r1.json(), r2.json(), r3.json()]);
 
-      const { data: workshopData, error: workshopError } = await supabase
-        .from("form_kerja_workshop")
-        .select("*");
+      const mapped = [
+        ...(j1.data ?? []).map((x: any) => ({ ...x, id: x.id_form, jenisForm: "hot-work"    as const, status: x.status ?? "submitted" })),
+        ...(j2.data ?? []).map((x: any) => ({ ...x, id: x.id_form, jenisForm: "workshop"     as const, status: x.status ?? "submitted" })),
+        ...(j3.data ?? []).map((x: any) => ({ ...x, id: x.id_form, jenisForm: "height-work"  as const, status: x.status ?? "submitted" })),
+      ].sort((a, b) => new Date(b.tanggal ?? 0).getTime() - new Date(a.tanggal ?? 0).getTime());
 
-      const { data: heightWorkData, error: heightWorkError } = await supabase
-        .from("form-kerja-ketinggian")
-        .select("*");
-
-      if (hotWorkError || workshopError || heightWorkError) {
-        console.error("Error fetching data:", { hotWorkError, workshopError, heightWorkError });
-        alert("Gagal memuat data riwayat.");
-        return;
-      }
-
-      // Gabungkan dan tandai jenis form
-      const mappedHotWork = (hotWorkData || []).map((item) => ({
-        ...item,
-        id: item.id_form,
-        jenisForm: "hot-work" as const,
-        status: "submitted" as const,
-        submittedAt: item.tanggal_pelaksanaan || item.tanggal,
-        createdAt: item.tanggal,
-      }));
-
-      const mappedWorkshop = (workshopData || []).map((item) => ({
-        ...item,
-        id: item.id_form,
-        jenisForm: "workshop" as const,
-        status: "submitted" as const,
-        submittedAt: item.tanggal_pelaksanaan || item.tanggal,
-        createdAt: item.tanggal,
-      }));
-
-      const mappedHeightWork = (heightWorkData || []).map((item) => ({
-        ...item,
-        id: item.id_form,
-        jenisForm: "height-work" as const,
-        status: "submitted" as const,
-        submittedAt: item.tanggal_pelaksanaan || item.tanggal,
-        createdAt: item.tanggal,
-      }));
-
-      const allPermits = [...mappedHotWork, ...mappedWorkshop, ...mappedHeightWork].sort(
-        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-      );
-
-      setPermits(allPermits);
-    } catch (err) {
-      console.error("Unexpected error:", err);
-      alert("Terjadi kesalahan saat memuat data.");
+      setPermits(mapped);
+    } catch (err: any) {
+      console.error(err);
+      alert("Gagal memuat data: " + err.message);
     } finally {
       setLoading(false);
     }
   };
 
-  const filteredPermits = permits.filter((permit) => {
-    if (filter === "all") return true;
-    return permit.jenisForm === filter;
-  });
+  const filtered = permits.filter(p => filter === "all" || p.jenisForm === filter);
 
-  const handleViewPermit = (permit: Permit) => {
-    setSelectedPermit(permit);
-    setShowModal(true);
-  };
-
-  const getStatusBadge = (status: string) => {
-    const badges = {
-      draft: { bg: "bg-gray-100", text: "text-gray-700", icon: AlertCircle, label: "Draft" },
-      submitted: { bg: "bg-blue-100", text: "text-blue-700", icon: Clock, label: "Diajukan" },
-      approved: { bg: "bg-green-100", text: "text-green-700", icon: CheckCircle, label: "Disetujui" },
-      rejected: { bg: "bg-red-100", text: "text-red-700", icon: XCircle, label: "Ditolak" },
-    };
-    const badge = badges[status as keyof typeof badges] || badges.submitted;
-    const Icon = badge.icon;
-    return (
-      <span className={`inline-flex items-center space-x-1 px-3 py-1 rounded-full text-xs font-medium ${badge.bg} ${badge.text}`}>
-        <Icon className="w-3.5 h-3.5" />
-        <span>{badge.label}</span>
-      </span>
-    );
-  };
-
-  const formatDate = (dateString: string | undefined) => {
-    if (!dateString) return "-";
-    const date = new Date(dateString);
-    return date.toLocaleDateString("id-ID", { day: "2-digit", month: "long", year: "numeric" });
-  };
-
-  const formatTime = (timeString: string | undefined) => timeString || "-";
-
-  const DetailModal = () => {
-    if (!selectedPermit) return null;
-
-    const renderSection = (title: string, content: React.ReactNode) => (
-      <div className="border border-slate-200 rounded-lg overflow-hidden">
-        <div className="bg-slate-100 px-4 py-2">
-          <h3 className="font-bold text-slate-900">{title}</h3>
-        </div>
-        <div className="p-4">{content}</div>
-      </div>
-    );
-
-    const renderPekerjaanPanas = (item: any, label: string) => {
-      if (!item) return null;
-      if (typeof item === "string") {
-        return item ? <p key={label}>{label}: {item}</p> : null;
-      }
-      if (typeof item === "object" && (item.detail || item.mulai || item.selesai)) {
-        return (
-          <p key={label}>
-            {label}: {item.detail || "-"} 
-            {(item.mulai || item.selesai) && ` (Pukul ${item.mulai || "-"} - ${item.selesai || "-"})`}
-          </p>
-        );
-      }
-      return null;
-    };
-
-    // --- RENDER BERDASARKAN JENIS FORM ---
-    const renderContentByType = () => {
-      if (selectedPermit.jenisForm === "height-work") {
-        return (
-          <>
-            {/* BAGIAN 1: INFORMASI PETUGAS KETINGGIAN */}
-            {renderSection("BAGIAN 1: INFORMASI PETUGAS KETINGGIAN", (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {[
-                  { key: 'petugas_ketinggian', label: 'Tipe Perusahaan' },
-                  { key: 'deskripsi_pekerjaan', label: 'Deskripsi Pekerjaan' },
-                  { key: 'lokasi', label: 'Lokasi' },
-                  { key: 'tanggal_pelaksanaan', label: 'Tanggal Pelaksanaan' },
-                  { key: 'waktu_mulai', label: 'Waktu Mulai' },
-                  { key: 'waktu_selesai', label: 'Waktu Selesai' },
-                  { key: 'nama_pengawas_kontraktor', label: 'Nama Pengawas Kontraktor' },
-                ].map(({ key, label }) => (
-                  <div key={key} className="text-sm mb-2">
-                    <span className="text-xs text-slate-600 uppercase">{label}</span>
-                    <p className="font-medium mt-1">
-                      {key === 'petugas_ketinggian'
-                        ? selectedPermit[key] || '-'
-                        : key === 'tanggal_pelaksanaan'
-                        ? formatDate(selectedPermit[key])
-                        : key === 'waktu_mulai' || key === 'waktu_selesai'
-                        ? formatTime(selectedPermit[key])
-                        : selectedPermit[key] || '-'}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            ))}
-
-            {/* INFORMASI PETUGAS */}
-            {renderSection("INFORMASI PETUGAS", (
-              <div className="space-y-2">
-                {Array.from({ length: 10 }).map((_, i) => {
-                  const namaKey = `nama_petugas_${i + 1}`;
-                  const sehatKey = `petugas_${i + 1}_sehat`;
-                  const nama = selectedPermit[namaKey];
-                  const sehat = selectedPermit[sehatKey];
-                  if (!nama) return null;
-                  return (
-                    <div key={i} className="flex justify-between">
-                      <span>Petugas {i + 1}: {nama}</span>
-                      <span>{sehat ? "Sehat" : "Tidak Sehat"}</span>
-                    </div>
-                  );
-                })}
-              </div>
-            ))}
-
-            {/* PEMINJAMAN PERALATAN */}
-            {renderSection("PEMINJAMAN PERALATAN", (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {[
-                  { key: 'ada_kunci_pagar', label: 'Kunci Pagar Tangga Listrik' },
-                  { key: 'ada_rompi_ketinggian', label: 'Rompi Ketinggian' },
-                  { key: 'no_rompi', label: 'No. Rompi' },
-                  { key: 'jumlah_safety_helmet', label: 'Jumlah Safety Helmet' },
-                  { key: 'jumlah_full_body_harness', label: 'Jumlah Full Body Harness' },
-                ].map(({ key, label }) => (
-                  <div key={key} className="text-sm mb-2">
-                    <span className="text-xs text-slate-600 uppercase">{label}</span>
-                    <p className="font-medium mt-1">
-                      {key === 'ada_kunci_pagar' || key === 'ada_rompi_ketinggian'
-                        ? (selectedPermit[key] ? 'Ya' : 'Tidak')
-                        : selectedPermit[key] || '-'}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            ))}
-
-            {/* PEKERJAAN BERESIKO TINGGI */}
-            {renderSection("PEKERJAAN BERESIKO TINGGI", (
-              <div className="space-y-2">
-                {[
-                  { key: 'area_diperiksa_aman', label: 'Area kerja aman' },
-                  { key: 'paham_cara_menggunakan_alat_pemadam_kebakaran', label: 'Prosedur kebakaran dipahami' },
-                  { key: 'ada_kerja_listrik', label: 'Ada pekerjaan listrik' },
-                  { key: 'prosedur_LOTO', label: 'Melakukan prosedur LOTO' },
-                  { key: 'menutupi_area_bawah_prisai', label: 'Area ditutupi perisai tahan api' },
-                  { key: 'safetyline_tersedia', label: 'Safety line tersedia & baik' },
-                  { key: 'alat_bantu_kerja_aman', label: 'Alat bantu kerja aman' },
-                  { key: 'menggunakan_rompi', label: 'Menggunakan rompi saat kerja' },
-                ].map(({ key, label }) => (
-                  <div key={key} className="text-sm mb-2">
-                    <span className="text-xs text-slate-600 uppercase">{label}</span>
-                    <p className="font-medium mt-1">
-                      {selectedPermit[key] ? "Ya" : "Tidak"}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            ))}
-
-            {/* ALAT PELINDUNG DIRI */}
-            {renderSection("ALAT PELINDUNG DIRI", (
-              <div className="space-y-2">
-                {[
-                  { key: 'beban_tidak_5kg', label: 'Beban ≤ 5 kg' },
-                  { key: 'helm_sesuai_sop', label: 'Helm sesuai standar' },
-                  { key: 'rambu2_tersedia', label: 'Rambu safety tersedia' },
-                ].map(({ key, label }) => (
-                  <div key={key} className="text-sm mb-2">
-                    <span className="text-xs text-slate-600 uppercase">{label}</span>
-                    <p className="font-medium mt-1">
-                      {selectedPermit[key] ? "Ya" : "Tidak"}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            ))}
-
-            {/* POINT PENGECEKAN HARNESS */}
-            {renderSection("POINT PENGECEKAN HARNESS", (
-              <div className="space-y-2">
-                {[
-                  { key: 'webbing_kondisi_baik', label: 'Webbing baik' },
-                  { key: 'dring_kondisi_baik', label: 'D-Ring baik' },
-                  { key: 'gesper_kondisi_baik', label: 'Gesper baik' },
-                  { key: 'absorter_dan_timbes_kondisi_baik', label: 'Absorber baik' },
-                  { key: 'snap_hook_kondisi_baik', label: 'Snap Hook baik' },
-                  { key: 'rope_lanyard_kondisi_baik', label: 'Rope baik' },
-                ].map(({ key, label }) => (
-                  <div key={key} className="text-sm mb-2">
-                    <span className="text-xs text-slate-600 uppercase">{label}</span>
-                    <p className="font-medium mt-1">
-                      {selectedPermit[key] ? "Ya" : "Tidak"}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            ))}
-
-            {/* PERSETUJUAN */}
-            {renderSection("PERSETUJUAN", (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {[
-                  { key: 'spv_terkait', label: 'SPV Terkait' },
-                  { key: 'nama_kontraktor', label: 'Kontraktor' },
-                  { key: 'sfo', label: 'Safety Officer' },
-                  { key: 'mr_pga_mgr', label: 'MR/PGA MGR' },
-                ].map(({ key, label }) => (
-                  <div key={key} className="text-sm mb-2">
-                    <span className="text-xs text-slate-600 uppercase">{label}</span>
-                    <p className="font-medium mt-1">
-                      {selectedPermit[key] || "-"}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            ))}
-          </>
-        );
-      }
-
-      // Default: hot-work / workshop
-      return (
-        <>
-          {/* BAGIAN 1: INFORMASI UMUM */}
-          {renderSection("BAGIAN 1: INFORMASI UMUM", (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {[
-                { key: 'no_registrasi', label: 'No Registrasi' },
-                { key: 'nama_kontraktor_nik', label: 'Nama Kontraktor / NIK' },
-                { key: 'nama_nik', label: 'Nama Pekerja / NIK' },
-                { key: 'lokasi_pekerjaan', label: 'Lokasi' },
-                { key: 'tanggal_pelaksanaan', label: 'Tanggal Pelaksanaan' },
-                { key: 'waktu_pukul', label: 'Waktu Pukul' },
-                { key: 'nama_fire_watch', label: 'Nama Fire Watch' },
-                { key: 'nik_fire_watch', label: 'NIK Fire Watch' },
-                { key: 'jabatan_pemberi_izin', label: 'Jabatan Pemberi Izin' },
-                { key: 'nik_pemberi_ijin', label: 'NIK Pemberi Izin' },
-              ].map(({ key, label }) => (
-                <div key={key} className="text-sm mb-2">
-                  <span className="text-xs text-slate-600 uppercase">{label}</span>
-                  <p className="font-medium mt-1">
-                    {key === 'tanggal_pelaksanaan'
-                      ? formatDate(selectedPermit[key])
-                      : key === 'waktu_pukul'
-                      ? formatTime(selectedPermit[key])
-                      : selectedPermit[key] || '-'}
-                  </p>
-                </div>
-              ))}
-            </div>
-          ))}
-
-          {/* BAGIAN 2: JENIS PEKERJAAN & AREA BERISIKO */}
-          {renderSection("BAGIAN 2: JENIS PEKERJAAN & AREA BERISIKO", (
-            <div className="space-y-4">
-              <div>
-                <p className="text-xs text-slate-600 uppercase mb-2">Jenis Pekerjaan</p>
-                <div className="space-y-1">
-                  {selectedPermit.preventive_genset_pump_room && <p key="preventive">✓ Preventive Genset / Pump room</p>}
-                  {selectedPermit.tangki_solar && <p key="tangki">✓ Tangki Solar</p>}
-                  {selectedPermit.panel_listrik && <p key="panel">✓ Panel Listrik</p>}
-                  {selectedPermit.painting_spray && <p key="spray">✓ Painting Spray</p>}
-                  {selectedPermit.ada_kerja_lainnya && selectedPermit.jenis_kerjaan_lainnya && (
-                    <p key="lainnya">✓ Lainnya: {selectedPermit.jenis_kerjaan_lainnya}</p>
-                  )}
-                </div>
-              </div>
-
-              <div>
-                <p className="text-xs text-slate-600 uppercase mb-2">Detail Pekerjaan Panas</p>
-                <div className="space-y-1">
-                  {renderPekerjaanPanas({ detail: selectedPermit.detail_cutting, mulai: selectedPermit.t_mulai_cutting, selesai: selectedPermit.t_selesai_cutting }, "Cutting")}
-                  {renderPekerjaanPanas({ detail: selectedPermit.detail_grinding, mulai: selectedPermit.t_mulai_grinding, selesai: selectedPermit.t_selesai_grinding }, "Grinding")}
-                  {renderPekerjaanPanas({ detail: selectedPermit.detail_welding, mulai: selectedPermit.t_mulai_welding, selesai: selectedPermit.t_selesai_welding }, "Welding")}
-                  {renderPekerjaanPanas({ detail: selectedPermit.detail_painting, mulai: selectedPermit.t_mulai_painting, selesai: selectedPermit.t_selesai_painting }, "Painting")}
-                </div>
-              </div>
-
-              <div>
-                <p className="text-xs text-slate-600 uppercase mb-2">Area Berisiko</p>
-                <div className="space-y-1">
-                  {selectedPermit.ruang_tertutup && <p key="ruangTertutup">✓ Ruang tertutup</p>}
-                  {selectedPermit.bahan_mudah_terbakar && <p key="bahanMudah">✓ Bahan mudah terbakar</p>}
-                  {selectedPermit.gas_bejana_tangki && <p key="gas">✓ Gas</p>}
-                  {selectedPermit.height_work && <p key="ketinggian">✓ Ketinggian</p>}
-                  {selectedPermit.cairan_gas_bertekan && <p key="cairan">✓ Cairan/Gas bertekanan</p>}
-                  {selectedPermit.cairan_hydrocarbon && <p key="hydrocarbon">✓ Hydrocarbon</p>}
-                  {selectedPermit.bahaya_lain && <p key="lain-area">✓ Lain: {selectedPermit.bahaya_lain}</p>}
-                </div>
-              </div>
-            </div>
-          ))}
-
-          {/* BAGIAN 3: UPAYA PENCEGAHAN */}
-          {renderSection("BAGIAN 3: UPAYA PENCEGAHAN", (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {[
-                { key: 'kondisi_tools_baik', label: 'Equipment / Tools kondisi baik' },
-                { key: 'tersedia_apar_hydrant', label: 'APAR / Hydrant tersedia' },
-                { key: 'sensor_smoke_detector_non_aktif', label: 'Sensor Smoke Detector non-aktif' },
-                { key: 'apd_lengkap', label: 'APD lengkap' },
-                { key: 'tidak_ada_cairan_mudah_terbakar', label: 'Tidak ada cairan mudah terbakar' },
-                { key: 'lantai_bersih', label: 'Lantai bersih' },
-                { key: 'lantai_sudah_dibasahi', label: 'Lantai sudah dibasahi' },
-                { key: 'cairan_mudah_tebakar_tertutup', label: 'Cairan mudah terbakar tertutup' },
-                { key: 'lembaran_dibawah_pekerjaan', label: 'Lembaran di bawah pekerjaan' },
-                { key: 'lindungi_conveyor_dll', label: 'Lindungi conveyor dll' },
-                { key: 'alat_telah_bersih', label: 'Alat telah dibersihkan' },
-                { key: 'uap_menyala_telah_dibuang', label: 'Uap menyala telah dibuang' },
-                { key: 'kerja_pada_dinding_lagit', label: 'Kerja pada dinding/langit-langit' },
-                { key: 'bahan_mudah_terbakar_dipindahkan_dari_dinding', label: 'Bahan mudah terbakar dipindahkan' },
-                { key: 'fire_watch_memastikan_area_aman', label: 'Fire watch pastikan area aman' },
-                { key: 'firwatch_terlatih', label: 'Fire watch terlatih' },
-              ].map(({ key, label }) => (
-                <div key={key} className="text-sm mb-2">
-                  <span className="text-xs text-slate-600 uppercase">{label}</span>
-                  <p className="font-medium mt-1">
-                    {selectedPermit[key] ? "Ya" : "Tidak"}
-                  </p>
-                </div>
-              ))}
-              {selectedPermit.jumlah_fire_blanket && (
-                <div key="jumlah_fire_blanket" className="text-sm mb-2">
-                  <span className="text-xs text-slate-600 uppercase">Jumlah Fire Blanket</span>
-                  <p className="font-medium mt-1">{selectedPermit.jumlah_fire_blanket}</p>
-                </div>
-              )}
-              {selectedPermit.permintaan_tambahan && (
-                <div key="permintaan_tambahan" className="text-sm mb-2">
-                  <span className="text-xs text-slate-600 uppercase">Permintaan Tambahan</span>
-                  <p className="font-medium mt-1">{selectedPermit.permintaan_tambahan}</p>
-                </div>
-              )}
-            </div>
-          ))}
-
-          {/* PERSETUJUAN */}
-          {renderSection("PERSETUJUAN", (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {[
-                { key: 'spv_terkait', label: 'SPV Terkait' },
-                { key: 'kontraktor', label: 'Kontraktor' },
-                { key: 'sfo', label: 'Safety Officer' },
-                { key: 'pga', label: 'PGA / Dept Head' },
-              ].map(({ key, label }) => (
-                <div key={key} className="text-sm mb-2">
-                  <span className="text-xs text-slate-600 uppercase">{label}</span>
-                  <p className="font-medium mt-1">
-                    {selectedPermit[key] || "-"}
-                  </p>
-                </div>
-              ))}
-            </div>
-          ))}
-        </>
-      );
-    };
-
-    return (
-      <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-        <div className="bg-white rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-          <div className="sticky top-0 bg-gradient-to-r from-orange-50 to-orange-100 border-b border-orange-200 p-6 flex items-center justify-between">
-            <div>
-              <h2 className="text-2xl font-bold text-slate-900">
-                {selectedPermit.jenisForm === "workshop"
-                  ? "Detail Izin Kerja Workshop"
-                  : selectedPermit.jenisForm === "height-work"
-                  ? "Detail Izin Kerja Ketinggian"
-                  : "Detail Izin Kerja Panas"}
-              </h2>
-              <p className="text-sm text-slate-600 mt-1">
-                ID Form: {selectedPermit.id}
-              </p>
-            </div>
-            <button onClick={() => setShowModal(false)} className="p-2 hover:bg-orange-200 rounded-lg">
-              <X className="w-6 h-6 text-slate-600" />
-            </button>
-          </div>
-
-          <div className="p-6 space-y-6">
-            <div className="flex items-center justify-between p-4 bg-slate-50 rounded-lg border">
-              <span className="text-sm font-medium text-slate-700">Status:</span>
-              {getStatusBadge(selectedPermit.status)}
-            </div>
-
-            {renderContentByType()}
-          </div>
-
-          <div className="sticky bottom-0 bg-slate-50 border-t p-4 flex justify-end gap-3">
-            <button onClick={() => setShowModal(false)} className="px-4 py-2 border rounded">
-              Tutup
-            </button>
-            <button className="px-4 py-2 bg-orange-600 text-white rounded hover:bg-orange-700">
-              Print
-            </button>
-          </div>
-        </div>
-      </div>
-    );
+  const stats = {
+    total:     permits.length,
+    submitted: permits.filter(p => p.status === "submitted").length,
+    approved:  permits.filter(p => p.status === "approved").length,
+    draft:     permits.filter(p => p.status === "draft").length,
   };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
       <div className="bg-white shadow-sm border-b border-slate-200 sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <Link href="/" className="p-2 hover:bg-slate-100 rounded-lg transition-colors">
-                <Home className="w-5 h-5 text-slate-600" />
-              </Link>
-              <div className="flex items-center space-x-3">
-                <div className="p-2 bg-orange-100 rounded-lg">
-                  <FileText className="w-5 h-5 text-orange-600" />
-                </div>
-                <div>
-                  <h1 className="text-2xl font-bold text-slate-900">Riwayat Izin Kerja</h1>
-                  <p className="text-sm text-slate-600">Daftar semua permit yang telah dibuat</p>
-                </div>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <Link href="/" className="p-2 hover:bg-slate-100 rounded-lg"><Home className="w-5 h-5 text-slate-600" /></Link>
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-orange-100 rounded-lg"><FileText className="w-5 h-5 text-orange-600" /></div>
+              <div>
+                <h1 className="text-xl font-bold text-slate-900">Riwayat Izin Kerja</h1>
+                <p className="text-xs text-slate-500">PT Jatim Autocomp Indonesia</p>
               </div>
             </div>
-            <Link
-              href="/form/hot-work"
-              className="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-lg font-medium transition-colors shadow-md"
-            >
+          </div>
+          <div className="flex items-center gap-3">
+            <button onClick={loadPermits} disabled={loading} className="p-2 hover:bg-slate-100 rounded-lg disabled:opacity-50" title="Refresh">
+              <RefreshCw className={`w-5 h-5 text-slate-600 ${loading ? "animate-spin" : ""}`} />
+            </button>
+            <Link href="/form/hot-work" className="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-lg text-sm font-semibold shadow-sm">
               + Buat Permit Baru
             </Link>
           </div>
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        <div className="bg-white rounded-lg shadow-sm p-4 mb-6 border border-slate-200">
-          <div className="flex items-center space-x-2 flex-wrap gap-2">
-            <span className="text-sm font-semibold text-slate-700">Filter Jenis Form:</span>
-            {(["all", "hot-work", "workshop", "height-work"] as const).map((type) => (
-              <button
-                key={type}
-                onClick={() => setFilter(type)}
-                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                  filter === type
-                    ? "bg-orange-600 text-white shadow-md"
-                    : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-5">
+        {/* Stat cards */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {[
+            { label: "Total Permit", value: stats.total,     color: "text-slate-700", bg: "bg-white" },
+            { label: "Diajukan",     value: stats.submitted, color: "text-blue-700",  bg: "bg-blue-50" },
+            { label: "Disetujui",    value: stats.approved,  color: "text-green-700", bg: "bg-green-50" },
+            { label: "Draft",        value: stats.draft,     color: "text-gray-600",  bg: "bg-gray-50" },
+          ].map(s => (
+            <div key={s.label} className={`${s.bg} border border-slate-200 rounded-xl p-4 shadow-sm`}>
+              <p className="text-xs text-slate-500 uppercase font-medium">{s.label}</p>
+              <p className={`text-3xl font-bold mt-1 ${s.color}`}>{s.value}</p>
+            </div>
+          ))}
+        </div>
+
+        {/* Filter bar */}
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-sm font-semibold text-slate-600 mr-1">Filter:</span>
+            {(["all","hot-work","workshop","height-work"] as const).map(type => (
+              <button key={type} onClick={() => setFilter(type)}
+                className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                  filter === type ? "bg-orange-600 text-white" : "bg-slate-100 text-slate-700 hover:bg-slate-200"
                 }`}
               >
-                {type === "all"
-                  ? "Semua"
-                  : type === "hot-work"
-                  ? "Hot Work"
-                  : type === "workshop"
-                  ? "Workshop"
-                  : "Ketinggian"}
+                {type === "all" ? "Semua" : type === "hot-work" ? "Hot Work" : type === "workshop" ? "Workshop" : "Ketinggian"}
+                {type !== "all" && (
+                  <span className="ml-1.5 bg-black/10 rounded-full px-1.5 text-xs">
+                    {permits.filter(p => p.jenisForm === type).length}
+                  </span>
+                )}
               </button>
             ))}
           </div>
         </div>
 
+        {/* List */}
         {loading ? (
-          <div className="text-center py-12">
-            <div className="inline-block animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-orange-600"></div>
-            <p className="mt-4 text-slate-600">Memuat data riwayat...</p>
+          <div className="text-center py-16">
+            <div className="inline-block animate-spin rounded-full h-10 w-10 border-4 border-orange-200 border-t-orange-600" />
+            <p className="mt-4 text-slate-500 text-sm">Memuat data...</p>
+          </div>
+        ) : filtered.length === 0 ? (
+          <div className="bg-white rounded-xl border border-slate-200 p-16 text-center">
+            <FileText className="w-16 h-16 text-slate-200 mx-auto mb-4" />
+            <h3 className="text-lg font-bold text-slate-700 mb-2">Belum ada data</h3>
+            <p className="text-slate-400 text-sm">Data akan muncul setelah Anda mengajukan izin kerja.</p>
           </div>
         ) : (
-          <div className="space-y-4">
-            {filteredPermits.length === 0 ? (
-              <div className="bg-white rounded-lg shadow-sm p-12 text-center border border-slate-200">
-                <FileText className="w-16 h-16 text-slate-300 mx-auto mb-4" />
-                <h3 className="text-lg font-bold text-slate-900 mb-2">Belum ada data</h3>
-                <p className="text-slate-600 mb-6">
-                  Data akan muncul setelah Anda mengajukan izin kerja.
-                </p>
-              </div>
-            ) : (
-              filteredPermits.map((permit) => (
-                <div
-                  key={permit.id}
-                  className="bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow border border-slate-200 overflow-hidden"
-                >
-                  <div className="p-6">
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="flex-1">
-                        <div className="flex items-center space-x-3 mb-3">
-                          <h3 className="text-lg font-bold text-slate-900">
-                            {permit.id}
-                          </h3>
-                          {getStatusBadge(permit.status)}
-                        </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-sm text-slate-600">
-                          <div className="flex items-center space-x-2">
-                            <User className="w-4 h-4 flex-shrink-0 text-slate-400" />
-                            <span>{permit.nama_kontraktor_nik || permit.nama_kontraktor || "-"}</span>
-                          </div>
-                          <div className="flex items-center space-x-2">
-                            <MapPin className="w-4 h-4 flex-shrink-0 text-slate-400" />
-                            <span>{permit.lokasi_pekerjaan || permit.lokasi || "-"}</span>
-                          </div>
-                          <div className="flex items-center space-x-2">
-                            <Calendar className="w-4 h-4 flex-shrink-0 text-slate-400" />
-                            <span>{formatDate(permit.tanggal_pelaksanaan)}</span>
-                          </div>
-                          <div className="flex items-center space-x-2">
-                            <Clock className="w-4 h-4 flex-shrink-0 text-slate-400" />
-                            <span>{formatTime(permit.waktu_pukul)}</span>
-                          </div>
-                        </div>
+          <div className="space-y-3">
+            {filtered.map(permit => (
+              <div key={permit.id} className="bg-white rounded-xl shadow-sm hover:shadow-md transition-all border border-slate-200">
+                <div className="p-5 flex items-start justify-between gap-4">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-3 mb-3 flex-wrap">
+                      <h3 className="text-base font-bold text-slate-900">{permit.id}</h3>
+                      <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${formTypeBadge[permit.jenisForm]}`}>
+                        {formTypeLabel[permit.jenisForm]}
+                      </span>
+                      {getStatusBadge(permit.status)}
+                    </div>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm text-slate-500">
+                      <div className="flex items-center gap-1.5">
+                        <User     className="w-3.5 h-3.5 shrink-0 text-slate-400" />
+                        <span className="truncate">{permit.nama_kontraktor_nik || permit.nama_kontraktor || "-"}</span>
                       </div>
-                      <button
-                        onClick={() => handleViewPermit(permit)}
-                        className="p-3 hover:bg-orange-50 rounded-lg transition-colors group"
-                        title="Lihat Detail Form"
-                      >
-                        <Eye className="w-5 h-5 text-orange-600 group-hover:text-orange-700" />
-                      </button>
+                      <div className="flex items-center gap-1.5">
+                        <MapPin   className="w-3.5 h-3.5 shrink-0 text-slate-400" />
+                        <span className="truncate">{permit.lokasi_pekerjaan || permit.lokasi || "-"}</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <Calendar className="w-3.5 h-3.5 shrink-0 text-slate-400" />
+                        <span>{formatDate(permit.tanggal_pelaksanaan)}</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <Clock    className="w-3.5 h-3.5 shrink-0 text-slate-400" />
+                        <span>{formatTime(permit.waktu_pukul || permit.waktu_mulai)}</span>
+                      </div>
                     </div>
                   </div>
+                  <button onClick={() => setSelectedPermit(permit)}
+                    className="p-2.5 hover:bg-orange-50 rounded-lg transition-colors group shrink-0"
+                  >
+                    <Eye className="w-5 h-5 text-orange-500 group-hover:text-orange-700" />
+                  </button>
                 </div>
-              ))
-            )}
+              </div>
+            ))}
           </div>
         )}
       </div>
 
-      {showModal && <DetailModal />}
+      {selectedPermit && <DetailModal permit={selectedPermit} onClose={() => setSelectedPermit(null)} />}
     </div>
   );
 }
