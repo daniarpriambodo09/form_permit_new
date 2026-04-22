@@ -1,7 +1,7 @@
 // app/api/auth/login/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { queryOne } from '@/lib/db';
-import { verifyPassword, signToken, getCookieOptions, COOKIE_NAME } from '@/lib/auth';
+import { verifyPassword, signToken, getCookieOptions, COOKIE_NAME, UserRole } from '@/lib/auth';
 
 interface User {
   id:        number;
@@ -44,7 +44,7 @@ export async function POST(req: NextRequest) {
       username: user.username,
       nama:     user.nama,
       jabatan:  user.jabatan,
-      role:     user.role,
+      role:     user.role as UserRole,
     });
 
     // Set cookie httpOnly

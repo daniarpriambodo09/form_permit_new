@@ -1,6 +1,6 @@
 // app/register/page.tsx
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { UserPlus, Eye, EyeOff, AlertCircle, CheckCircle, Shield } from "lucide-react";
@@ -8,9 +8,8 @@ import { UserPlus, Eye, EyeOff, AlertCircle, CheckCircle, Shield } from "lucide-
 export default function RegisterPage() {
   const router = useRouter();
   const [formData, setFormData] = useState({
-    nik:        "",
     nama:       "",
-    email:      "",
+    username:   "",
     perusahaan: "",
     no_telp:    "",
     password:   "",
@@ -20,25 +19,76 @@ export default function RegisterPage() {
   const [loading,   setLoading]   = useState(false);
   const [error,     setError]     = useState("");
   const [success,   setSuccess]   = useState(false);
+  const [checkingUsername, setCheckingUsername] = useState(false);
+  const [usernameStatus, setUsernameStatus] = useState<"available" | "taken" | "invalid" | null>(null);
+  const [usernameError, setUsernameError] = useState("");
 
-  const handleChange = (key: string, value: string) =>
+  const handleChange = (key: string, value: string) => {
     setFormData(prev => ({ ...prev, [key]: value }));
+    // Reset username validation saat user mengubah nilai
+    if (key === "username") {
+      setUsernameStatus(null);
+      setUsernameError("");
+    }
+  };
+
+  // Cek ketersediaan username dengan debounce
+  useEffect(() => {
+    if (!formData.username) {
+      setUsernameStatus(null);
+      setUsernameError("");
+      return;
+    }
+
+    // Validasi format username
+    const usernameRegex = /^[a-zA-Z0-9_]{3,20}$/;
+    if (!usernameRegex.test(formData.username)) {
+      setUsernameStatus("invalid");
+      setUsernameError("Username harus 3-20 karakter, hanya huruf, angka, dan underscore");
+      return;
+    }
+
+    // Check uniqueness
+    const timer = setTimeout(async () => {
+      setCheckingUsername(true);
+      try {
+        const res = await fetch(`/api/auth/check-username?username=${encodeURIComponent(formData.username)}`);
+        if (res.ok) {
+          const data = await res.json();
+          setUsernameStatus(data.available ? "available" : "taken");
+          if (!data.available) {
+            setUsernameError("Username sudah digunakan");
+          }
+        }
+      } catch (err) {
+        console.error("Error checking username:", err);
+      } finally {
+        setCheckingUsername(false);
+      }
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [formData.username]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
 
     // Validasi
+    if (!formData.username) {
+      setError("Username wajib diisi");
+      return;
+    }
+    if (usernameStatus !== "available") {
+      setError("Username tidak tersedia atau tidak valid");
+      return;
+    }
     if (formData.password !== formData.password2) {
       setError("Password dan konfirmasi password tidak cocok");
       return;
     }
     if (formData.password.length < 6) {
       setError("Password minimal 6 karakter");
-      return;
-    }
-    if (formData.nik.length < 10) {
-      setError("NIK tidak valid (minimal 10 digit)");
       return;
     }
 
@@ -125,21 +175,6 @@ export default function RegisterPage() {
           )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
-            {/* NIK */}
-            <div>
-              <label className="block text-sm font-medium text-slate-300 mb-1.5">
-                NIK (Nomor Induk Kependudukan) <span className="text-red-400">*</span>
-              </label>
-              <input
-                type="text"
-                value={formData.nik}
-                onChange={e => handleChange("nik", e.target.value)}
-                placeholder="16 digit NIK"
-                maxLength={16}
-                required
-                className={inputCls}
-              />
-            </div>
 
             {/* Nama */}
             <div>
@@ -156,20 +191,39 @@ export default function RegisterPage() {
               />
             </div>
 
-            {/* Email */}
+            {/* Username */}
             <div>
               <label className="block text-sm font-medium text-slate-300 mb-1.5">
-                Email <span className="text-red-400">*</span>
+                Username <span className="text-red-400">*</span>
               </label>
               <input
-                type="email"
-                value={formData.email}
-                onChange={e => handleChange("email", e.target.value)}
-                placeholder="email@example.com"
+                type="text"
+                value={formData.username}
+                onChange={e => handleChange("username", e.target.value)}
+                placeholder="3-20 karakter, huruf/angka/underscore"
                 required
-                className={inputCls}
+                className={`${inputCls} ${
+                  usernameStatus === "available" ? "border-green-500" : 
+                  usernameStatus === "taken" || usernameStatus === "invalid" ? "border-red-500" : ""
+                }`}
               />
-              <p className="text-xs text-slate-500 mt-1">Untuk notifikasi status izin kerja</p>
+              <div className="mt-1.5 flex items-center gap-2">
+                {checkingUsername && (
+                  <>
+                    <div className="w-3 h-3 border-2 border-orange-400 border-t-transparent rounded-full animate-spin" />
+                    <p className="text-xs text-slate-400">Memeriksa ketersediaan...</p>
+                  </>
+                )}
+                {!checkingUsername && usernameStatus === "available" && (
+                  <p className="text-xs text-green-400">✓ Username tersedia</p>
+                )}
+                {!checkingUsername && usernameStatus === "taken" && (
+                  <p className="text-xs text-red-400">✗ {usernameError}</p>
+                )}
+                {!checkingUsername && usernameStatus === "invalid" && (
+                  <p className="text-xs text-red-400">✗ {usernameError}</p>
+                )}
+              </div>
             </div>
 
             {/* Perusahaan */}
@@ -183,20 +237,6 @@ export default function RegisterPage() {
                 onChange={e => handleChange("perusahaan", e.target.value)}
                 placeholder="PT JAI / PT Kontraktor ABC"
                 required
-                className={inputCls}
-              />
-            </div>
-
-            {/* No Telp */}
-            <div>
-              <label className="block text-sm font-medium text-slate-300 mb-1.5">
-                No. Telepon
-              </label>
-              <input
-                type="tel"
-                value={formData.no_telp}
-                onChange={e => handleChange("no_telp", e.target.value)}
-                placeholder="08xxxxxxxxxx"
                 className={inputCls}
               />
             </div>

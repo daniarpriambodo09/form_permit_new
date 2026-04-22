@@ -1,6 +1,5 @@
 // app/dashboard/page.tsx
 "use client";
-
 import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import {
@@ -18,10 +17,10 @@ interface Permit {
   id: string;
   status: "draft" | "submitted" | "approved" | "rejected";
   jenisForm: "hot-work" | "workshop" | "height-work";
-  tanggal: string; // timestamp saat form disimpan
+  tanggal: string;
 }
 
-type Period    = "daily" | "weekly" | "monthly" | "yearly";
+type Period = "daily" | "weekly" | "monthly" | "yearly";
 type JenisForm = "hot-work" | "height-work" | "workshop" | null;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -31,28 +30,30 @@ const getDate = (p: Permit): Date | null => {
   return isNaN(d.getTime()) ? null : d;
 };
 
-// Monday = 0 … Sunday = 6
 const dayOfWeek = (d: Date) => (d.getDay() === 0 ? 6 : d.getDay() - 1);
 
 const monthNames = [
-  "Januari","Februari","Maret","April","Mei","Juni",
-  "Juli","Agustus","September","Oktober","November","Desember",
+  "Januari", "Februari", "Maret", "April", "Mei", "Juni",
+  "Juli", "Agustus", "September", "Oktober", "November", "Desember",
 ];
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 export default function DashboardPage() {
-  const [permits, setPermits]               = useState<Permit[]>([]);
-  const [loading, setLoading]               = useState(true);
-  const [selectedYear, setSelectedYear]     = useState("");
-  const [selectedMonth, setSelectedMonth]   = useState("");
-  const [selectedDay, setSelectedDay]       = useState("");
-  const [period, setPeriod]                 = useState<Period>("monthly");
-  const [selectedJenis, setSelectedJenis]   = useState<JenisForm>(null);
+  const [permits, setPermits] = useState<Permit[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedYear, setSelectedYear] = useState("");
+  const [selectedMonth, setSelectedMonth] = useState("");
+  const [selectedDay, setSelectedDay] = useState("");
+  const [period, setPeriod] = useState<Period>("monthly");
+  const [selectedJenis, setSelectedJenis] = useState<JenisForm>(null);
   const [availableYears, setAvailableYears] = useState<string[]>([]);
+  const [userRole, setUserRole] = useState("");
 
-  useEffect(() => { loadPermits(); }, []);
+  useEffect(() => {
+    setUserRole(sessionStorage.getItem("user_role") || "");
+    loadPermits();
+  }, []);
 
-  // ── Fetch all permits via API routes (SELECT * untuk dapat kolom tanggal) ──
   const loadPermits = async () => {
     setLoading(true);
     try {
@@ -63,16 +64,30 @@ export default function DashboardPage() {
       ]);
       if (!r1.ok || !r2.ok || !r3.ok) throw new Error("Gagal mengambil data");
       const [j1, j2, j3] = await Promise.all([r1.json(), r2.json(), r3.json()]);
-
+      
       const all: Permit[] = [
-        ...(j1.data ?? []).map((x: any) => ({ id: x.id_form, status: x.status ?? "submitted", jenisForm: "hot-work"    as const, tanggal: x.tanggal })),
-        ...(j2.data ?? []).map((x: any) => ({ id: x.id_form, status: x.status ?? "submitted", jenisForm: "workshop"     as const, tanggal: x.tanggal })),
-        ...(j3.data ?? []).map((x: any) => ({ id: x.id_form, status: x.status ?? "submitted", jenisForm: "height-work"  as const, tanggal: x.tanggal })),
+        ...(j1.data ?? []).map((x: any) => ({ 
+          id: x.id_form, 
+          status: x.status ?? "submitted", 
+          jenisForm: "hot-work" as const, 
+          tanggal: x.tanggal 
+        })),
+        ...(j2.data ?? []).map((x: any) => ({ 
+          id: x.id_form, 
+          status: x.status ?? "submitted", 
+          jenisForm: "workshop" as const, 
+          tanggal: x.tanggal 
+        })),
+        ...(j3.data ?? []).map((x: any) => ({ 
+          id: x.id_form, 
+          status: x.status ?? "submitted", 
+          jenisForm: "height-work" as const, 
+          tanggal: x.tanggal 
+        })),
       ];
 
       setPermits(all);
 
-      // Kumpulkan tahun unik dari field tanggal
       const years = new Set<string>();
       all.forEach(p => {
         const d = getDate(p);
@@ -89,13 +104,11 @@ export default function DashboardPage() {
     }
   };
 
-  // ── Filter permits sesuai pilihan filter ──────────────────────────────────
   const filtered = useMemo(() => {
     return permits.filter(p => {
       const d = getDate(p);
       if (!d || !selectedYear) return false;
       if (d.getFullYear().toString() !== selectedYear) return false;
-
       if (period === "daily" && selectedDay) {
         const sel = new Date(selectedDay);
         if (d.toDateString() !== sel.toDateString()) return false;
@@ -109,64 +122,73 @@ export default function DashboardPage() {
     });
   }, [permits, selectedYear, selectedMonth, selectedDay, period, selectedJenis]);
 
-  // ── Line chart data ───────────────────────────────────────────────────────
   const lineData = useMemo(() => {
     if (period === "daily") {
       return Array.from({ length: 24 }, (_, h) => ({
-        name: `${String(h).padStart(2, "0")}.00`,
-        jumlah: filtered.filter(p => { const d = getDate(p); return d && d.getHours() === h; }).length,
+        name: `${String(h).padStart(2, "0")}:00`,
+        jumlah: filtered.filter(p => { 
+          const d = getDate(p); 
+          return d && d.getHours() === h; 
+        }).length,
       }));
     }
     if (period === "weekly") {
-      const days = ["Senin","Selasa","Rabu","Kamis","Jumat","Sabtu","Minggu"];
+      const days = ["Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu", "Minggu"];
       const counts = new Array(7).fill(0);
-      filtered.forEach(p => { const d = getDate(p); if (d) counts[dayOfWeek(d)]++; });
+      filtered.forEach(p => { 
+        const d = getDate(p); 
+        if (d) counts[dayOfWeek(d)]++; 
+      });
       return days.map((name, i) => ({ name, jumlah: counts[i] }));
     }
     if (period === "monthly") {
-      const month   = parseInt(selectedMonth || "1");
-      const year    = parseInt(selectedYear);
+      const month = parseInt(selectedMonth || "1");
+      const year = parseInt(selectedYear);
       const daysInMonth = new Date(year, month, 0).getDate();
       const counts: Record<number, number> = {};
       for (let i = 1; i <= daysInMonth; i++) counts[i] = 0;
       filtered.forEach(p => {
         const d = getDate(p);
-        if (d && d.getFullYear() === year && d.getMonth() + 1 === month) counts[d.getDate()]++;
+        if (d && d.getFullYear() === year && d.getMonth() + 1 === month) {
+          counts[d.getDate()]++;
+        }
       });
       return Object.entries(counts).map(([day, jumlah]) => ({ name: day, jumlah }));
     }
-    // yearly
     const counts = new Array(12).fill(0);
-    filtered.forEach(p => { const d = getDate(p); if (d) counts[d.getMonth()]++; });
-    return ["Jan","Feb","Mar","Apr","Mei","Jun","Jul","Agu","Sep","Okt","Nov","Des"]
+    filtered.forEach(p => { 
+      const d = getDate(p); 
+      if (d) counts[d.getMonth()]++; 
+    });
+    return ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"]
       .map((name, i) => ({ name, jumlah: counts[i] }));
   }, [filtered, period, selectedMonth, selectedYear]);
 
-  // ── Bar & Pie data ────────────────────────────────────────────────────────
   const barData = useMemo(() => [
-    { name: "Hot Work",    jumlah: filtered.filter(p => p.jenisForm === "hot-work").length },
+    { name: "Hot Work", jumlah: filtered.filter(p => p.jenisForm === "hot-work").length },
     { name: "Height Work", jumlah: filtered.filter(p => p.jenisForm === "height-work").length },
-    { name: "Workshop",    jumlah: filtered.filter(p => p.jenisForm === "workshop").length },
+    { name: "Workshop", jumlah: filtered.filter(p => p.jenisForm === "workshop").length },
   ], [filtered]);
 
   const pieData = useMemo(() => [
-    { name: "Hot Work",    value: barData[0].jumlah, fill: "#FF6B6B" },
+    { name: "Hot Work", value: barData[0].jumlah, fill: "#FF6B6B" },
     { name: "Height Work", value: barData[1].jumlah, fill: "#06B6D4" },
-    { name: "Workshop",    value: barData[2].jumlah, fill: "#10B981" },
+    { name: "Workshop", value: barData[2].jumlah, fill: "#10B981" },
   ], [barData]);
 
-  const pieTotal  = pieData.reduce((s, x) => s + x.value, 0);
+  const pieTotal = pieData.reduce((s, x) => s + x.value, 0);
   const pct = (name: string) => {
     const v = pieData.find(x => x.name === name)?.value ?? 0;
     return pieTotal > 0 ? ((v / pieTotal) * 100).toFixed(1) : "0.0";
   };
 
-  // ── Available months / days for selectors ─────────────────────────────────
   const availableMonths = useMemo(() => {
     const s = new Set<number>();
     permits.forEach(p => {
       const d = getDate(p);
-      if (d && d.getFullYear().toString() === selectedYear) s.add(d.getMonth() + 1);
+      if (d && d.getFullYear().toString() === selectedYear) {
+        s.add(d.getMonth() + 1);
+      }
     });
     return Array.from(s).sort((a, b) => a - b);
   }, [permits, selectedYear]);
@@ -175,8 +197,9 @@ export default function DashboardPage() {
     const s = new Set<string>();
     permits.forEach(p => {
       const d = getDate(p);
-      if (d && d.getFullYear().toString() === selectedYear)
+      if (d && d.getFullYear().toString() === selectedYear) {
         s.add(d.toISOString().split("T")[0]);
+      }
     });
     return Array.from(s).sort().reverse();
   }, [permits, selectedYear]);
@@ -184,62 +207,69 @@ export default function DashboardPage() {
   const toggleJenis = (j: NonNullable<JenisForm>) =>
     setSelectedJenis(prev => prev === j ? null : j);
 
-  // ─── Loading state ────────────────────────────────────────────────────────
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-100">
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-orange-200 border-t-orange-600" />
-          <p className="mt-4 text-gray-600">Memuat data dashboard...</p>
+          <RefreshCw className="w-12 h-12 text-orange-500 animate-spin mx-auto mb-4" />
+          <p className="text-gray-600">Memuat data dashboard...</p>
         </div>
       </div>
     );
   }
 
-  // ─── Select styling helper ────────────────────────────────────────────────
   const selCls = "w-full px-4 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-400 appearance-none cursor-pointer";
 
   return (
-    <div className="min-h-screen bg-gray-100">
+    <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <div className="bg-white border-b border-gray-200 sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5">
+      <header className="bg-white border-b border-gray-200">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <Link href="/" className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
+              {/* ✅ HOME ICON - Admin ke /home, lainnya ke /approval */}
+              <Link 
+                href={userRole === 'admin' ? '/home' : '/approval'}
+                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                title="Kembali ke Home"
+              >
                 <Home className="w-5 h-5 text-gray-600" />
               </Link>
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-orange-100 rounded-lg">
-                  <BarChart2 className="w-5 h-5 text-orange-600" />
-                </div>
-                <div>
-                  <h1 className="text-xl font-bold text-gray-900">Dashboard Analitik</h1>
-                  <p className="text-xs text-gray-500">Visualisasi Data Permintaan Izin Kerja — PT Jatim Autocomp Indonesia</p>
-                </div>
+              
+              <div>
+                <h1 className="text-2xl font-bold text-gray-900">Dashboard Analitik</h1>
+                <p className="text-sm text-gray-600">
+                  Visualisasi Data Permintaan Izin Kerja — PT Jatim Autocomp Indonesia
+                </p>
               </div>
             </div>
-            <button onClick={loadPermits} disabled={loading}
+            
+            <button 
+              onClick={loadPermits} 
+              disabled={loading}
               className="p-2 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50"
               title="Refresh data"
             >
-              <RefreshCw className={`w-5 h-5 text-gray-500 ${loading ? "animate-spin" : ""}`} />
+              <RefreshCw className={`w-5 h-5 text-gray-500 ${loading ? 'animate-spin' : ''}`} />
             </button>
           </div>
         </div>
-      </div>
+      </header>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-
-        {/* ── Filter Section ────────────────────────────────────────────── */}
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Filter Section */}
         <div className="bg-white rounded-xl shadow-sm p-6 mb-8 border border-gray-200">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {/* Tahun */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Tahun</label>
               <div className="relative">
-                <select value={selectedYear}
-                  onChange={e => { setSelectedYear(e.target.value); setSelectedMonth(""); setSelectedDay(""); }}
+                <select 
+                  value={selectedYear}
+                  onChange={e => { 
+                    setSelectedYear(e.target.value); 
+                    setSelectedMonth(""); 
+                    setSelectedDay(""); 
+                  }}
                   className={selCls}
                 >
                   <option value="">Pilih Tahun</option>
@@ -249,12 +279,16 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            {/* Periode */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Periode</label>
               <div className="relative">
-                <select value={period}
-                  onChange={e => { setPeriod(e.target.value as Period); setSelectedMonth(""); setSelectedDay(""); }}
+                <select 
+                  value={period}
+                  onChange={e => { 
+                    setPeriod(e.target.value as Period); 
+                    setSelectedMonth(""); 
+                    setSelectedDay(""); 
+                  }}
                   className={selCls}
                 >
                   <option value="daily">Harian (Daily)</option>
@@ -266,12 +300,12 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            {/* Bulan (hanya jika monthly) */}
             {period === "monthly" && (
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Bulan</label>
                 <div className="relative">
-                  <select value={selectedMonth}
+                  <select 
+                    value={selectedMonth}
                     onChange={e => setSelectedMonth(e.target.value)}
                     className={selCls}
                   >
@@ -287,19 +321,23 @@ export default function DashboardPage() {
               </div>
             )}
 
-            {/* Tanggal (hanya jika daily) */}
             {period === "daily" && (
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Tanggal</label>
                 <div className="relative">
-                  <select value={selectedDay}
+                  <select 
+                    value={selectedDay}
                     onChange={e => setSelectedDay(e.target.value)}
                     className={selCls}
                   >
                     <option value="">Pilih Tanggal</option>
                     {availableDays.map(day => (
                       <option key={day} value={day}>
-                        {new Date(day).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })}
+                        {new Date(day).toLocaleDateString("id-ID", { 
+                          day: "numeric", 
+                          month: "long", 
+                          year: "numeric" 
+                        })}
                       </option>
                     ))}
                   </select>
@@ -308,36 +346,10 @@ export default function DashboardPage() {
               </div>
             )}
           </div>
-
-          {/* Active filter indicator */}
-          {(selectedJenis || selectedMonth || selectedDay) && (
-            <div className="mt-4 pt-4 border-t border-gray-100 flex items-center gap-2 flex-wrap">
-              <span className="text-xs text-gray-500">Filter aktif:</span>
-              {selectedJenis && (
-                <span className="px-2 py-0.5 bg-orange-100 text-orange-700 text-xs rounded-full font-medium">
-                  {selectedJenis === "hot-work" ? "Hot Work" : selectedJenis === "height-work" ? "Height Work" : "Workshop"}
-                  <button onClick={() => setSelectedJenis(null)} className="ml-1.5 hover:text-orange-900">×</button>
-                </span>
-              )}
-              {selectedMonth && (
-                <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-xs rounded-full font-medium">
-                  {monthNames[parseInt(selectedMonth) - 1]}
-                  <button onClick={() => setSelectedMonth("")} className="ml-1.5 hover:text-blue-900">×</button>
-                </span>
-              )}
-              {selectedDay && (
-                <span className="px-2 py-0.5 bg-green-100 text-green-700 text-xs rounded-full font-medium">
-                  {new Date(selectedDay).toLocaleDateString("id-ID", { day: "numeric", month: "long" })}
-                  <button onClick={() => setSelectedDay("")} className="ml-1.5 hover:text-green-900">×</button>
-                </span>
-              )}
-            </div>
-          )}
         </div>
 
-        {/* ── Stats Cards ───────────────────────────────────────────────── */}
+        {/* Stats Cards */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-5 mb-8">
-          {/* Total */}
           <div className="bg-white rounded-xl shadow-sm p-5 border border-gray-200">
             <div className="flex items-start justify-between">
               <div>
@@ -351,16 +363,20 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* Hot Work */}
-          <div onClick={() => toggleJenis("hot-work")}
+          <div 
+            onClick={() => toggleJenis("hot-work")}
             className={`bg-white rounded-xl shadow-sm p-5 border cursor-pointer transition-all ${
-              selectedJenis === "hot-work" ? "border-orange-500 ring-2 ring-orange-200 bg-orange-50" : "border-gray-200 hover:border-orange-300"
+              selectedJenis === "hot-work" 
+                ? "border-orange-500 ring-2 ring-orange-200 bg-orange-50" 
+                : "border-gray-200 hover:border-orange-300"
             }`}
           >
             <div className="flex items-start justify-between">
               <div>
                 <p className="text-gray-500 text-xs font-medium mb-2 uppercase tracking-wide">Hot Work</p>
-                <p className="text-3xl font-bold text-gray-900">{filtered.filter(p => p.jenisForm === "hot-work").length}</p>
+                <p className="text-3xl font-bold text-gray-900">
+                  {filtered.filter(p => p.jenisForm === "hot-work").length}
+                </p>
                 <p className="text-xs text-gray-400 mt-1">Pekerjaan panas</p>
               </div>
               <div className="p-2.5 bg-orange-100 rounded-lg">
@@ -368,17 +384,20 @@ export default function DashboardPage() {
               </div>
             </div>
           </div>
-
-          {/* Height Work */}
-          <div onClick={() => toggleJenis("height-work")}
+          <div 
+            onClick={() => toggleJenis("height-work")}
             className={`bg-white rounded-xl shadow-sm p-5 border cursor-pointer transition-all ${
-              selectedJenis === "height-work" ? "border-blue-500 ring-2 ring-blue-200 bg-blue-50" : "border-gray-200 hover:border-blue-300"
+              selectedJenis === "height-work" 
+                ? "border-blue-500 ring-2 ring-blue-200 bg-blue-50" 
+                : "border-gray-200 hover:border-blue-300"
             }`}
           >
             <div className="flex items-start justify-between">
               <div>
                 <p className="text-gray-500 text-xs font-medium mb-2 uppercase tracking-wide">Height Work</p>
-                <p className="text-3xl font-bold text-gray-900">{filtered.filter(p => p.jenisForm === "height-work").length}</p>
+                <p className="text-3xl font-bold text-gray-900">
+                  {filtered.filter(p => p.jenisForm === "height-work").length}  
+                </p>
                 <p className="text-xs text-gray-400 mt-1">Pekerjaan ketinggian</p>
               </div>
               <div className="p-2.5 bg-blue-100 rounded-lg">
@@ -387,16 +406,20 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* Workshop */}
-          <div onClick={() => toggleJenis("workshop")}
+          <div 
+            onClick={() => toggleJenis("workshop")}
             className={`bg-white rounded-xl shadow-sm p-5 border cursor-pointer transition-all ${
-              selectedJenis === "workshop" ? "border-green-500 ring-2 ring-green-200 bg-green-50" : "border-gray-200 hover:border-green-300"
+              selectedJenis === "workshop" 
+                ? "border-green-500 ring-2 ring-green-200 bg-green-50" 
+                : "border-gray-200 hover:border-green-300"
             }`}
           >
             <div className="flex items-start justify-between">
               <div>
                 <p className="text-gray-500 text-xs font-medium mb-2 uppercase tracking-wide">Workshop</p>
-                <p className="text-3xl font-bold text-gray-900">{filtered.filter(p => p.jenisForm === "workshop").length}</p>
+                <p className="text-3xl font-bold text-gray-900">
+                  {filtered.filter(p => p.jenisForm === "workshop").length}
+                </p>
                 <p className="text-xs text-gray-400 mt-1">Workshop</p>
               </div>
               <div className="p-2.5 bg-green-100 rounded-lg">
@@ -406,7 +429,7 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* ── Empty state ───────────────────────────────────────────────── */}
+        {/* Empty State */}
         {filtered.length === 0 && (
           <div className="bg-white rounded-xl border border-gray-200 p-12 text-center mb-8">
             <BarChart2 className="w-12 h-12 text-gray-200 mx-auto mb-3" />
@@ -415,12 +438,10 @@ export default function DashboardPage() {
           </div>
         )}
 
-        {/* ── Line Chart ────────────────────────────────────────────────── */}
+        {/* Line Chart */}
         <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-200 mb-6">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-base font-semibold text-gray-900">
-              Tren Permintaan Izin
-            </h3>
+            <h3 className="text-base font-semibold text-gray-900">Tren Permintaan Izin</h3>
             <span className="text-xs text-gray-400 bg-gray-100 px-2 py-1 rounded-full">
               berdasarkan tanggal pengisian
             </span>
@@ -429,45 +450,83 @@ export default function DashboardPage() {
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={lineData} margin={{ bottom: 15, left: 10 }}>
                 <CartesianGrid stroke="#f0f0f0" strokeDasharray="3 3" />
-                <XAxis dataKey="name" stroke="#999" tick={{ fontSize: 11, fill: "#9ca3af" }}
+                <XAxis 
+                  dataKey="name" 
+                  stroke="#999" 
+                  tick={{ fontSize: 11, fill: "#9ca3af" }}
                   label={{
                     value: period === "daily" ? "Jam" : period === "weekly" ? "Hari" : period === "monthly" ? "Tanggal" : "Bulan",
-                    position: "insideBottom", offset: -10, style: { fill: "#9ca3af", fontSize: 12 },
+                    position: "insideBottom", 
+                    offset: -10, 
+                    style: { fill: "#9ca3af", fontSize: 12 },
                   }}
                 />
-                <YAxis stroke="#999" tick={{ fontSize: 11, fill: "#9ca3af" }} allowDecimals={false}
-                  label={{ value: "Jumlah Izin", angle: -90, position: "insideLeft", offset: -5, style: { fill: "#9ca3af", fontSize: 11 } }}
+                <YAxis 
+                  stroke="#999" 
+                  tick={{ fontSize: 11, fill: "#9ca3af" }} 
+                  allowDecimals={false}
+                  label={{ 
+                    value: "Jumlah Izin", 
+                    angle: -90, 
+                    position: "insideLeft", 
+                    offset: -5, 
+                    style: { fill: "#9ca3af", fontSize: 11 } 
+                  }}
                 />
-                <Tooltip contentStyle={{ backgroundColor: "#fff", border: "1px solid #e5e7eb", borderRadius: "8px" }} />
-                <Line type="monotone" dataKey="jumlah" stroke="#f97316" strokeWidth={3}
+                <Tooltip 
+                  contentStyle={{ 
+                    backgroundColor: "#fff", 
+                    border: "1px solid #e5e7eb", 
+                    borderRadius: "8px" 
+                  }} 
+                />
+                <Line 
+                  type="monotone" 
+                  dataKey="jumlah" 
+                  stroke="#f97316" 
+                  strokeWidth={3}
                   dot={{ r: 4, fill: "#f97316", strokeWidth: 2, stroke: "#fff" }}
-                  activeDot={{ r: 6 }} name="Jumlah"
+                  activeDot={{ r: 6 }} 
+                  name="Jumlah"
                 />
               </LineChart>
             </ResponsiveContainer>
           </div>
         </div>
 
-        {/* ── Pie + Bar charts ──────────────────────────────────────────── */}
+        {/* Pie + Bar Charts */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-          {/* Pie */}
+          {/* Pie Chart */}
           <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-200 flex flex-col">
             <h3 className="text-base font-semibold text-gray-900 mb-4">Distribusi Jenis Izin</h3>
             <div className="flex-1 min-h-[240px]">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
-                  <Pie data={pieData} cx="50%" cy="50%" innerRadius={55} outerRadius={95} dataKey="value">
+                  <Pie 
+                    data={pieData} 
+                    cx="50%" 
+                    cy="50%" 
+                    innerRadius={55} 
+                    outerRadius={95} 
+                    dataKey="value"
+                  >
                     {pieData.map((e, i) => <Cell key={i} fill={e.fill} />)}
                   </Pie>
-                  <Tooltip contentStyle={{ backgroundColor: "#fff", border: "1px solid #e5e7eb", borderRadius: "8px" }} />
+                  <Tooltip 
+                    contentStyle={{ 
+                      backgroundColor: "#fff", 
+                      border: "1px solid #e5e7eb", 
+                      borderRadius: "8px" 
+                    }} 
+                  />
                 </PieChart>
               </ResponsiveContainer>
             </div>
             <div className="mt-3 space-y-2.5 border-t border-gray-100 pt-3">
               {[
-                { name: "Hot Work",    color: "text-red-500",     dot: "bg-[#FF6B6B]" },
-                { name: "Height Work", color: "text-cyan-500",    dot: "bg-[#06B6D4]" },
-                { name: "Workshop",    color: "text-emerald-500", dot: "bg-[#10B981]" },
+                { name: "Hot Work", color: "text-red-500", dot: "bg-[#FF6B6B]" },
+                { name: "Height Work", color: "text-cyan-500", dot: "bg-[#06B6D4]" },
+                { name: "Workshop", color: "text-emerald-500", dot: "bg-[#10B981]" },
               ].map(item => (
                 <div key={item.name} className="flex items-center justify-between text-sm">
                   <div className="flex items-center gap-2">
@@ -480,7 +539,7 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* Bar */}
+          {/* Bar Chart */}
           <div className="lg:col-span-2 bg-white rounded-xl shadow-sm p-6 border border-gray-200 flex flex-col">
             <h3 className="text-base font-semibold text-gray-900 mb-4">Perbandingan Jenis Izin</h3>
             <div className="flex-1 min-h-[240px]">
@@ -489,11 +548,17 @@ export default function DashboardPage() {
                   <CartesianGrid stroke="#f0f0f0" strokeDasharray="3 3" />
                   <XAxis dataKey="name" stroke="#999" tick={{ fontSize: 12, fill: "#9ca3af" }} />
                   <YAxis stroke="#999" tick={{ fontSize: 12, fill: "#9ca3af" }} allowDecimals={false} />
-                  <Tooltip contentStyle={{ backgroundColor: "#fff", border: "1px solid #e5e7eb", borderRadius: "8px" }} />
+                  <Tooltip 
+                    contentStyle={{ 
+                      backgroundColor: "#fff", 
+                      border: "1px solid #e5e7eb", 
+                      borderRadius: "8px" 
+                    }} 
+                  />
                   <Legend />
                   <Bar dataKey="jumlah" name="Jumlah Izin" radius={[8, 8, 0, 0]}>
                     {barData.map((_, i) => (
-                      <Cell key={i} fill={["#FF6B6B","#06B6D4","#10B981"][i]} />
+                      <Cell key={i} fill={["#FF6B6B", "#06B6D4", "#10B981"][i]} />
                     ))}
                   </Bar>
                 </BarChart>
@@ -502,7 +567,7 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* ── Summary table ─────────────────────────────────────────────── */}
+        {/* Summary Table */}
         <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-200">
           <h3 className="text-base font-semibold text-gray-900 mb-4">Ringkasan Status</h3>
           <div className="overflow-x-auto">
@@ -519,9 +584,9 @@ export default function DashboardPage() {
               </thead>
               <tbody>
                 {[
-                  { key: "hot-work",    label: "Hot Work",    color: "text-red-600",   bg: "bg-red-50" },
-                  { key: "height-work", label: "Height Work", color: "text-blue-600",  bg: "bg-blue-50" },
-                  { key: "workshop",    label: "Workshop",    color: "text-green-600", bg: "bg-green-50" },
+                  { key: "hot-work", label: "Hot Work", color: "text-red-600", bg: "bg-red-50" },
+                  { key: "height-work", label: "Height Work", color: "text-blue-600", bg: "bg-blue-50" },
+                  { key: "workshop", label: "Workshop", color: "text-green-600", bg: "bg-green-50" },
                 ].map(row => {
                   const subset = filtered.filter(p => p.jenisForm === row.key);
                   return (
@@ -531,28 +596,47 @@ export default function DashboardPage() {
                           {row.label}
                         </span>
                       </td>
-                      <td className="text-right py-3 px-3 text-gray-600">{subset.filter(p => p.status === "draft").length}</td>
-                      <td className="text-right py-3 px-3 text-blue-600 font-medium">{subset.filter(p => p.status === "submitted").length}</td>
-                      <td className="text-right py-3 px-3 text-green-600 font-medium">{subset.filter(p => p.status === "approved").length}</td>
-                      <td className="text-right py-3 px-3 text-red-500 font-medium">{subset.filter(p => p.status === "rejected").length}</td>
-                      <td className="text-right py-3 px-3 font-bold text-gray-900">{subset.length}</td>
+                      <td className="text-right py-3 px-3 text-gray-600">
+                        {subset.filter(p => p.status === "draft").length}
+                      </td>
+                      <td className="text-right py-3 px-3 text-blue-600 font-medium">
+                        {subset.filter(p => p.status === "submitted").length}
+                      </td>
+                      <td className="text-right py-3 px-3 text-green-600 font-medium">
+                        {subset.filter(p => p.status === "approved").length}
+                      </td>
+                      <td className="text-right py-3 px-3 text-red-500 font-medium">
+                        {subset.filter(p => p.status === "rejected").length}
+                      </td>
+                      <td className="text-right py-3 px-3 font-bold text-gray-900">
+                        {subset.length}
+                      </td>
                     </tr>
                   );
                 })}
                 <tr className="bg-gray-50 font-semibold">
                   <td className="py-3 px-3 text-gray-700">Total</td>
-                  <td className="text-right py-3 px-3">{filtered.filter(p => p.status === "draft").length}</td>
-                  <td className="text-right py-3 px-3 text-blue-600">{filtered.filter(p => p.status === "submitted").length}</td>
-                  <td className="text-right py-3 px-3 text-green-600">{filtered.filter(p => p.status === "approved").length}</td>
-                  <td className="text-right py-3 px-3 text-red-500">{filtered.filter(p => p.status === "rejected").length}</td>
-                  <td className="text-right py-3 px-3 text-gray-900 font-bold">{filtered.length}</td>
+                  <td className="text-right py-3 px-3">
+                    {filtered.filter(p => p.status === "draft").length}
+                  </td>
+                  <td className="text-right py-3 px-3 text-blue-600">
+                    {filtered.filter(p => p.status === "submitted").length}
+                  </td>
+                  <td className="text-right py-3 px-3 text-green-600">
+                    {filtered.filter(p => p.status === "approved").length}
+                  </td>
+                  <td className="text-right py-3 px-3 text-red-500">
+                    {filtered.filter(p => p.status === "rejected").length}
+                  </td>
+                  <td className="text-right py-3 px-3 text-gray-900 font-bold">
+                    {filtered.length}
+                  </td>
                 </tr>
               </tbody>
             </table>
           </div>
         </div>
-
-      </div>
+      </main>
     </div>
   );
 }

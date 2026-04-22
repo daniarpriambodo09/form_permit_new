@@ -4,7 +4,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Flame, Shield, AlertTriangle, LogIn, UserPlus, Loader2 } from "lucide-react";
+import { Flame, Shield, AlertTriangle, LogIn, UserPlus, Loader2, ShieldCheck } from "lucide-react";
 
 export default function HomePage() {
   const router = useRouter();
@@ -76,20 +76,27 @@ export default function HomePage() {
         </div>
 
         {/* CTA Buttons */}
-        <div className="max-w-md mx-auto space-y-4 mb-16">
-          <Link href="/login"
-            className="flex items-center justify-center gap-3 w-full py-4 bg-orange-600 hover:bg-orange-500
+        <div className="max-w-2xl mx-auto grid md:grid-cols-2 gap-4 mb-16">
+          <Link href="/login/worker"
+            className="flex items-center justify-center gap-3 py-4 bg-orange-600 hover:bg-orange-500
                        text-white rounded-xl font-semibold text-lg transition-colors shadow-lg shadow-orange-600/30"
           >
             <LogIn className="w-5 h-5" />
-            Masuk / Login
+            Login Pekerja
+          </Link>
+          <Link href="/login/approver"
+            className="flex items-center justify-center gap-3 py-4 bg-slate-700 hover:bg-slate-600
+                       text-white rounded-xl font-semibold text-lg transition-colors shadow-lg shadow-slate-700/30 border border-slate-600"
+          >
+            <ShieldCheck className="w-5 h-5" />
+            Login Approver
           </Link>
           <Link href="/register"
-            className="flex items-center justify-center gap-3 w-full py-4 bg-white/10 hover:bg-white/20
+            className="md:col-span-2 flex items-center justify-center gap-3 py-4 bg-white/10 hover:bg-white/20
                        text-white rounded-xl font-semibold text-lg transition-colors border border-white/20"
           >
             <UserPlus className="w-5 h-5" />
-            Daftar Akun Baru
+            Daftar Akun Baru (Pekerja)
           </Link>
         </div>
 

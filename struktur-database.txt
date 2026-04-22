@@ -1,0 +1,392 @@
+jai_permit_db=# \dt
+                 List of relations
+ Schema |         Name          | Type  |  Owner
+--------+-----------------------+-------+----------
+ public | form_kerja_ketinggian | table | postgres
+ public | form_kerja_panas      | table | postgres
+ public | form_kerja_workshop   | table | postgres
+ public | users                 | table | postgres
+(4 rows)
+
+
+jai_permit_db=# \d form_kerja_ketinggian
+                                                        Table "public.form_kerja_ketinggian"
+                    Column                     |           Type           | Collation | Nullable |                      Default
+-----------------------------------------------+--------------------------+-----------+----------+---------------------------------------------------
+ id                                            | integer                  |           | not null | nextval('form_kerja_ketinggian_id_seq'::regclass)
+ id_form                                       | character varying(20)    |           | not null |
+ tanggal                                       | timestamp with time zone |           | not null | now()
+ tanggal_pelaksanaan                           | timestamp with time zone |           |          |
+ status                                        | character varying(20)    |           | not null | 'draft'::character varying
+ petugas_ketinggian                            | character varying(50)    |           |          |
+ deskripsi_pekerjaan                           | text                     |           |          |
+ lokasi                                        | character varying(255)   |           |          |
+ waktu_mulai                                   | time without time zone   |           |          |
+ waktu_selesai                                 | time without time zone   |           |          |
+ nama_pengawas_kontraktor                      | character varying(255)   |           |          |
+ nama_petugas_1                                | character varying(255)   |           |          |
+ petugas_1_sehat                               | boolean                  |           |          | false
+ nama_petugas_2                                | character varying(255)   |           |          |
+ petugas_2_sehat                               | boolean                  |           |          | false
+ nama_petugas_3                                | character varying(255)   |           |          |
+ petugas_3_sehat                               | boolean                  |           |          | false
+ nama_petugas_4                                | character varying(255)   |           |          |
+ petugas_4_sehat                               | boolean                  |           |          | false
+ nama_petugas_5                                | character varying(255)   |           |          |
+ petugas_5_sehat                               | boolean                  |           |          | false
+ nama_petugas_6                                | character varying(255)   |           |          |
+ petugas_6_sehat                               | boolean                  |           |          | false
+ nama_petugas_7                                | character varying(255)   |           |          |
+ petugas_7_sehat                               | boolean                  |           |          | false
+ nama_petugas_8                                | character varying(255)   |           |          |
+ petugas_8_sehat                               | boolean                  |           |          | false
+ nama_petugas_9                                | character varying(255)   |           |          |
+ petugas_9_sehat                               | boolean                  |           |          | false
+ nama_petugas_10                               | character varying(255)   |           |          |
+ petugas_10_sehat                              | boolean                  |           |          | false
+ ada_kunci_pagar                               | boolean                  |           |          | false
+ ada_rompi_ketinggian                          | boolean                  |           |          | false
+ no_rompi                                      | numeric                  |           |          |
+ ada_safety_helmet                             | boolean                  |           |          | false
+ jumlah_safety_helmet                          | numeric                  |           |          |
+ ada_full_body_harmess                         | boolean                  |           |          | false
+ jumlah_full_body_harness                      | numeric                  |           |          |
+ area_diperiksa_aman                           | boolean                  |           |          | false
+ paham_cara_menggunakan_alat_pemadam_kebakaran | boolean                  |           |          | false
+ ada_kerja_listrik                             | boolean                  |           |          | false
+ prosedur_loto                                 | boolean                  |           |          | false
+ menutupi_area_bawah_prisai                    | boolean                  |           |          | false
+ safetyline_tersedia                           | boolean                  |           |          | false
+ alat_bantu_kerja_aman                         | boolean                  |           |          | false
+ menggunakan_rompi                             | boolean                  |           |          | false
+ beban_tidak_5kg                               | boolean                  |           |          | false
+ helm_sesuai_sop                               | boolean                  |           |          | false
+ rambu2_tersedia                               | boolean                  |           |          | false
+ webbing_kondisi_baik                          | boolean                  |           |          | false
+ dring_kondisi_baik                            | boolean                  |           |          | false
+ gesper_kondisi_baik                           | boolean                  |           |          | false
+ absorter_dan_timbes_kondisi_baik              | boolean                  |           |          | false
+ snap_hook_kondisi_baik                        | boolean                  |           |          | false
+ rope_lanyard_kondisi_baik                     | boolean                  |           |          | false
+ spv_terkait                                   | character varying(255)   |           |          |
+ nama_kontraktor                               | character varying(255)   |           |          |
+ sfo                                           | character varying(255)   |           |          |
+ mr_pga_mgr                                    | character varying(255)   |           |          |
+ created_at                                    | timestamp with time zone |           | not null | now()
+ updated_at                                    | timestamp with time zone |           | not null | now()
+ edit_token                                    | character varying(20)    |           |          |
+ catatan_reject                                | text                     |           |          |
+ approved_by                                   | character varying(255)   |           |          |
+ approved_at                                   | timestamp with time zone |           |          |
+ user_id                                       | integer                  |           |          |
+ current_stage                                 | integer                  |           |          | 1
+ spv_approved                                  | boolean                  |           |          | false
+ spv_approved_by                               | character varying(255)   |           |          |
+ spv_approved_at                               | timestamp with time zone |           |          |
+ kontraktor_approved                           | boolean                  |           |          | false
+ kontraktor_approved_by                        | character varying(255)   |           |          |
+ kontraktor_approved_at                        | timestamp with time zone |           |          |
+ sfo_approved                                  | boolean                  |           |          | false
+ sfo_approved_by                               | character varying(255)   |           |          |
+ sfo_approved_at                               | timestamp with time zone |           |          |
+ mr_pga_approved                               | boolean                  |           |          | false
+ mr_pga_approved_by                            | character varying(255)   |           |          |
+ mr_pga_approved_at                            | timestamp with time zone |           |          |
+ nama_pengawas_departemen                      | character varying(255)   |           |          |
+ nama_departemen                               | character varying(255)   |           |          |
+ foto_lisensi_1                                | text                     |           |          |
+ foto_lisensi_2                                | text                     |           |          |
+ foto_lisensi_3                                | text                     |           |          |
+ foto_lisensi_4                                | text                     |           |          |
+ foto_lisensi_5                                | text                     |           |          |
+ foto_lisensi_6                                | text                     |           |          |
+ foto_lisensi_7                                | text                     |           |          |
+ foto_lisensi_8                                | text                     |           |          |
+ foto_lisensi_9                                | text                     |           |          |
+ foto_lisensi_10                               | text                     |           |          |
+ admin_k3_approved                             | boolean                  |           | not null | false
+ admin_k3_approved_by                          | character varying(255)   |           |          |
+ admin_k3_approved_at                          | timestamp with time zone |           |          |
+ tipe_perusahaan                               | character varying(20)    |           |          |
+Indexes:
+    "form_kerja_ketinggian_pkey" PRIMARY KEY, btree (id)
+    "form_kerja_ketinggian_edit_token_key" UNIQUE CONSTRAINT, btree (edit_token)
+    "form_kerja_ketinggian_id_form_key" UNIQUE CONSTRAINT, btree (id_form)
+    "idx_hew_edit_token" btree (edit_token)
+    "idx_hew_status" btree (status)
+    "idx_hew_user_id" btree (user_id)
+    "idx_ketinggian_admin_k3" btree (admin_k3_approved)
+    "idx_ketinggian_status" btree (status)
+    "idx_ketinggian_tanggal" btree (tanggal DESC)
+Foreign-key constraints:
+    "form_kerja_ketinggian_user_id_fkey" FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
+Triggers:
+    trg_ketinggian_updated BEFORE UPDATE ON form_kerja_ketinggian FOR EACH ROW EXECUTE FUNCTION update_updated_at()
+
+
+jai_permit_db=# \d form_kerja_panas
+                                                        Table "public.form_kerja_panas"
+                    Column                     |           Type           | Collation | Nullable |                   Default
+-----------------------------------------------+--------------------------+-----------+----------+----------------------------------------------
+ id                                            | integer                  |           | not null | nextval('form_kerja_panas_id_seq'::regclass)
+ id_form                                       | character varying(20)    |           | not null |
+ tanggal                                       | timestamp with time zone |           | not null | now()
+ tanggal_pelaksanaan                           | timestamp with time zone |           |          |
+ status                                        | character varying(20)    |           | not null | 'draft'::character varying
+ no_registrasi                                 | character varying(100)   |           |          |
+ nama_kontraktor_nik                           | character varying(255)   |           |          |
+ nama_pekerja_nik                              | character varying(255)   |           |          |
+ lokasi_pekerjaan                              | character varying(255)   |           |          |
+ waktu_pukul                                   | time without time zone   |           |          |
+ nama_fire_watch                               | character varying(255)   |           |          |
+ nik_fire_watch                                | character varying(100)   |           |          |
+ tanda_tangan_fw                               | text                     |           |          |
+ jabatan_pemberi_izin                          | character varying(255)   |           |          |
+ nik_pemberi_ijin                              | character varying(100)   |           |          |
+ preventive_genset_pump_room                   | boolean                  |           |          | false
+ tangki_solar                                  | boolean                  |           |          | false
+ panel_listrik                                 | boolean                  |           |          | false
+ detail_cutting                                | text                     |           |          |
+ t_mulai_cutting                               | time without time zone   |           |          |
+ t_selesai_cutting                             | time without time zone   |           |          |
+ detail_grinding                               | text                     |           |          |
+ t_mulai_grinding                              | time without time zone   |           |          |
+ t_selesai_grinding                            | time without time zone   |           |          |
+ detail_welding                                | text                     |           |          |
+ t_mulai_welding                               | time without time zone   |           |          |
+ t_selesai_welding                             | time without time zone   |           |          |
+ detail_painting                               | text                     |           |          |
+ t_mulai_painting                              | time without time zone   |           |          |
+ t_selesai_painting                            | time without time zone   |           |          |
+ ada_kerja_lainnya                             | boolean                  |           |          | false
+ jenis_kerjaan_lainnya                         | text                     |           |          |
+ ruang_tertutup                                | boolean                  |           |          | false
+ bahan_mudah_terbakar                          | boolean                  |           |          | false
+ gas_bejana_tangki                             | boolean                  |           |          | false
+ height_work                                   | boolean                  |           |          | false
+ cairan_gas_bertekan                           | boolean                  |           |          | false
+ cairan_hydrocarbon                            | boolean                  |           |          | false
+ bahaya_lain                                   | text                     |           |          |
+ kondisi_tools_baik                            | boolean                  |           |          | false
+ tersedia_apar_hydrant                         | boolean                  |           |          | false
+ sensor_smoke_detector_non_aktif               | boolean                  |           |          | false
+ apd_lengkap                                   | boolean                  |           |          | false
+ tidak_ada_cairan_mudah_terbakar               | boolean                  |           |          | false
+ lantai_bersih                                 | boolean                  |           |          | false
+ lantai_sudah_dibasahi                         | boolean                  |           |          | false
+ cairan_mudah_tebakar_tertutup                 | boolean                  |           |          | false
+ lembaran_dibawah_pekerjaan                    | boolean                  |           |          | false
+ lindungi_conveyor_dll                         | boolean                  |           |          | false
+ alat_telah_bersih                             | boolean                  |           |          | false
+ uap_menyala_telah_dibuang                     | boolean                  |           |          | false
+ kerja_pada_dinding_lagit                      | boolean                  |           |          | false
+ bahan_mudah_terbakar_dipindahkan_dari_dinding | boolean                  |           |          | false
+ fire_watch_memastikan_area_aman               | boolean                  |           |          | false
+ firwatch_terlatih                             | boolean                  |           |          | false
+ kondisi_fire_blanket                          | boolean                  |           |          | false
+ jumlah_fire_blanket                           | integer                  |           |          |
+ permintaan_tambahan                           | text                     |           |          |
+ spv_terkait                                   | character varying(255)   |           |          |
+ kontraktor                                    | character varying(255)   |           |          |
+ sfo                                           | character varying(255)   |           |          |
+ pga                                           | character varying(255)   |           |          |
+ created_at                                    | timestamp with time zone |           | not null | now()
+ updated_at                                    | timestamp with time zone |           | not null | now()
+ edit_token                                    | character varying(20)    |           |          |
+ catatan_reject                                | text                     |           |          |
+ approved_by                                   | character varying(255)   |           |          |
+ approved_at                                   | timestamp with time zone |           |          |
+ user_id                                       | integer                  |           |          |
+ current_stage                                 | integer                  |           |          | 0
+ spv_approved                                  | boolean                  |           |          | false
+ spv_approved_by                               | character varying(255)   |           |          |
+ spv_approved_at                               | timestamp with time zone |           |          |
+ kontraktor_approved                           | boolean                  |           |          | false
+ kontraktor_approved_by                        | character varying(255)   |           |          |
+ kontraktor_approved_at                        | timestamp with time zone |           |          |
+ sfo_approved                                  | boolean                  |           |          | false
+ sfo_approved_by                               | character varying(255)   |           |          |
+ sfo_approved_at                               | timestamp with time zone |           |          |
+ pga_approved                                  | boolean                  |           |          | false
+ pga_approved_by                               | character varying(255)   |           |          |
+ pga_approved_at                               | timestamp with time zone |           |          |
+ fw_approved                                   | boolean                  |           | not null | false
+ fw_approved_by                                | character varying(255)   |           |          |
+ fw_approved_at                                | timestamp with time zone |           |          |
+ pemberi_izin_approved                         | boolean                  |           | not null | false
+ pemberi_izin_approved_by                      | character varying(255)   |           |          |
+ pemberi_izin_approved_at                      | timestamp with time zone |           |          |
+ tipe_perusahaan                               | character varying(20)    |           |          | 'eksternal'::character varying
+ admin_k3_approved                             | boolean                  |           | not null | false
+ admin_k3_approved_by                          | character varying(255)   |           |          |
+ admin_k3_approved_at                          | timestamp with time zone |           |          |
+ mr_pga_approved                               | boolean                  |           | not null | false
+ mr_pga_approved_by                            | character varying(255)   |           |          |
+ mr_pga_approved_at                            | timestamp with time zone |           |          |
+ mr_pga_mgr                                    | character varying(255)   |           |          |
+Indexes:
+    "form_kerja_panas_pkey" PRIMARY KEY, btree (id)
+    "form_kerja_panas_edit_token_key" UNIQUE CONSTRAINT, btree (edit_token)
+    "form_kerja_panas_id_form_key" UNIQUE CONSTRAINT, btree (id_form)
+    "idx_panas_edit_token" btree (edit_token)
+    "idx_panas_status" btree (status)
+    "idx_panas_tanggal" btree (tanggal DESC)
+    "idx_panas_tipe" btree (tipe_perusahaan)
+    "idx_panas_user_id" btree (user_id)
+Foreign-key constraints:
+    "form_kerja_panas_user_id_fkey" FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
+Triggers:
+    trg_panas_updated BEFORE UPDATE ON form_kerja_panas FOR EACH ROW EXECUTE FUNCTION update_updated_at()
+
+
+jai_permit_db=#
+jai_permit_db=#
+jai_permit_db=# \d form_kerja_workshop
+                                                        Table "public.form_kerja_workshop"
+                    Column                     |           Type           | Collation | Nullable |                     Default
+-----------------------------------------------+--------------------------+-----------+----------+-------------------------------------------------
+ id                                            | integer                  |           | not null | nextval('form_kerja_workshop_id_seq'::regclass)
+ id_form                                       | character varying(20)    |           | not null |
+ tanggal                                       | timestamp with time zone |           | not null | now()
+ tanggal_pelaksanaan                           | timestamp with time zone |           |          |
+ status                                        | character varying(20)    |           | not null | 'draft'::character varying
+ no_registrasi                                 | character varying(100)   |           |          |
+ nama_kontraktor_nik                           | character varying(255)   |           |          |
+ nama_pekerja_nik                              | character varying(255)   |           |          |
+ lokasi_pekerjaan                              | character varying(255)   |           |          |
+ waktu_pukul                                   | time without time zone   |           |          |
+ nama_fire_watch                               | character varying(255)   |           |          |
+ nik_fire_watch                                | character varying(100)   |           |          |
+ jabatan_pemberi_izin                          | character varying(255)   |           |          |
+ nik_pemberi_ijin                              | character varying(100)   |           |          |
+ preventive_genset_pump_room                   | boolean                  |           |          | false
+ tangki_solar                                  | boolean                  |           |          | false
+ panel_listrik                                 | boolean                  |           |          | false
+ detail_cutting                                | text                     |           |          |
+ t_mulai_cutting                               | time without time zone   |           |          |
+ t_selesai_cutting                             | time without time zone   |           |          |
+ detail_grinding                               | text                     |           |          |
+ t_mulai_grinding                              | time without time zone   |           |          |
+ t_selesai_grinding                            | time without time zone   |           |          |
+ detail_welding                                | text                     |           |          |
+ t_mulai_welding                               | time without time zone   |           |          |
+ t_selesai_welding                             | time without time zone   |           |          |
+ detail_painting                               | text                     |           |          |
+ t_mulai_painting                              | time without time zone   |           |          |
+ t_selesai_painting                            | time without time zone   |           |          |
+ painting_spray                                | boolean                  |           |          | false
+ painting_non_spray                            | boolean                  |           |          | false
+ ada_kerja_lainnya                             | boolean                  |           |          | false
+ jenis_kerjaan_lainnya                         | text                     |           |          |
+ ruang_tertutup                                | boolean                  |           |          | false
+ bahan_mudah_terbakar                          | boolean                  |           |          | false
+ gas_bejana_tangki                             | boolean                  |           |          | false
+ height_work                                   | boolean                  |           |          | false
+ cairan_gas_bertekan                           | boolean                  |           |          | false
+ cairan_hydrocarbon                            | boolean                  |           |          | false
+ bahaya_lain                                   | text                     |           |          |
+ kondisi_tools_baik                            | boolean                  |           |          | false
+ tersedia_apar_hydrant                         | boolean                  |           |          | false
+ sensor_smoke_detector_non_aktif               | boolean                  |           |          | false
+ apd_lengkap                                   | boolean                  |           |          | false
+ tidak_ada_cairan_mudah_terbakar               | boolean                  |           |          | false
+ lantai_bersih                                 | boolean                  |           |          | false
+ lantai_sudah_dibasahi                         | boolean                  |           |          | false
+ cairan_mudah_tebakar_tertutup                 | boolean                  |           |          | false
+ lembaran_dibawah_pekerjaan                    | boolean                  |           |          | false
+ lindungi_conveyor_dll                         | boolean                  |           |          | false
+ alat_telah_bersih                             | boolean                  |           |          | false
+ uap_menyala_telah_dibuang                     | boolean                  |           |          | false
+ kerja_pada_dinding_lagit                      | boolean                  |           |          | false
+ bahan_mudah_terbakar_dipindahkan_dari_dinding | boolean                  |           |          | false
+ fire_watch_memastikan_area_aman               | boolean                  |           |          | false
+ firwatch_terlatih                             | boolean                  |           |          | false
+ permintaan_tambahan                           | text                     |           |          |
+ spv_terkait                                   | character varying(255)   |           |          |
+ kontraktor                                    | character varying(255)   |           |          |
+ sfo                                           | character varying(255)   |           |          |
+ pga                                           | character varying(255)   |           |          |
+ created_at                                    | timestamp with time zone |           | not null | now()
+ updated_at                                    | timestamp with time zone |           | not null | now()
+ edit_token                                    | character varying(20)    |           |          |
+ catatan_reject                                | text                     |           |          |
+ approved_by                                   | character varying(255)   |           |          |
+ approved_at                                   | timestamp with time zone |           |          |
+ user_id                                       | integer                  |           |          |
+ current_stage                                 | integer                  |           |          | 0
+ spv_approved                                  | boolean                  |           |          | false
+ spv_approved_by                               | character varying(255)   |           |          |
+ spv_approved_at                               | timestamp with time zone |           |          |
+ kontraktor_approved                           | boolean                  |           |          | false
+ kontraktor_approved_by                        | character varying(255)   |           |          |
+ kontraktor_approved_at                        | timestamp with time zone |           |          |
+ sfo_approved                                  | boolean                  |           |          | false
+ sfo_approved_by                               | character varying(255)   |           |          |
+ sfo_approved_at                               | timestamp with time zone |           |          |
+ pga_approved                                  | boolean                  |           |          | false
+ pga_approved_by                               | character varying(255)   |           |          |
+ pga_approved_at                               | timestamp with time zone |           |          |
+ fw_approved                                   | boolean                  |           | not null | false
+ fw_approved_by                                | character varying(255)   |           |          |
+ fw_approved_at                                | timestamp with time zone |           |          |
+ pemberi_izin_approved                         | boolean                  |           | not null | false
+ pemberi_izin_approved_by                      | character varying(255)   |           |          |
+ pemberi_izin_approved_at                      | timestamp with time zone |           |          |
+ tipe_perusahaan                               | character varying(20)    |           |          | 'eksternal'::character varying
+ admin_k3_approved                             | boolean                  |           | not null | false
+ admin_k3_approved_by                          | character varying(255)   |           |          |
+ admin_k3_approved_at                          | timestamp with time zone |           |          |
+ mr_pga_approved                               | boolean                  |           | not null | false
+ mr_pga_approved_by                            | character varying(255)   |           |          |
+ mr_pga_approved_at                            | timestamp with time zone |           |          |
+ mr_pga_mgr                                    | character varying(255)   |           |          |
+Indexes:
+    "form_kerja_workshop_pkey" PRIMARY KEY, btree (id)
+    "form_kerja_workshop_edit_token_key" UNIQUE CONSTRAINT, btree (edit_token)
+    "form_kerja_workshop_id_form_key" UNIQUE CONSTRAINT, btree (id_form)
+    "idx_workshop_edit_token" btree (edit_token)
+    "idx_workshop_status" btree (status)
+    "idx_workshop_tanggal" btree (tanggal DESC)
+    "idx_workshop_tipe" btree (tipe_perusahaan)
+    "idx_workshop_user_id" btree (user_id)
+Foreign-key constraints:
+    "form_kerja_workshop_user_id_fkey" FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
+Triggers:
+    trg_workshop_updated BEFORE UPDATE ON form_kerja_workshop FOR EACH ROW EXECUTE FUNCTION update_updated_at()
+
+
+jai_permit_db=#
+jai_permit_db=#
+jai_permit_db=#
+jai_permit_db=#
+jai_permit_db=#
+jai_permit_db=# \d users;
+                                       Table "public.users"
+   Column   |           Type           | Collation | Nullable |              Default
+------------+--------------------------+-----------+----------+-----------------------------------
+ id         | integer                  |           | not null | nextval('users_id_seq'::regclass)
+ username   | character varying(100)   |           | not null |
+ password   | character varying(255)   |           | not null |
+ nama       | character varying(255)   |           | not null |
+ jabatan    | character varying(100)   |           |          |
+ role       | character varying(50)    |           | not null | 'approver'::character varying
+ is_active  | boolean                  |           | not null | true
+ created_at | timestamp with time zone |           | not null | now()
+ updated_at | timestamp with time zone |           | not null | now()
+ email      | character varying(255)   |           |          |
+ perusahaan | character varying(255)   |           |          |
+ no_telp    | character varying(50)    |           |          |
+ nik        | character varying(50)    |           |          |
+Indexes:
+    "users_pkey" PRIMARY KEY, btree (id)
+    "users_email_key" UNIQUE CONSTRAINT, btree (email)
+    "users_username_key" UNIQUE CONSTRAINT, btree (username)
+Referenced by:
+    TABLE "form_kerja_ketinggian" CONSTRAINT "form_kerja_ketinggian_user_id_fkey" FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
+    TABLE "form_kerja_panas" CONSTRAINT "form_kerja_panas_user_id_fkey" FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
+    TABLE "form_kerja_workshop" CONSTRAINT "form_kerja_workshop_user_id_fkey" FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
+Triggers:
+    set_users_updated_at BEFORE UPDATE ON users FOR EACH ROW EXECUTE FUNCTION update_updated_at_column()
+
+
+jai_permit_db=#

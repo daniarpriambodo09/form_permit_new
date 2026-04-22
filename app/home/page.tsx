@@ -2,15 +2,13 @@
 "use client";
 import Link from "next/link";
 import { FileText, Flame, Shield, AlertTriangle, History, BarChart3 } from "lucide-react";
-import Image from "next/image";
 
 export default function HomePage() {
   const permitTypes = [
     {
       id: "hot-work",
       name: "Izin Kerja Panas",
-      description:
-        "Formulir untuk pekerjaan yang menghasilkan panas, api, atau percikan (Cutting, Grinding, Welding, Painting)",
+      description: "Formulir untuk pekerjaan yang menghasilkan panas, api, atau percikan (Cutting, Grinding, Welding, Painting)",
       icon: Flame,
       active: true,
       color: "orange",
@@ -40,30 +38,25 @@ export default function HomePage() {
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100">
+    <div className="min-h-screen bg-slate-50">
       {/* Header Section */}
-      <header className="border-b border-slate-200 bg-white sticky top-0 z-50 shadow-sm">
+      <header className="bg-white border-b border-slate-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          <div className="flex flex-col sm:flex-row items-center sm:items-center gap-3 sm:gap-4">
+          <div className="flex items-center justify-between">
             {/* Logo Container */}
-            <div className="relative w-10 h-10 sm:w-12 sm:h-12 flex-shrink-0">
-              <Image
-                src="/logo-k3.png"
-                alt="Logo K3"
-                fill
-                className="object-contain"
-                priority
-              />
-            </div>
-
-            {/* Title Container */}
-            <div className="flex flex-col justify-center text-center sm:text-left">
-              <h1 className="text-xl sm:text-3xl font-bold text-slate-900 tracking-tight">
-                PT. JATIM AUTOCOMP INDONESIA
-              </h1>
-              <p className="text-xs sm:text-sm text-slate-600">
-                WIRING HARNESS MANUFACTURER
-              </p>
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl flex items-center justify-center shadow-lg">
+                <Shield className="w-7 h-7 text-white" />
+              </div>
+              {/* Title Container */}
+              <div className="flex flex-col justify-center text-center sm:text-left">
+                <h1 className="text-xl sm:text-3xl font-bold text-slate-900 tracking-tight">
+                  PT. JATIM AUTOCOMP INDONESIA
+                </h1>
+                <p className="text-xs sm:text-sm text-slate-600">
+                  WIRING HARNESS MANUFACTURER
+                </p>
+              </div>
             </div>
           </div>
         </div>
@@ -213,7 +206,7 @@ export default function HomePage() {
                   {permit.active && (
                     <div className="mt-auto pt-4">
                       <div className="flex items-center text-orange-600 text-sm font-semibold group">
-                        <span>Buka Formulir</span>
+                        <span>Lihat Formulir</span>
                         <svg
                           className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform"
                           fill="none"
