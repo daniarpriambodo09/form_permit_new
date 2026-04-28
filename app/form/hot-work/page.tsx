@@ -206,8 +206,22 @@ export default function HotWorkPermitForm() {
             </div>
 
             <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-2">Nama Kontraktor *</label>
-              <input type="text" value={formData.namaKontraktor} onChange={e => setFormData(p => ({ ...p, namaKontraktor: e.target.value }))} className={inputCls} placeholder="PT ABC Konstruksi" />
+              <label className="block text-sm font-semibold text-slate-700 mb-2">
+                Nama Kontraktor{" "}
+                {isInternal
+                  ? <span className="text-slate-400 font-normal text-xs ml-1">(tidak diperlukan untuk Internal)</span>
+                  : <span className="text-red-500">*</span>
+                }
+              </label>
+              <input
+                type="text"
+                value={isInternal ? "" : formData.namaKontraktor}
+                onChange={e => setFormData(p => ({ ...p, namaKontraktor: e.target.value }))}
+                disabled={isInternal}
+                required={!isInternal}
+                placeholder={isInternal ? "Tidak diperlukan untuk Internal / Karyawan PT.JAI" : "PT ABC"}
+                className={`${inputCls} ${isInternal ? "bg-slate-100 text-slate-400 cursor-not-allowed opacity-60" : ""}`}
+              />
             </div>
             <div>
               <label className="block text-sm font-semibold text-slate-700 mb-2">Nama Pekerja / NIK *</label>

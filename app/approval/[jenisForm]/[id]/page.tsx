@@ -641,7 +641,7 @@ export default function ApprovalDetailPage({
                     onClick={() => { setShowReject(false); setCatatan(""); setError(""); }}
                     className="px-4 py-3 border border-slate-300 text-slate-600
                                hover:bg-slate-100 rounded-xl text-sm font-medium transition-colors"
-                  >
+                  > 
                     Batal
                   </button>
                 </div>
