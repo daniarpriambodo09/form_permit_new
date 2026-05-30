@@ -2,114 +2,143 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { COOKIE_NAME } from '@/lib/auth';
 
-// Route yang memerlukan login approver/admin
-const APPROVER_ROUTES = [
-  '/approval',
-  '/history',
-  '/dashboard',
+// FIX: BASE harus konsisten dengan basePath di next.config.ts
+const BASE = '/form-permit';
+
+// 🔓 Route yang boleh diakses tanpa login
+const PUBLIC_ROUTES = [
+  `${BASE}/login`,
+  `${BASE}/login/worker`,
+  `${BASE}/login/approver`,
+  `${BASE}/register`,
+  // FIX: Tambahkan API auth routes sebagai public agar login/logout
+  // tidak ter-redirect sebelum cookie sempat diset
+  `${BASE}/api/auth/login`,
+  `${BASE}/api/auth/logout`,
+  `${BASE}/api/auth/register`,
 ];
 
-// Route yang memerlukan login worker
+// 🔐 Route khusus worker
 const WORKER_ROUTES = [
-  '/my-forms',
-  '/form',
+  `${BASE}/my-forms`,
+  `${BASE}/form`,
 ];
 
-// Route untuk home (admin & worker)
-const HOME_ROUTES = [
-  '/home',
-];
-
-// Route API
-const PROTECTED_API = [
-  '/api/auth/me',
-  '/api/approval',
-  '/api/my-forms',
+// 🔐 Route khusus approver
+const APPROVER_ROUTES = [
+  `${BASE}/approval`,
 ];
 
 export function middleware(req: NextRequest) {
+  const allowedApproverRoles = ['spv', 'admin', 'kontraktor', 'sfo', 'pga', 'firewatch', 'admin_k3'];
   const { pathname } = req.nextUrl;
 
-  const isApproverRoute = APPROVER_ROUTES.some(p => pathname.startsWith(p));
-  const isWorkerRoute   = WORKER_ROUTES.some(p => pathname.startsWith(p));
-  const isHomeRoute     = HOME_ROUTES.some(p => pathname.startsWith(p));
-  const isProtectedApi  = PROTECTED_API.some(p => pathname.startsWith(p));
+  // FIX: Skip middleware untuk _next/static, _next/image, favicon, dll.
+  // Ini penting agar asset loading tidak ikut di-intercept
+  if (
+    pathname.startsWith(`${BASE}/_next/`) ||
+    pathname.startsWith('/_next/') ||
+    pathname.includes('/favicon') ||
+    pathname.includes('/__nextjs')
+  ) {
+    return NextResponse.next();
+  }
 
-  const needsAuth = isApproverRoute || isWorkerRoute || isHomeRoute || isProtectedApi;
+  // 🔓 Skip public routes (exact match prefix)
+  if (PUBLIC_ROUTES.some(route => pathname.startsWith(route))) {
+    return NextResponse.next();
+  }
 
-  if (!needsAuth) return NextResponse.next();
-
-  // Ambil token dari cookie
+  // FIX: Baca cookie — pastikan nama cookie sama persis dengan yang diset di route.ts
   const token = req.cookies.get(COOKIE_NAME)?.value;
 
-  // Jika tidak ada token → redirect ke login yang sesuai
+  // ❌ Belum login — redirect ke halaman login worker
   if (!token) {
-    const loginPath = isApproverRoute || isHomeRoute ? '/login/approver' : '/login/worker';
-    const loginUrl  = new URL(loginPath, req.url);
+    const loginUrl = new URL(`${BASE}/login/worker`, req.url);
+    // FIX: Simpan tujuan asal di query param 'from' agar setelah login
+    // bisa redirect kembali ke halaman yang dituju
     loginUrl.searchParams.set('from', pathname);
     return NextResponse.redirect(loginUrl);
   }
 
-  // Verifikasi token (decode tanpa import jwt supaya edge-compatible)
   try {
-    const [, payloadB64] = token.split('.');
+    // FIX: Parse JWT payload dengan aman
+    // Split harus menghasilkan tepat 3 bagian (header.payload.signature)
+    const parts = token.split('.');
+    if (parts.length !== 3) {
+      throw new Error('Invalid JWT format');
+    }
+
+    const [, payloadB64] = parts;
+
+    // FIX: Padding base64url yang benar sebelum decode
+    // Base64url tidak punya padding, Buffer.from bisa handle ini tapi
+    // kita tambahkan padding manual untuk keamanan
+    const padded = payloadB64.padEnd(
+      payloadB64.length + (4 - (payloadB64.length % 4)) % 4,
+      '='
+    );
     const payload = JSON.parse(
-      Buffer.from(payloadB64, 'base64url').toString('utf8')
+      Buffer.from(padded, 'base64').toString('utf8')
     );
 
-    // Cek expiry
+    // ⛔ Token expired
     if (payload.exp && Date.now() / 1000 > payload.exp) {
-      const loginPath = isApproverRoute || isHomeRoute ? '/login/approver' : '/login/worker';
-      const loginUrl  = new URL(loginPath, req.url);
+      const loginUrl = new URL(`${BASE}/login/worker`, req.url);
       loginUrl.searchParams.set('expired', '1');
       const res = NextResponse.redirect(loginUrl);
-      res.cookies.delete(COOKIE_NAME);
+      // FIX: Delete cookie dengan path yang sama persis seperti saat diset
+      res.cookies.delete({
+        name: COOKIE_NAME,
+        path: '/form-permit',
+      });
       return res;
     }
 
-    const userRole = payload.role as string;
+    const role = payload.role as string;
 
-    // Jika home route, hanya admin yang boleh
-    if (isHomeRoute) {
-      if (userRole !== 'admin') {
-        return NextResponse.redirect(new URL('/my-forms', req.url));
-      }
+    // 🔐 Worker mencoba akses halaman approver
+    if (
+      APPROVER_ROUTES.some(r => pathname.startsWith(r)) &&
+      !allowedApproverRoles.includes(role)
+    ) {
+      return NextResponse.redirect(
+        new URL(`${BASE}/my-forms`, req.url)
+      );
     }
 
-    // Jika approver route — ✅ tambahkan 'firewatch'
-    if (isApproverRoute) {
-      const allowedRoles = ['spv', 'admin', 'sfo', 'kontraktor', 'pga', 'firewatch'];
-
-      if (!allowedRoles.includes(userRole)) {
-        return NextResponse.redirect(new URL('/my-forms', req.url));
-      }
+    // 🔐 Approver mencoba akses halaman worker
+    if (
+      WORKER_ROUTES.some(r => pathname.startsWith(r)) &&
+      role !== 'worker'
+    ) {
+      return NextResponse.redirect(
+        new URL(`${BASE}/approval`, req.url)
+      );
     }
 
-    // Jika worker route, hanya worker yang boleh
-    if (isWorkerRoute) {
-      if (userRole !== 'worker') {
-        return NextResponse.redirect(new URL('/approval', req.url));
-      }
-    }
-
+    // ✅ Lolos semua check — lanjutkan request
     return NextResponse.next();
-  } catch {
-    const loginPath = isApproverRoute || isHomeRoute ? '/login/approver' : '/login/worker';
-    const loginUrl  = new URL(loginPath, req.url);
-    return NextResponse.redirect(loginUrl);
+
+  } catch (err) {
+    console.error('[Middleware] Token parse error:', err);
+
+    // Token corrupt/invalid — hapus dan redirect ke login
+    const loginUrl = new URL(`${BASE}/login/worker`, req.url);
+    const res = NextResponse.redirect(loginUrl);
+    res.cookies.delete({
+      name: COOKIE_NAME,
+      path: '/form-permit',
+    });
+    return res;
   }
 }
 
 export const config = {
   matcher: [
-    '/approval/:path*',
-    '/history/:path*',
-    '/dashboard/:path*',
-    '/home/:path*',
-    '/my-forms/:path*',
-    '/form/:path*',
-    '/api/auth/me',
-    '/api/approval/:path*',
-    '/api/my-forms/:path*',
+    // FIX: Matcher ini menangkap semua sub-path /form-permit/*
+    // KECUALI file statis Next.js (_next/static, _next/image)
+    // yang ditangani di awal fungsi middleware di atas.
+    '/form-permit/:path*',
   ],
 };

@@ -183,7 +183,7 @@ export default function ApprovalPage() {
 
   const loadFormCounts = async () => {
     try {
-      const res = await fetch("/api/approval?countOnly=1");
+      const res = await fetch("/form-permit/api/approval?countOnly=1");
       if (res.ok) {
         const data = await res.json();
         if (data.counts) setFormCounts(data.counts);
@@ -196,7 +196,7 @@ export default function ApprovalPage() {
   const loadForms = async (status = activeTab) => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/approval?status=${status}`);
+      const res = await fetch(`/form-permit/api/approval?status=${status}`);
       if (res.status === 401) { router.push("/login"); return; }
       const data = await res.json();
       setForms(data.data ?? []);
@@ -217,7 +217,7 @@ export default function ApprovalPage() {
   };
 
   const handleLogout = async () => {
-    await fetch("/api/auth/logout", { method: "POST" });
+    await fetch("/form-permit/api/auth/logout", { method: "POST" });
     sessionStorage.clear();
     router.push("/");
   };

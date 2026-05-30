@@ -1,7 +1,5 @@
 // app/my-forms/page.tsx
-// FIX: getApprovalStages sekarang aware tipe_perusahaan untuk hot-work & workshop
-// Internal:  fw → spv → admin_k3 → sfo → mr_pga
-// Eksternal: kontraktor → fw → spv → admin_k3 → sfo → mr_pga
+
 "use client";
 import { useState, useEffect } from "react";
 import Link from "next/link";
@@ -36,7 +34,6 @@ interface FormItem {
   catatan_reject?: string;
   approved_by?: string;
   approved_at?: string;
-  // tipe_perusahaan: 'internal' | 'eksternal' — berlaku untuk semua jenis form
   tipe_perusahaan?: string;
   // Kolom approval hot-work & workshop
   fw_approved?: boolean;
@@ -44,16 +41,17 @@ interface FormItem {
   kontraktor_approved?: boolean;
   sfo_approved?: boolean;
   pga_approved?: boolean;
-  // Kolom approval baru hot-work & workshop
+  // Kolom approval baru
   admin_k3_approved?: boolean;
   mr_pga_approved?: boolean;
-  // Kolom approval height-work
 }
 
 // ── Helpers ───────────────────────────────────────────────────
 const formatDate = (d?: string) => {
   if (!d) return "-";
-  return new Date(d).toLocaleDateString("id-ID", { day: "2-digit", month: "long", year: "numeric" });
+  return new Date(d).toLocaleDateString("id-ID", {
+    day: "2-digit", month: "long", year: "numeric",
+  });
 };
 
 const jenisLabel: Record<string, string> = {
@@ -69,14 +67,6 @@ const statusConfig: Record<string, { label: string; icon: any; color: string; bg
   rejected:  { label: "Ditolak",   icon: XCircle,     color: "text-red-600",   bg: "bg-red-100" },
 };
 
-// ── Helper: dapatkan stages berdasarkan jenis form & tipe perusahaan ──
-// Alur hot-work & workshop:
-//   Internal:  fw(0) → spv(1) → admin_k3(2) → sfo(3) → mr_pga(4)
-//   Eksternal: kontraktor(0) → fw(1) → spv(2) → admin_k3(3) → sfo(4) → mr_pga(5)
-//
-// Alur height-work:
-//   Internal:  spv(1) → admin_k3(2) → sfo(3) → mr_pga(4)
-//   Eksternal: kontraktor(1) → spv(2) → admin_k3(3) → sfo(4) → mr_pga(5)
 const getApprovalStages = (form: FormItem): { key: keyof FormItem; label: string }[] => {
   const isEksternal = form.tipe_perusahaan === "eksternal";
 
@@ -98,9 +88,7 @@ const getApprovalStages = (form: FormItem): { key: keyof FormItem; label: string
     ];
   }
 
-  // hot-work & workshop — sekarang aware tipe_perusahaan
   if (isEksternal) {
-    // Eksternal: Kontraktor → Firewatch → SPV → Admin K3 → SFO → MR/PGA
     return [
       { key: "kontraktor_approved", label: "Kontraktor" },
       { key: "fw_approved",         label: "Fire Watch" },
@@ -111,7 +99,6 @@ const getApprovalStages = (form: FormItem): { key: keyof FormItem; label: string
     ];
   }
 
-  // Internal: Firewatch → SPV → Admin K3 → SFO → MR/PGA
   return [
     { key: "fw_approved",       label: "Fire Watch" },
     { key: "spv_approved",      label: "SPV" },
@@ -121,13 +108,11 @@ const getApprovalStages = (form: FormItem): { key: keyof FormItem; label: string
   ];
 };
 
-// ── Helper: cek apakah semua approver sudah approve ──
 const checkAllApproved = (form: FormItem): boolean => {
   const stages = getApprovalStages(form);
   return stages.every(({ key }) => Boolean(form[key]));
 };
 
-// ── Helper: render approval progress badges ──
 const renderApprovalProgress = (form: FormItem) => {
   const stages = getApprovalStages(form);
   const isEksternal = form.tipe_perusahaan === "eksternal";
@@ -138,12 +123,9 @@ const renderApprovalProgress = (form: FormItem) => {
         {stages.map((stage) => {
           const approved = Boolean(form[stage.key]);
           return (
-            <span
-              key={stage.key}
+            <span key={stage.key}
               className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                approved
-                  ? "bg-green-100 text-green-700"
-                  : "bg-slate-100 text-slate-500"
+                approved ? "bg-green-100 text-green-700" : "bg-slate-100 text-slate-500"
               }`}
             >
               {approved ? "✓" : "○"} {stage.label}
@@ -151,7 +133,6 @@ const renderApprovalProgress = (form: FormItem) => {
           );
         })}
       </div>
-      {/* Info alur approval */}
       {(form.jenis_form === "hot-work" || form.jenis_form === "workshop") && form.tipe_perusahaan && (
         <p className="text-[10px] text-slate-400 mt-1">
           Alur: {isEksternal
@@ -234,12 +215,32 @@ export default function MyFormsPage() {
   const loadForms = async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/my-forms");
-      if (res.status === 401) { router.push("/login"); return; }
+      // FIX #1: URL harus menyertakan basePath /form-permit
+      // Sebelumnya: "/api/my-forms" → 404 karena tidak ada handler di sana
+      // Sesudahnya: "/form-permit/api/my-forms" → diterima Next.js dengan benar
+      const res = await fetch("/form-permit/api/my-forms", {
+        credentials: "include",
+      });
+
+      if (res.status === 401) {
+        // FIX #2: router.push tidak perlu basePath — Next.js otomatis prepend
+        router.replace("/login/worker");
+        return;
+      }
+
+      // FIX #3: Handle response non-JSON (misal HTML 404 page)
+      const contentType = res.headers.get("content-type") || "";
+      if (!contentType.includes("application/json")) {
+        console.error("[my-forms] Response bukan JSON:", res.status, res.url);
+        console.error("[my-forms] Kemungkinan URL salah atau middleware redirect");
+        setForms([]);
+        return;
+      }
+
       const data = await res.json();
       setForms(data.data ?? []);
     } catch (err) {
-      console.error(err);
+      console.error("[my-forms] Fetch error:", err);
     } finally {
       setLoading(false);
     }
@@ -249,9 +250,10 @@ export default function MyFormsPage() {
     if (!cancelModal.formId || !cancelModal.formType) return;
     setCancelling(true);
     try {
-      const res = await fetch(`/api/forms/${cancelModal.formType}/${cancelModal.formId}`, {
-        method: "DELETE",
-      });
+      const res = await fetch(
+        `/form-permit/api/forms/${cancelModal.formType}/${cancelModal.formId}`,
+        { method: "DELETE", credentials: "include" }
+      );
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Gagal membatalkan form");
       await loadForms();
@@ -265,13 +267,18 @@ export default function MyFormsPage() {
   };
 
   const handleLogout = async () => {
-    await fetch("/api/auth/logout", { method: "POST" });
+    await fetch("/form-permit/api/auth/logout", {
+      method: "POST",
+      credentials: "include",
+    });
     sessionStorage.clear();
     router.push("/");
   };
 
   const filtered = filterStatus === "all" ? forms : forms.filter(f => f.status === filterStatus);
-  const counts: Record<string, number> = { all: forms.length, draft: 0, submitted: 0, approved: 0, rejected: 0 };
+  const counts: Record<string, number> = {
+    all: forms.length, draft: 0, submitted: 0, approved: 0, rejected: 0,
+  };
   forms.forEach(f => { if (counts[f.status] !== undefined) counts[f.status]++; });
 
   return (
@@ -302,7 +309,8 @@ export default function MyFormsPage() {
                 </div>
               )}
               <button onClick={loadForms} disabled={loading}
-                className="p-2 hover:bg-slate-100 rounded-lg transition-colors disabled:opacity-50" title="Refresh">
+                className="p-2 hover:bg-slate-100 rounded-lg transition-colors disabled:opacity-50"
+                title="Refresh">
                 <RefreshCw className={`w-4 h-4 text-slate-500 ${loading ? "animate-spin" : ""}`} />
               </button>
               <button onClick={handleLogout}
@@ -353,7 +361,10 @@ export default function MyFormsPage() {
           <div className="bg-white rounded-xl border border-slate-200 p-12 text-center">
             <FileText className="w-12 h-12 text-slate-200 mx-auto mb-3" />
             <p className="font-semibold text-slate-600">
-              {filterStatus === "all" ? "Belum ada form" : `Tidak ada form dengan status "${statusConfig[filterStatus]?.label}"`}
+              {filterStatus === "all"
+                ? "Belum ada form"
+                : `Tidak ada form dengan status "${statusConfig[filterStatus]?.label}"`
+              }
             </p>
             <p className="text-slate-400 text-sm mt-1">Buat form izin kerja baru untuk memulai.</p>
             <button onClick={() => setShowFormModal(true)}
@@ -367,11 +378,8 @@ export default function MyFormsPage() {
             {filtered.map(form => {
               const cfg  = statusConfig[form.status] || statusConfig.submitted;
               const Icon = cfg.icon;
-              const canCancel = form.status === "submitted" || form.status === "draft";
-
-              const isHeightWork = form.jenis_form === "height-work";
-              const isFwForm     = form.jenis_form === "hot-work" || form.jenis_form === "workshop";
-              const isEksternal  = form.tipe_perusahaan === "eksternal";
+              const canCancel  = form.status === "submitted" || form.status === "draft";
+              const isEksternal = form.tipe_perusahaan === "eksternal";
 
               return (
                 <div key={form.id_form}
@@ -384,12 +392,9 @@ export default function MyFormsPage() {
                           <span className="text-xs font-semibold px-2 py-0.5 bg-orange-100 text-orange-700 rounded-full">
                             {jenisLabel[form.jenis_form] || form.jenis_form}
                           </span>
-                          {/* Badge tipe perusahaan */}
                           {form.tipe_perusahaan && (
                             <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
-                              isEksternal
-                                ? "bg-purple-100 text-purple-700"
-                                : "bg-blue-100 text-blue-700"
+                              isEksternal ? "bg-purple-100 text-purple-700" : "bg-blue-100 text-blue-700"
                             }`}>
                               {isEksternal ? "Eksternal" : "Internal"}
                             </span>
@@ -414,7 +419,6 @@ export default function MyFormsPage() {
                           </div>
                         </div>
 
-                        {/* Catatan reject */}
                         {form.catatan_reject && (
                           <div className="mt-3 text-xs text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">
                             <span className="font-semibold">Alasan ditolak: </span>{form.catatan_reject}
@@ -438,12 +442,10 @@ export default function MyFormsPage() {
                       </div>
                     </div>
 
-                    {/* Approval Progress Badges */}
-                    {(form.status === "submitted" || form.status === "approved") && (
+                    {(form.status === "submitted" || form.status === "approved") &&
                       renderApprovalProgress(form)
-                    )}
+                    }
 
-                    {/* Action buttons */}
                     <div className="flex items-center gap-2 pt-3 border-t border-slate-100 flex-wrap mt-3">
                       <button
                         onClick={() => setDetailModal({ isOpen: true, formId: form.id_form, formType: form.jenis_form })}
@@ -457,7 +459,8 @@ export default function MyFormsPage() {
                           onClick={() => setEditModal({ isOpen: true, formId: form.id_form, formType: form.jenis_form })}
                           className="flex items-center gap-1.5 px-3 py-1.5 text-orange-600
                                      hover:bg-orange-50 rounded-lg text-xs font-medium transition-colors">
-                          <Edit className="w-3.5 h-3.5" /> {form.status === "rejected" ? "Perbaiki" : "Edit"}
+                          <Edit className="w-3.5 h-3.5" />
+                          {form.status === "rejected" ? "Perbaiki" : "Edit"}
                         </button>
                       )}
 

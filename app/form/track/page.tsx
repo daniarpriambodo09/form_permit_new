@@ -103,7 +103,7 @@ function TrackContent() {
     setNotFound(false);
     setError("");
     try {
-      const res  = await fetch(`/api/forms/track?q=${encodeURIComponent(q.trim().toUpperCase())}`);
+      const res  = await fetch(`/form-permit/api/forms/track?q=${encodeURIComponent(q.trim().toUpperCase())}`);
       const data = await res.json();
       if (res.status === 404 || !data.found) { setNotFound(true); return; }
       if (!res.ok) throw new Error(data.error);

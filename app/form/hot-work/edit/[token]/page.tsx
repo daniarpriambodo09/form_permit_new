@@ -163,7 +163,7 @@ export default function HotWorkEditPage({
 
   const loadForm = async () => {
     try {
-      const res  = await fetch(`/api/forms/track?q=${token}`);
+      const res  = await fetch(`/form-permit/api/forms/track?q=${token}`);
       const data = await res.json();
       if (!res.ok || !data.found) { setError('Form tidak ditemukan. Pastikan kode edit benar.'); return; }
 
@@ -174,13 +174,13 @@ export default function HotWorkEditPage({
       }
       // Ambil data lengkap via approval API (tanpa auth) — atau langsung dari track
       // Track sudah cukup untuk identifikasi, tapi untuk prefill kita butuh full data
-      const resFull = await fetch(`/api/forms/hot-work?full=1&limit=1`);
+      const resFull = await fetch(`/form-permit/api/forms/hot-work?full=1&limit=1`);
       // Ambil langsung dengan id_form
-      const resDetail = await fetch(`/api/forms/track?q=${row.id_form}`);
+      const resDetail = await fetch(`/form-permit/api/forms/track?q=${row.id_form}`);
       const dataDetail = await resDetail.json();
 
       // Gunakan GET full by id_form
-      const resById = await fetch(`/api/forms/hot-work/by-token?token=${token}`);
+      const resById = await fetch(`/form-permit/api/forms/hot-work/by-token?token=${token}`);
       const dataById = await resById.json();
 
       if (dataById.data) {
@@ -212,7 +212,7 @@ export default function HotWorkEditPage({
     setSubmitting(true);
     setError('');
     try {
-      const res  = await fetch('/api/forms/hot-work', {
+      const res  = await fetch('/form-permit/api/forms/hot-work', {
         method:  'PUT',
         headers: { 'Content-Type': 'application/json' },
         body:    JSON.stringify({ ...formData, editToken: token, isSubmit }),

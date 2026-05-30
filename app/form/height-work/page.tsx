@@ -64,9 +64,10 @@ function LisensiUploadButton({ namaPetugas, index, fotoUrl, uploadStatus, upload
       const fd = new FormData();
       fd.append("file", file);
       fd.append("index", String(index));
-      const res = await fetch("/api/upload/lisensi", { method: "POST", body: fd });
+      const res = await fetch("/form-permit/api/upload/lisensi", { method: "POST", body: fd });
       if (!res.ok) { const e = await res.json(); throw new Error(e.error || "Upload gagal"); }
       const { url } = await res.json();
+      console.log("URL hasil upload:", url);
       onUploaded(url, "success", "");
     } catch (err: any) {
       onUploaded("", "error", err.message || "Upload gagal, coba lagi");
@@ -128,7 +129,7 @@ function LisensiUploadButton({ namaPetugas, index, fotoUrl, uploadStatus, upload
               className="w-full flex items-center gap-2.5 px-4 py-3 text-sm text-slate-700 hover:bg-slate-50 transition-colors">
               <Camera className="w-4 h-4 text-orange-500" /> Ambil Foto
             </button>
-            <div className="border-t border-slate-100" />
+            <div className="border-t border-slate-100" /> 
             <button type="button" onClick={() => { setShowOptions(false); fileRef.current?.click(); }}
               className="w-full flex items-center gap-2.5 px-4 py-3 text-sm text-slate-700 hover:bg-slate-50 transition-colors">
               <Upload className="w-4 h-4 text-blue-500" /> Upload File
@@ -283,7 +284,7 @@ export default function HeightWorkFormPage() {
   const handleSaveDraft = async () => {
     setSaving(true); setError("");
     try {
-      const res  = await fetch("/api/forms/height-work", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(buildBody(false)) });
+      const res  = await fetch("/form-permit/api/forms/height-work", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(buildBody(false)) });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Gagal menyimpan draft");
       router.push("/history");
@@ -301,7 +302,7 @@ export default function HeightWorkFormPage() {
     if (lisensiUploading) { setError("Masih ada foto yang sedang diupload, tunggu sebentar."); return; }
     setSubmitting(true);
     try {
-      const res  = await fetch("/api/forms/height-work", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(buildBody(true)) });
+      const res  = await fetch("/form-permit/api/forms/height-work", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(buildBody(true)) });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Gagal mengajukan form");
       setSuccessId(data.id_form); setSuccess(true);
@@ -323,7 +324,7 @@ export default function HeightWorkFormPage() {
           </div>
           {successId && <p className="text-xs text-slate-400 mb-6">ID Form: <span className="font-mono font-bold text-slate-700">{successId}</span></p>}
           <div className="flex gap-3">
-            <Link href="/history" className="flex-1 py-2.5 bg-orange-600 hover:bg-orange-700 text-white font-semibold rounded-lg text-sm transition-colors">Lihat Riwayat</Link>
+            <Link href="/my-forms" className="flex-1 py-2.5 bg-orange-600 hover:bg-orange-700 text-white font-semibold rounded-lg text-sm transition-colors">Lihat Riwayat</Link>
             <Link href="/home"    className="flex-1 py-2.5 border border-slate-200 hover:bg-slate-50 text-slate-700 font-semibold rounded-lg text-sm transition-colors">Kembali</Link>
           </div>
         </div>
@@ -346,7 +347,7 @@ export default function HeightWorkFormPage() {
             <div>
               <h1 className="font-bold text-slate-900 text-sm leading-tight">Form Izin Kerja Ketinggian</h1>
               <div className="flex items-center gap-1 text-xs text-slate-500">
-                <Link href="/home" className="hover:text-orange-600 transition-colors">Beranda</Link>
+                <Link href="/my-forms" className="hover:text-orange-600 transition-colors">Beranda</Link>
                 <ChevronRight className="w-3 h-3" /><span>Kerja Ketinggian</span>
               </div>
             </div>
@@ -600,7 +601,7 @@ export default function HeightWorkFormPage() {
                     <button type="button" onClick={() => setHarnessLightbox(true)}
                       className="group relative w-full rounded-xl overflow-hidden border border-slate-200 shadow-sm hover:border-orange-400 hover:shadow-md transition-all cursor-zoom-in" title="Klik untuk perbesar">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src="/images/Cek_Body_Harness.jpg" alt="Diagram pengecekan body harness" className="w-full object-contain bg-white" />
+                      <img src="/form-permit/images/Cek_Body_Harness.jpg" alt="Diagram pengecekan body harness" className="w-full object-contain bg-white" />
                       <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
                         <div className="opacity-0 group-hover:opacity-100 transition-opacity bg-black/60 rounded-full p-2">
                           <ZoomIn className="w-5 h-5 text-white" />

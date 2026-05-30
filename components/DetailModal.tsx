@@ -115,7 +115,7 @@ export default function DetailModal({ isOpen, onClose, formId, formType }: Detai
     setLoading(true);
     setError("");
     try {
-      const res = await fetch(`/api/forms/${formType}/${formId}`);
+      const res = await fetch(`/form-permit/api/forms/${formType}/${formId}`);
       if (!res.ok) throw new Error("Gagal memuat data form");
       const json = await res.json();
       setData(json.data);

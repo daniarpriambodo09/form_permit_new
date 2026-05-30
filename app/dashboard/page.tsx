@@ -58,9 +58,9 @@ export default function DashboardPage() {
     setLoading(true);
     try {
       const [r1, r2, r3] = await Promise.all([
-        fetch("/api/forms/hot-work?limit=2000&full=1"),
-        fetch("/api/forms/workshop?limit=2000&full=1"),
-        fetch("/api/forms/height-work?limit=2000&full=1"),
+        fetch("/form-permit/api/forms/hot-work?limit=2000&full=1"),
+        fetch("/form-permit/api/forms/workshop?limit=2000&full=1"),
+        fetch("/form-permit/api/forms/height-work?limit=2000&full=1"),
       ]);
       if (!r1.ok || !r2.ok || !r3.ok) throw new Error("Gagal mengambil data");
       const [j1, j2, j3] = await Promise.all([r1.json(), r2.json(), r3.json()]);

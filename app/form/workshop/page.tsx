@@ -122,7 +122,7 @@ export default function WorkshopPermitForm() {
   const submit = async (isSubmit: boolean) => {
     setSubmitting(true);
     try {
-      const res = await fetch("/api/forms/workshop", {
+      const res = await fetch("/form-permit/api/forms/workshop", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...formData, isSubmit }),
       });
@@ -140,7 +140,7 @@ export default function WorkshopPermitForm() {
       <div className="bg-white shadow-sm border-b border-slate-200 sticky top-0 z-50">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-5 flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <Link href="/" className="p-2 hover:bg-slate-100 rounded-lg"><Home className="w-5 h-5 text-slate-600" /></Link>
+            <Link href="/my-forms" className="p-2 hover:bg-slate-100 rounded-lg"><Home className="w-5 h-5 text-slate-600" /></Link>
             <div className="flex items-center gap-3">
               <div className="p-2 bg-orange-100 rounded-lg"><Flame className="w-5 h-5 text-orange-600" /></div>
               <div>

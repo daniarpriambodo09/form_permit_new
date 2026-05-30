@@ -9,12 +9,11 @@ const pool = new Pool({
   user:     process.env.DB_USER,
   password: process.env.DB_PASSWORD,
 
-  max: 10,                // maksimal 10 koneksi paralel
+  max: 10,
   idleTimeoutMillis: 30000,
   connectionTimeoutMillis: 5000,
-  ssl: process.env.NODE_ENV === 'production'
-    ? { rejectUnauthorized: false }
-    : false,
+
+  ssl: false, 
 });
 
 // Helper query dengan error logging

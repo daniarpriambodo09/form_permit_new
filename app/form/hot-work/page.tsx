@@ -129,7 +129,7 @@ export default function HotWorkPermitForm() {
   const submit = async (isSubmit: boolean) => {
     setSubmitting(true);
     try {
-      const res = await fetch("/api/forms/hot-work", {
+      const res = await fetch("/form-permit/api/forms/hot-work", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...formData, isSubmit }),
       });
@@ -140,7 +140,7 @@ export default function HotWorkPermitForm() {
   };
 
   const handleSave   = async () => { try { const r = await submit(false); alert(`Draft disimpan! ID: ${r.id_form}`); } catch (e: any) { alert("Gagal: " + e.message); } };
-  const handleSubmit = async () => { try { const r = await submit(true); alert(`Izin diajukan! ID: ${r.id_form}`); window.location.href = "/my-forms"; } catch (e: any) { alert("Gagal: " + e.message); } };
+  const handleSubmit = async () => { try { const r = await submit(true); alert(`Izin diajukan! ID: ${r.id_form}`); window.location.href = "/form-permit/my-forms"; } catch (e: any) { alert("Gagal: " + e.message); } };
 
   return (
     <div className="min-h-screen bg-slate-50">

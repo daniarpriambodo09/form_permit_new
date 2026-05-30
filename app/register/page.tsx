@@ -52,7 +52,7 @@ export default function RegisterPage() {
     const timer = setTimeout(async () => {
       setCheckingUsername(true);
       try {
-        const res = await fetch(`/api/auth/check-username?username=${encodeURIComponent(formData.username)}`);
+        const res = await fetch(`/form-permit/api/auth/check-username?username=${encodeURIComponent(formData.username)}`);
         if (res.ok) {
           const data = await res.json();
           setUsernameStatus(data.available ? "available" : "taken");
@@ -94,7 +94,7 @@ export default function RegisterPage() {
 
     setLoading(true);
     try {
-      const res  = await fetch("/api/auth/register", {
+      const res  = await fetch("/form-permit/api/auth/register", {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
         body:    JSON.stringify(formData),

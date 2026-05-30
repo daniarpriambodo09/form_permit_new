@@ -124,6 +124,13 @@ Triggers:
     trg_ketinggian_updated BEFORE UPDATE ON form_kerja_ketinggian FOR EACH ROW EXECUTE FUNCTION update_updated_at()
 
 
+jai_permit_db=#
+jai_permit_db=#
+jai_permit_db=#
+jai_permit_db=#
+jai_permit_db=#
+jai_permit_db=#
+jai_permit_db=#
 jai_permit_db=# \d form_kerja_panas
                                                         Table "public.form_kerja_panas"
                     Column                     |           Type           | Collation | Nullable |                   Default
@@ -239,8 +246,6 @@ Triggers:
     trg_panas_updated BEFORE UPDATE ON form_kerja_panas FOR EACH ROW EXECUTE FUNCTION update_updated_at()
 
 
-jai_permit_db=#
-jai_permit_db=#
 jai_permit_db=# \d form_kerja_workshop
                                                         Table "public.form_kerja_workshop"
                     Column                     |           Type           | Collation | Nullable |                     Default
@@ -356,11 +361,7 @@ Triggers:
 
 
 jai_permit_db=#
-jai_permit_db=#
-jai_permit_db=#
-jai_permit_db=#
-jai_permit_db=#
-jai_permit_db=# \d users;
+jai_permit_db=# \d users
                                        Table "public.users"
    Column   |           Type           | Collation | Nullable |              Default
 ------------+--------------------------+-----------+----------+-----------------------------------
@@ -387,6 +388,27 @@ Referenced by:
     TABLE "form_kerja_workshop" CONSTRAINT "form_kerja_workshop_user_id_fkey" FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
 Triggers:
     set_users_updated_at BEFORE UPDATE ON users FOR EACH ROW EXECUTE FUNCTION update_updated_at_column()
+
+
+jai_permit_db=# select * from users;
+ id |        username         |                           password                           |       nama       |    jabatan     |    role    | is_active |          created_at           |          updated_at           |            email            | perusahaan |   no_telp    |  nik
+----+-------------------------+--------------------------------------------------------------+------------------+----------------+------------+-----------+-------------------------------+-------------------------------+-----------------------------+------------+--------------+--------
+  1 | admin                   | $2b$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi | Administrator    | ADMIN          | admin      | t         | 2026-02-16 18:16:06.201607+07 | 2026-02-18 10:13:36.8404+07   | admin@jai.co.id             | PT JAI     | 081234567890 |
+  4 | manager01               | $2b$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi | Manager          | MANAGER        | approver   | t         | 2026-02-16 18:16:06.201607+07 | 2026-02-18 10:18:43.487623+07 | manager01@jai.co.id         | PT JAI     | 081234567893 |
+  5 | worker_1234567891234567 | $2b$10$9TkGE2FtFetMayFQnWovMOY7r8CLr8rFWAZ0hgOVE97A6/Us0bNg. | Daniar Priambodo | Pekerja        | worker     | t         | 2026-02-18 10:27:30.623684+07 | 2026-02-18 10:27:30.623684+07 | daniarpriambodo11@gmail.com | PT JAI     | 081217733975 |
+  6 | daniar1                 | $2b$10$nC599t.VWA2BJH5BH9nRfO8YjMThECOKumjo7gnm0lNXGUUWwWVgq | Daniar Priambodo | Pekerja        | worker     | t         | 2026-02-18 11:32:55.881543+07 | 2026-02-18 11:32:55.881543+07 |                             | PT JAI     | 081234567891 |
+  7 | daniar2                 | $2b$10$x2XryU4ZvnobH7GbEfhh2u.p4w3Ee3JgrZj.vFJLKqGfSURf.Vjyu | Daniar P         | Pekerja        | worker     | t         | 2026-02-18 11:52:41.37034+07  | 2026-02-18 11:52:41.37034+07  |                             | PT JAI     | 0890909090   |
+ 13 | daniar_ctr              | $2b$10$zMh4XfrctzbLMFtkQhpaVulAZYgWl6vDUBMKd7wg17b.KS43avtGu | Daniar_CTR       | Contractor     | kontraktor | t         | 2026-02-19 08:46:12.313005+07 | 2026-02-19 08:46:12.313005+07 |                             |            |              |
+ 14 | daniar_sfo              | $2b$10$zMh4XfrctzbLMFtkQhpaVulAZYgWl6vDUBMKd7wg17b.KS43avtGu | Daniar_SFO       | Safety Officer | sfo        | t         | 2026-02-19 08:46:12.313005+07 | 2026-02-19 08:46:12.313005+07 |                             |            |              |
+ 15 | daniar_pga              | $2b$10$zMh4XfrctzbLMFtkQhpaVulAZYgWl6vDUBMKd7wg17b.KS43avtGu | Daniar_PGA       | PGA Manager    | pga        | t         | 2026-02-19 08:46:12.313005+07 | 2026-02-19 08:46:12.313005+07 |                             |            |              |
+ 16 | daniar_worker1          | $2b$10$LBImeBFPzuIpqptJS2YnkOk1vxWOlJ7hyP0IsbGppI5LX3Y5SMhTi | Daniar Priambodo | Pekerja        | worker     | t         | 2026-02-19 13:42:05.083746+07 | 2026-02-19 13:42:05.083746+07 |                             | PT JAI     | 09           |
+ 17 | daniar_worker2          | $2b$10$s/e63ZCp4ZG5G0KFIeMGTeh1MWAwzNuPExuH8bRpd7g7MM4IT5NvC | Daniar 1         | Pekerja        | worker     | t         | 2026-02-19 14:25:06.353177+07 | 2026-02-19 14:25:06.353177+07 |                             | PT JAI     |              |
+ 21 | daniar_sfo1             | $2b$10$IqRZwyk9FZUQ11GRwd.Zs.EF64twPpM6MBOrHYk2CXwZLmbsSbxKG | Daniar_sfo1      | Safety Officer | sfo        | t         | 2026-02-20 09:10:30.803741+07 | 2026-02-20 09:10:30.803741+07 |                             |            |              |
+ 22 | firewatch1              | $2b$10$SAUblN9wscELpQYvWh7Ko.kul1YiKz2040pDhPWZHSkMi1iZRNehK | firewatch Daniar | Fire Watch     | firewatch  | t         | 2026-04-12 18:41:52.477117+07 | 2026-04-14 07:40:30.142233+07 |                             |            |              | 1234  +
+    |                         |                                                              |                  |                |            |           |                               |                               |                             |            |              |
+ 12 | daniar_spv              | $2b$10$zMh4XfrctzbLMFtkQhpaVulAZYgWl6vDUBMKd7wg17b.KS43avtGu | Daniar_SPV       | Supervisor     | spv        | t         | 2026-02-19 08:46:12.313005+07 | 2026-04-14 14:04:10.592159+07 |                             |            |              | 4321
+ 23 | daniark3                | $2b$10$SAUblN9wscELpQYvWh7Ko.kul1YiKz2040pDhPWZHSkMi1iZRNehK | daniar k3        | Admin K3       | admin_k3   | t         | 2026-04-16 10:01:41.753525+07 | 2026-04-16 10:01:41.753525+07 |                             |            |              | 123456
+(14 rows)
 
 
 jai_permit_db=#

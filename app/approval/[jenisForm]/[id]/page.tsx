@@ -198,7 +198,7 @@ export default function ApprovalDetailPage({
     setUserRole(sessionStorage.getItem("user_role") || "");
     setUserJabatan(sessionStorage.getItem("user_jabatan") || "");
 
-    fetch("/api/auth/me")
+    fetch("/form-permit/api/auth/me")
       .then(r => r.json())
       .then(data => {
         if (data.user?.nik)     setUserNik(data.user.nik);
@@ -214,7 +214,7 @@ export default function ApprovalDetailPage({
   const loadForm = async () => {
     setLoading(true);
     try {
-      const res  = await fetch(`/api/approval/${jenisForm}/${id}`);
+      const res  = await fetch(`/form-permit/api/approval/${jenisForm}/${id}`);
       if (res.status === 401) { router.push("/login"); return; }
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
@@ -237,7 +237,7 @@ export default function ApprovalDetailPage({
     setSubmitting(true);
     setError("");
     try {
-      const res = await fetch(`/api/approval/${jenisForm}/${id}`, {
+      const res = await fetch(`/form-permit/api/approval/${jenisForm}/${id}`, {
         method:  "PATCH",
         headers: { "Content-Type": "application/json" },
         body:    JSON.stringify({ action, catatan_reject: catatan }),

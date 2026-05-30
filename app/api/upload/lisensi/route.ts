@@ -1,15 +1,18 @@
 // app/api/upload/lisensi/route.ts
 // Upload foto lisensi petugas ketinggian.
-// Menyimpan file ke /public/uploads/lisensi/ (filesystem lokal).
-// Tidak menggunakan Supabase sama sekali.
+// Menyimpan file ke /uploads/lisensi/ (di luar /public — tidak di-serve statis).
+// File diakses via /api/files/lisensi/[...path] bukan URL statis.
 
 import { NextRequest, NextResponse } from 'next/server';
 import path from 'path';
 import fs from 'fs/promises';
 import { verifyToken, COOKIE_NAME } from '@/lib/auth';
 
-const MAX_SIZE     = 5 * 1024 * 1024; // 5 MB
+const MAX_SIZE      = 5 * 1024 * 1024; // 5 MB
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+
+// Simpan di luar /public — di root project agar tidak ikut di-cache build
+const UPLOAD_ROOT = path.join(process.cwd(), 'uploads', 'lisensi');
 
 function getUser(req: NextRequest) {
   const token = req.cookies.get(COOKIE_NAME)?.value;
@@ -58,17 +61,18 @@ export async function POST(req: NextRequest) {
     const timestamp    = Date.now();
     const fileName     = `petugas_${petugasIndex}_${timestamp}.${ext}`;
 
-    // Folder tujuan: public/uploads/lisensi/<formId>/
-    const uploadDir = path.join(process.cwd(), 'public', 'uploads', 'lisensi', formId);
+    // Folder tujuan: <project_root>/uploads/lisensi/<formId>/
+    // (BUKAN di /public — agar tidak bergantung pada static file serving)
+    const uploadDir = path.join(UPLOAD_ROOT, formId);
     await fs.mkdir(uploadDir, { recursive: true });
 
-    // Tulis file ke disk
-    const arrayBuffer = await file.arrayBuffer();
-    const buffer      = Buffer.from(arrayBuffer);
+    // Tulis file ke disk — SATU KALI saja
+    const buffer = Buffer.from(await file.arrayBuffer());
     await fs.writeFile(path.join(uploadDir, fileName), buffer);
 
-    // URL publik yang bisa diakses browser
-    const publicUrl = `/uploads/lisensi/${formId}/${fileName}`;
+    // URL yang dikembalikan ke frontend → mengarah ke API file server
+    // bukan ke /public/... yang tidak bekerja di production runtime
+    const publicUrl = `/form-permit/api/files/lisensi/${formId}/${fileName}`;
 
     return NextResponse.json({ success: true, url: publicUrl, fileName });
 
@@ -94,12 +98,24 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ error: 'URL file wajib diisi' }, { status: 400 });
     }
 
-    // Keamanan: hanya izinkan path di dalam /uploads/lisensi/
-    if (!url.startsWith('/uploads/lisensi/')) {
+    // Keamanan: hanya izinkan path dari endpoint file server ini
+    if (!url.includes('/api/files/lisensi/')) {
       return NextResponse.json({ error: 'URL tidak valid' }, { status: 400 });
     }
 
-    const diskPath = path.join(process.cwd(), 'public', url);
+    // Ekstrak relative path setelah /api/files/lisensi/
+    const relativePath = url.split('/api/files/lisensi/')[1];
+    if (!relativePath) {
+      return NextResponse.json({ error: 'URL tidak valid' }, { status: 400 });
+    }
+
+    const diskPath = path.join(UPLOAD_ROOT, relativePath);
+
+    // Path traversal guard
+    if (!diskPath.startsWith(UPLOAD_ROOT)) {
+      return NextResponse.json({ error: 'Akses ditolak' }, { status: 403 });
+    }
+
     await fs.unlink(diskPath).catch(() => {}); // abaikan jika sudah tidak ada
 
     return NextResponse.json({ success: true });

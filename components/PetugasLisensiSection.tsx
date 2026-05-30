@@ -122,7 +122,7 @@ function LisensiUploadButton({
         fd.append("index", String(index + 1));
         if (formId) fd.append("formId", formId);
 
-        const res = await fetch("/api/upload/lisensi", {
+        const res = await fetch("/form-permit/api/upload/lisensi", {
           method: "POST",
           body: fd,
         });

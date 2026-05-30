@@ -375,9 +375,9 @@ export default function HistoryPage() {
     try {
       // FIX ROOT CAUSE: tambah ?full=1 → API harus query SELECT * bukan SELECT sebagian kolom
       const [r1, r2, r3] = await Promise.all([
-        fetch("/api/forms/hot-work?limit=200&full=1"),
-        fetch("/api/forms/workshop?limit=200&full=1"),
-        fetch("/api/forms/height-work?limit=200&full=1"),
+        fetch("/form-permit/api/forms/hot-work?limit=200&full=1"),
+        fetch("/form-permit/api/forms/workshop?limit=200&full=1"),
+        fetch("/form-permit/api/forms/height-work?limit=200&full=1"),
       ]);
       if (!r1.ok || !r2.ok || !r3.ok) throw new Error("Gagal mengambil data dari server");
       const [j1, j2, j3] = await Promise.all([r1.json(), r2.json(), r3.json()]);
