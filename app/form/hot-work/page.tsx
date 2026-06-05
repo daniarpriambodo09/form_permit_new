@@ -1,11 +1,18 @@
 // app/form/hot-work/page.tsx
-// Alur baru:
-//   Internal:  Firewatch → SPV → Admin K3 → SFO → MR/PGA
-//   Eksternal: Kontraktor → Firewatch → SPV → Admin K3 → SFO → MR/PGA
+// UPDATED: Tambah Bagian 5 — Upload JSA
+// Alur baru (UPDATED):
+//   Internal:  SPV → Admin K3 → SFO → MR/PGA
+//   Eksternal: Kontraktor → SPV → Admin K3 → SFO → MR/PGA
+// Fire Watch dipilih saat form dibuat, tidak lagi menjadi approver
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { ChevronDown, ChevronUp, Home, Flame, Save, Send, AlertCircle, Lock } from "lucide-react";
+import { getFireWatchByDept } from "@/lib/firewatch";
+import JsaUploadSection, {
+  type JsaFileInfo,
+  type JsaUploadStatus as JsaStatus,
+} from "@/components/JsaUploadSection";
 
 type WorkDetail = { detail: string; mulai: string; selesai: string };
 
@@ -16,6 +23,8 @@ interface FormData {
   lokasi: string;
   tanggalPelaksanaan: string;
   waktuPukul: string;
+  namaFireWatch: string;
+  nikFireWatch: string;
   jenisPekerjaan: {
     preventive: boolean; tangki: boolean; panel: boolean;
     cutting: WorkDetail; grinding: WorkDetail; welding: WorkDetail; painting: WorkDetail;
@@ -87,6 +96,7 @@ const emptyWork = (): WorkDetail => ({ detail: "", mulai: "", selesai: "" });
 const defaultForm = (): FormData => ({
   tipePerusahaan: "internal",
   namaKontraktor: "", namaPekerjaNIK: "", lokasi: "", tanggalPelaksanaan: "", waktuPukul: "",
+  namaFireWatch: "", nikFireWatch: "",
   jenisPekerjaan: {
     preventive: false, tangki: false, panel: false,
     cutting: emptyWork(), grinding: emptyWork(), welding: emptyWork(), painting: emptyWork(),
@@ -105,15 +115,42 @@ const defaultForm = (): FormData => ({
   persetujuan: { spvNama: "", kontraktorNama: "", sfoNama: "", pgaNama: "" },
 });
 
-// Label approver sesuai alur
 const getApproverLabels = (isInternal: boolean) => isInternal
-  ? ["Fire Watch", "SPV / Pemberi Izin", "Admin K3", "SFO", "MR I/PGA MGR"]
-  : ["Kontraktor", "Fire Watch", "SPV / Pemberi Izin", "Admin K3", "SFO", "MR I/PGA MGR"];
+  ? ["SPV / Pemberi Izin", "Admin K3", "SFO", "MR I/PGA MGR"]
+  : ["Kontraktor", "SPV / Pemberi Izin", "Admin K3", "SFO", "MR I/PGA MGR"];
 
 export default function HotWorkPermitForm() {
   const [formData, setFormData] = useState(defaultForm);
   const [submitting, setSubmitting] = useState(false);
   const [expanded, setExpanded] = useState({ bagian1: true, bagian2: true, bagian3: true, bagian4: true });
+  const [user, setUser] = useState<any>(null);
+  const [fireWatchList, setFireWatchList] = useState<Array<{nama: string; nik: string}>>([]);
+  const [validationError, setValidationError] = useState<string>("");
+
+  // ── JSA state ──────────────────────────────────────────────
+  const [perluJsa,        setPerluJsa]        = useState(false);
+  const [jsaFile,         setJsaFile]         = useState<JsaFileInfo | null>(null);
+  const [jsaUploadStatus, setJsaUploadStatus] = useState<JsaStatus>("idle");
+  const [jsaUploadError,  setJsaUploadError]  = useState("");
+
+  useEffect(() => {
+    const fetchUser = async () => {
+      try {
+        const res = await fetch("/form-permit/api/auth/me");
+        if (res.ok) {
+          const data = await res.json();
+          setUser(data.user);
+          if (data.user.departmen) {
+            const fwList = getFireWatchByDept(data.user.departmen);
+            setFireWatchList(fwList);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to fetch user:", err);
+      }
+    };
+    fetchUser();
+  }, []);
 
   const toggle = (s: string) => setExpanded(prev => ({ ...prev, [s]: !prev[s as keyof typeof prev] }));
   const setJ = (patch: any) => setFormData(prev => ({ ...prev, jenisPekerjaan: { ...prev.jenisPekerjaan, ...patch } }));
@@ -127,11 +164,30 @@ export default function HotWorkPermitForm() {
   const inputCls = "w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent text-black";
 
   const submit = async (isSubmit: boolean) => {
+    setValidationError("");
+
+    // Validasi Fire Watch
+    if (!formData.namaFireWatch || !formData.nikFireWatch) {
+      setValidationError("Fire Watch wajib dipilih");
+      return;
+    }
+
+    // ── Validasi JSA ──────────────────────────────────────────
+    if (perluJsa && (!jsaFile || jsaUploadStatus !== "success")) {
+      setValidationError("File JSA wajib diupload sebelum mengajukan form");
+      return;
+    }
+
     setSubmitting(true);
     try {
       const res = await fetch("/form-permit/api/forms/hot-work", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...formData, isSubmit }),
+        body: JSON.stringify({
+          ...formData,
+          isSubmit,
+          perluJsa,
+          jsaFileUrl: jsaFile?.url ?? null,
+        }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Terjadi kesalahan server");
@@ -140,7 +196,15 @@ export default function HotWorkPermitForm() {
   };
 
   const handleSave   = async () => { try { const r = await submit(false); alert(`Draft disimpan! ID: ${r.id_form}`); } catch (e: any) { alert("Gagal: " + e.message); } };
-  const handleSubmit = async () => { try { const r = await submit(true); alert(`Izin diajukan! ID: ${r.id_form}`); window.location.href = "/form-permit/my-forms"; } catch (e: any) { alert("Gagal: " + e.message); } };
+  const handleSubmit = async () => {
+    if (validationError) { alert(validationError); return; }
+    try {
+      const r = await submit(true);
+      if (!r) return;
+      alert(`Izin diajukan! ID: ${r.id_form}`);
+      window.location.href = "/form-permit/my-forms";
+    } catch (e: any) { alert("Gagal: " + e.message); }
+  };
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -171,15 +235,12 @@ export default function HotWorkPermitForm() {
           expanded={expanded} toggle={toggle}>
           <div className="space-y-5">
 
-            {/* Pilihan tipe perusahaan */}
             <div>
               <label className="block text-sm font-semibold text-slate-700 mb-2">Tipe Pekerja / Perusahaan <span className="text-red-500">*</span></label>
               <div className="grid grid-cols-2 gap-3">
                 {[
-                  { value: "internal",  label: "Internal / Karyawan PT.JAI",
-                    desc: "Alur: Firewatch → SPV → Admin K3 → SFO → MR/PGA" },
-                  { value: "eksternal", label: "Eksternal / Subkontraktor",
-                    desc: "Alur: Kontraktor → Firewatch → SPV → Admin K3 → SFO → MR/PGA" },
+                  { value: "internal",  label: "Internal / Karyawan PT.JAI", desc: "Alur: SPV → Admin K3 → SFO → MR/PGA" },
+                  { value: "eksternal", label: "Eksternal / Subkontraktor",   desc: "Alur: Kontraktor → SPV → Admin K3 → SFO → MR/PGA" },
                 ].map(opt => (
                   <label key={opt.value}
                     className={`flex flex-col gap-1 p-3 rounded-xl border-2 cursor-pointer transition-all ${
@@ -198,30 +259,20 @@ export default function HotWorkPermitForm() {
               </div>
               <div className={`mt-3 px-3 py-2 rounded-lg text-xs font-medium ${isInternal ? "bg-blue-50 text-blue-700 border border-blue-200" : "bg-purple-50 text-purple-700 border border-purple-200"}`}>
                 <strong>Alur approval yang akan diterapkan:</strong>
-                <span className="ml-1">{isInternal
-                  ? "Firewatch → SPV → Admin K3 → SFO → MR I/PGA MGR"
-                  : "Kontraktor → Firewatch → SPV → Admin K3 → SFO → MR I/PGA MGR"
-                }</span>
+                <span className="ml-1">{isInternal ? "SPV → Admin K3 → SFO → MR I/PGA MGR" : "Kontraktor → SPV → Admin K3 → SFO → MR I/PGA MGR"}</span>
               </div>
             </div>
 
             <div>
               <label className="block text-sm font-semibold text-slate-700 mb-2">
                 Nama Kontraktor{" "}
-                {isInternal
-                  ? <span className="text-slate-400 font-normal text-xs ml-1">(tidak diperlukan untuk Internal)</span>
-                  : <span className="text-red-500">*</span>
-                }
+                {isInternal ? <span className="text-slate-400 font-normal text-xs ml-1">(tidak diperlukan untuk Internal)</span> : <span className="text-red-500">*</span>}
               </label>
-              <input
-                type="text"
-                value={isInternal ? "" : formData.namaKontraktor}
+              <input type="text" value={isInternal ? "" : formData.namaKontraktor}
                 onChange={e => setFormData(p => ({ ...p, namaKontraktor: e.target.value }))}
-                disabled={isInternal}
-                required={!isInternal}
+                disabled={isInternal} required={!isInternal}
                 placeholder={isInternal ? "Tidak diperlukan untuk Internal / Karyawan PT.JAI" : "PT ABC"}
-                className={`${inputCls} ${isInternal ? "bg-slate-100 text-slate-400 cursor-not-allowed opacity-60" : ""}`}
-              />
+                className={`${inputCls} ${isInternal ? "bg-slate-100 text-slate-400 cursor-not-allowed opacity-60" : ""}`} />
             </div>
             <div>
               <label className="block text-sm font-semibold text-slate-700 mb-2">Nama Pekerja / NIK *</label>
@@ -242,24 +293,41 @@ export default function HotWorkPermitForm() {
               <input type="time" value={formData.waktuPukul} onChange={e => setFormData(p => ({ ...p, waktuPukul: e.target.value }))} className={inputCls} />
             </div>
 
-            {/* Fire Watch — selalu ada di kedua alur */}
+            {/* Fire Watch */}
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
               <div className="flex items-center gap-2 mb-3">
                 <Lock className="w-4 h-4 text-blue-600 shrink-0" />
-                <h4 className="font-bold text-blue-900 text-sm">Fire Watch (Pengawas Api)</h4>
+                <h4 className="font-bold text-blue-900 text-sm">Fire Watch (Pengawas Api) <span className="text-red-500">*</span></h4>
               </div>
               <div className="flex items-start gap-2 bg-blue-100 border border-blue-300 rounded-lg px-3 py-2.5 mb-4">
                 <AlertCircle className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
-                <p className="text-xs text-blue-700">
-                  {isInternal
-                    ? <>Fire Watch adalah approver <strong>pertama</strong> dalam alur Internal. Field ini akan terisi otomatis saat Fire Watch login dan menyetujui.</>
-                    : <>Fire Watch adalah approver <strong>kedua</strong> setelah Kontraktor dalam alur Eksternal. Field ini akan terisi otomatis saat Fire Watch menyetujui.</>
-                  }
-                </p>
+                <p className="text-xs text-blue-700">Pilih Fire Watch dari departemen Anda. Fire Watch dipilih saat membuat form dan tidak lagi menjadi approver.</p>
               </div>
+              {validationError && (
+                <div className="bg-red-100 border border-red-300 rounded-lg px-3 py-2.5 mb-4">
+                  <p className="text-xs text-red-700">{validationError}</p>
+                </div>
+              )}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div><label className="block text-sm font-semibold text-slate-400 mb-2">Nama Fire Watch</label><DisabledField placeholder="Diisi otomatis oleh Fire Watch" /></div>
-                <div><label className="block text-sm font-semibold text-slate-400 mb-2">NIK Fire Watch</label><DisabledField placeholder="Diisi otomatis oleh Fire Watch" /></div>
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-2">Nama Fire Watch <span className="text-red-500">*</span></label>
+                  <select value={formData.namaFireWatch}
+                    onChange={(e) => {
+                      const nama = e.target.value;
+                      setFormData(p => ({ ...p, namaFireWatch: nama }));
+                      const fw = fireWatchList.find(f => f.nama === nama);
+                      if (fw) setFormData(p => ({ ...p, nikFireWatch: fw.nik }));
+                      setValidationError("");
+                    }}
+                    className={`w-full px-4 py-2.5 border ${formData.namaFireWatch ? 'border-slate-300' : 'border-red-300 bg-red-50'} rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent text-black`}>
+                    <option value="">-- Pilih Fire Watch --</option>
+                    {fireWatchList.map((fw) => (<option key={fw.nik} value={fw.nama}>{fw.nama}</option>))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-2">NIK Fire Watch (Readonly)</label>
+                  <input type="text" value={formData.nikFireWatch} readOnly className="w-full px-4 py-2.5 border border-slate-300 rounded-lg bg-slate-100 text-slate-600 text-sm" />
+                </div>
               </div>
             </div>
 
@@ -400,9 +468,7 @@ export default function HotWorkPermitForm() {
               <div>
                 <p className="text-sm font-semibold text-blue-800 mb-1">Alur Approval yang Diterapkan:</p>
                 <p className={`text-sm font-bold ${isInternal ? "text-blue-700" : "text-purple-700"}`}>
-                  {isInternal
-                    ? "Firewatch → SPV → Admin K3 → SFO → MR I/PGA MGR"
-                    : "Kontraktor → Firewatch → SPV → Admin K3 → SFO → MR I/PGA MGR"}
+                  {isInternal ? "SPV → Admin K3 → SFO → MR I/PGA MGR" : "Kontraktor → SPV → Admin K3 → SFO → MR I/PGA MGR"}
                 </p>
                 <p className="text-xs text-blue-700 mt-1">🔒 Kolom persetujuan terisi otomatis saat masing-masing approver menyetujui.</p>
               </div>
@@ -418,13 +484,29 @@ export default function HotWorkPermitForm() {
           </div>
         </Section>
 
+        {/* ── BAGIAN 5: UPLOAD JSA ── */}
+        <JsaUploadSection
+          perluJsa={perluJsa}
+          setPerluJsa={setPerluJsa}
+          jsaFile={jsaFile}
+          setJsaFile={setJsaFile}
+          jsaUploadStatus={jsaUploadStatus}
+          setJsaUploadStatus={setJsaUploadStatus}
+          jsaUploadError={jsaUploadError}
+          setJsaUploadError={setJsaUploadError}
+          sectionTitle="BAGIAN 5: UPLOAD JSA"
+          sectionStyle="hot-work"
+        />
+
         {/* Action buttons */}
         <div className="flex justify-between items-center gap-4 bg-white p-6 rounded-xl shadow-md sticky bottom-4 border border-slate-200">
-          <button onClick={handleSave} disabled={submitting} className="px-6 py-3 border-2 border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 font-semibold flex items-center gap-2 disabled:opacity-60">
+          <button onClick={handleSave} disabled={submitting || jsaUploadStatus === "uploading"}
+            className="px-6 py-3 border-2 border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 font-semibold flex items-center gap-2 disabled:opacity-60">
             <Save className="w-5 h-5" />{submitting ? "Menyimpan..." : "Simpan Draft"}
           </button>
-          <button onClick={handleSubmit} disabled={submitting} className="px-8 py-3 bg-gradient-to-r from-orange-600 to-orange-700 hover:from-orange-700 hover:to-orange-800 text-white rounded-lg font-semibold flex items-center gap-2 shadow-lg disabled:opacity-60">
-            <Send className="w-5 h-5" />{submitting ? "Mengajukan..." : "Ajukan Izin"}
+          <button onClick={handleSubmit} disabled={submitting || jsaUploadStatus === "uploading"}
+            className="px-8 py-3 bg-gradient-to-r from-orange-600 to-orange-700 hover:from-orange-700 hover:to-orange-800 text-white rounded-lg font-semibold flex items-center gap-2 shadow-lg disabled:opacity-60">
+            <Send className="w-5 h-5" />{submitting ? "Mengajukan..." : jsaUploadStatus === "uploading" ? "Upload JSA..." : "Ajukan Izin"}
           </button>
         </div>
       </div>

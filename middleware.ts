@@ -10,12 +10,8 @@ const PUBLIC_ROUTES = [
   `${BASE}/login`,
   `${BASE}/login/worker`,
   `${BASE}/login/approver`,
-  `${BASE}/register`,
-  // FIX: Tambahkan API auth routes sebagai public agar login/logout
-  // tidak ter-redirect sebelum cookie sempat diset
   `${BASE}/api/auth/login`,
   `${BASE}/api/auth/logout`,
-  `${BASE}/api/auth/register`,
 ];
 
 // 🔐 Route khusus worker

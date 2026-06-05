@@ -1,5 +1,4 @@
 // app/login/approver/ApproverLoginPage.tsx
-
 "use client";
 import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -9,7 +8,6 @@ import Link from "next/link";
 export default function ApproverLoginPage() {
   const router       = useRouter();
   const searchParams = useSearchParams();
-  const from         = searchParams.get("from") || "/approval";
   const expired      = searchParams.get("expired") === "1";
 
   const [username, setUsername] = useState("");
@@ -28,41 +26,33 @@ export default function ApproverLoginPage() {
     setLoading(true);
     try {
       const res  = await fetch("/form-permit/api/auth/login", {
-        method:  "POST",
+        method:      "POST",
         credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({ username, password }),
+        headers:     { "Content-Type": "application/json" },
+        body:        JSON.stringify({ username, password }),
       });
       const data = await res.json();
-      
+
       if (!res.ok) {
         setError(data.error || "Login gagal");
         return;
       }
 
-      // Cek apakah user adalah approver
-      if (data.user.role !== "spv" && data.user.role !== "admin" && 
-          data.user.role !== "kontraktor" && data.user.role !== "sfo" && 
-          data.user.role !== "pga" && data.user.role !== "firewatch") {
+      const allowedRoles = ["spv", "admin", "kontraktor", "sfo", "pga", "firewatch", "admin_k3"];
+      if (!allowedRoles.includes(data.user.role)) {
         await fetch("/form-permit/api/auth/logout", { method: "POST", credentials: "include" });
         sessionStorage.clear();
         setError("Akun ini bukan approver. Silakan gunakan halaman login pekerja.");
         return;
       }
 
-      // Simpan data user
       sessionStorage.setItem("user_nama",    data.user.nama);
       sessionStorage.setItem("user_jabatan", data.user.jabatan);
       sessionStorage.setItem("user_role",    data.user.role);
-      
-      // ✅ FIX: Admin redirect ke /home, approver lain ke /approval
-      if (data.user.role === 'admin') {
-        router.push('/home');
-      } else {
-        router.push(from);  // default: /approval
-      }
-      
-      router.refresh();
+
+      // UBAH: semua role (termasuk admin) redirect ke /home
+      router.replace("/home");
+
     } catch {
       setError("Terjadi kesalahan koneksi. Coba lagi.");
     } finally {
@@ -71,13 +61,13 @@ export default function ApproverLoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4"
+    <div
+      className="min-h-screen bg-slate-900 flex items-center justify-center p-4"
       style={{
         backgroundImage: `repeating-linear-gradient(-45deg, transparent, transparent 20px, rgba(255,255,255,.015) 20px, rgba(255,255,255,.015) 21px)`,
       }}
     >
       <div className="w-full max-w-sm">
-        {/* Logo area */}
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-16 h-16 bg-orange-500 rounded-2xl shadow-lg shadow-orange-500/30 mb-4">
             <Shield className="w-8 h-8 text-white" />
@@ -86,13 +76,12 @@ export default function ApproverLoginPage() {
           <p className="text-slate-400 text-sm mt-1">PT Jatim Autocomp Indonesia</p>
         </div>
 
-        {/* Card */}
         <div className="bg-slate-800 border border-slate-700 rounded-2xl p-8 shadow-2xl">
           <div className="mb-6">
             <div className="flex items-center gap-2 bg-slate-700/50 rounded-lg px-3 py-2 mb-1">
               <Lock className="w-4 h-4 text-orange-400" />
               <span className="text-xs font-semibold text-orange-400 uppercase tracking-wide">
-                Akses Approver
+                Akses Approver / Admin
               </span>
             </div>
             <p className="text-slate-400 text-xs mt-2">
@@ -100,7 +89,6 @@ export default function ApproverLoginPage() {
             </p>
           </div>
 
-          {/* Error alert */}
           {error && (
             <div className="flex items-start gap-2 bg-red-500/10 border border-red-500/30 rounded-lg px-3 py-3 mb-5">
               <AlertCircle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
@@ -143,7 +131,9 @@ export default function ApproverLoginPage() {
                              focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent
                              transition-colors"
                 />
-                <button type="button" onClick={() => setShowPass(v => !v)}
+                <button
+                  type="button"
+                  onClick={() => setShowPass(v => !v)}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200 transition-colors"
                 >
                   {showPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -151,29 +141,31 @@ export default function ApproverLoginPage() {
               </div>
             </div>
 
-            <button type="submit" disabled={loading}
+            <button
+              type="submit"
+              disabled={loading}
               className="w-full py-3 bg-orange-600 hover:bg-orange-500 disabled:bg-orange-600/50
                          text-white font-semibold rounded-lg text-sm
                          transition-colors shadow-lg shadow-orange-600/20
                          flex items-center justify-center gap-2 mt-2"
             >
-              {loading
-                ? <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Memproses...</>
-                : "Masuk"
-              }
+              {loading ? (
+                <>
+                  <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  Memproses...
+                </>
+              ) : (
+                "Masuk"
+              )}
             </button>
           </form>
         </div>
 
-        {/* Footer link */}
         <p className="text-center text-slate-500 text-xs mt-6">
           Bukan approver?{" "}
-          <Link 
-            href="/" 
-            onClick={() => {
-              // Clear session saat klik kembali ke home
-              sessionStorage.clear();
-            }}
+          <Link
+            href="/"
+            onClick={() => sessionStorage.clear()}
             className="text-orange-400 hover:text-orange-300 transition-colors"
           >
             Kembali ke halaman utama →

@@ -1,5 +1,7 @@
 // app/api/forms/height-work/route.ts
+// UPDATED: Tambah kolom perlu_jsa dan jsa_file_url untuk fitur Upload JSA.
 // FIX: Tambah kolom tipe_perusahaan ke INSERT agar alur approval tersimpan dengan benar.
+
 import { NextRequest, NextResponse } from 'next/server';
 import { query, queryOne } from '@/lib/db';
 import { verifyToken, COOKIE_NAME } from '@/lib/auth';
@@ -40,7 +42,8 @@ export async function GET(req: NextRequest) {
       ? '*'
       : `id_form, tanggal, tanggal_pelaksanaan, status,
          petugas_ketinggian, tipe_perusahaan, deskripsi_pekerjaan, lokasi,
-         waktu_mulai, nama_pengawas_kontraktor, spv_terkait`;
+         waktu_mulai, nama_pengawas_kontraktor, spv_terkait,
+         perlu_jsa, jsa_file_url`;
 
     let sql = `SELECT ${selectCols} FROM form_kerja_ketinggian`;
     const params: any[] = [];
@@ -80,20 +83,21 @@ export async function POST(req: NextRequest) {
       ? new Date(formData.tanggalPelaksanaan).toISOString()
       : null;
 
-    // Normalisasi tipePerusahaan → selalu simpan 'internal' atau 'eksternal'
-    // (bukan string panjang seperti sebelumnya)
     const tipePerusahaan: 'internal' | 'eksternal' =
       formData.tipePerusahaan === 'eksternal' ? 'eksternal' : 'internal';
 
-    // Label panjang untuk kolom petugas_ketinggian (display purposes)
     const petugasKetinggianLabel = tipePerusahaan === 'eksternal'
       ? 'Eksternal / Subkontraktor'
       : 'Internal / Karyawan PT.JAI';
 
-    // ── 72 kolom, 72 parameter ────────────────────────────────
+    // JSA fields
+    const perluJsa   = formData.perluJsa === true;
+    const jsaFileUrl = perluJsa ? (formData.jsaFileUrl || null) : null;
+
+    // ── 74 kolom, 74 parameter ────────────────────────────────
     // Kolom:
     //  $1  – $4  : id_form, tanggal, tanggal_pelaksanaan, status
-    //  $5  – $6  : petugas_ketinggian (label), tipe_perusahaan ('internal'/'eksternal') ← BARU
+    //  $5  – $6  : petugas_ketinggian (label), tipe_perusahaan
     //  $7  – $11 : deskripsi_pekerjaan, lokasi, waktu_mulai, waktu_selesai, nama_pengawas_kontraktor
     //  $12 – $13 : nama_pengawas_departemen, nama_departemen
     //  $14 – $43 : 10x (nama_petugas_N, petugas_N_sehat, foto_lisensi_N)
@@ -101,7 +105,8 @@ export async function POST(req: NextRequest) {
     //  $51 – $61 : keselamatan (11 boolean)
     //  $62 – $67 : body harness + lanyard (6 boolean)
     //  $68 – $71 : persetujuan (spv, kontraktor, sfo, mr_pga) ← null saat submit
-    //  $72       : user_id
+    //  $72 – $73 : perlu_jsa, jsa_file_url ← BARU
+    //  $74       : user_id
 
     await query(
       `INSERT INTO form_kerja_ketinggian (
@@ -130,6 +135,7 @@ export async function POST(req: NextRequest) {
         webbing_kondisi_baik, dring_kondisi_baik, gesper_kondisi_baik,
         absorter_dan_timbes_kondisi_baik, snap_hook_kondisi_baik, rope_lanyard_kondisi_baik,
         spv_terkait, nama_kontraktor, sfo, mr_pga_mgr,
+        perlu_jsa, jsa_file_url,
         user_id
       ) VALUES (
         $1,  $2,  $3,  $4,
@@ -152,76 +158,81 @@ export async function POST(req: NextRequest) {
         $51, $52, $53, $54, $55, $56, $57, $58, $59, $60, $61,
         $62, $63, $64, $65, $66, $67,
         $68, $69, $70, $71,
-        $72
+        $72, $73,
+        $74
       )`,
       [
-        // $1–$4: identitas form
+        // $1–$4
         idForm, now, pelaksanaan, status,
 
-        // $5–$6: tipe petugas (DIPERBAIKI: simpan keduanya)
-        petugasKetinggianLabel,   // $5  petugas_ketinggian  (label panjang untuk display)
-        tipePerusahaan,           // $6  tipe_perusahaan     ('internal' atau 'eksternal')
+        // $5–$6
+        petugasKetinggianLabel,
+        tipePerusahaan,
 
-        // $7–$11: info pekerjaan
-        formData.deskripsiPekerjaan      || null,  // $7
-        formData.lokasi                  || null,  // $8
-        formData.waktuMulai              || null,  // $9
-        formData.waktuSelesai            || null,  // $10
-        formData.namaPengawasKontraktor  || null,  // $11
+        // $7–$11
+        formData.deskripsiPekerjaan      || null,
+        formData.lokasi                  || null,
+        formData.waktuMulai              || null,
+        formData.waktuSelesai            || null,
+        formData.namaPengawasKontraktor  || null,
 
-        // $12–$13: pengawas departemen
-        formData.namaPengawasDepartemen  || null,  // $12
-        formData.namaDepartemen          || null,  // $13
+        // $12–$13
+        formData.namaPengawasDepartemen  || null,
+        formData.namaDepartemen          || null,
 
-        // $14–$43: petugas 1–10 (nama, sehat, foto_lisensi)
-        formData.namaPetugas?.[0]  || null, formData.berbadanSehat?.[0]  ?? false, formData.fotoLisensi?.[0]  || null,  // $14,$15,$16
-        formData.namaPetugas?.[1]  || null, formData.berbadanSehat?.[1]  ?? false, formData.fotoLisensi?.[1]  || null,  // $17,$18,$19
-        formData.namaPetugas?.[2]  || null, formData.berbadanSehat?.[2]  ?? false, formData.fotoLisensi?.[2]  || null,  // $20,$21,$22
-        formData.namaPetugas?.[3]  || null, formData.berbadanSehat?.[3]  ?? false, formData.fotoLisensi?.[3]  || null,  // $23,$24,$25
-        formData.namaPetugas?.[4]  || null, formData.berbadanSehat?.[4]  ?? false, formData.fotoLisensi?.[4]  || null,  // $26,$27,$28
-        formData.namaPetugas?.[5]  || null, formData.berbadanSehat?.[5]  ?? false, formData.fotoLisensi?.[5]  || null,  // $29,$30,$31
-        formData.namaPetugas?.[6]  || null, formData.berbadanSehat?.[6]  ?? false, formData.fotoLisensi?.[6]  || null,  // $32,$33,$34
-        formData.namaPetugas?.[7]  || null, formData.berbadanSehat?.[7]  ?? false, formData.fotoLisensi?.[7]  || null,  // $35,$36,$37
-        formData.namaPetugas?.[8]  || null, formData.berbadanSehat?.[8]  ?? false, formData.fotoLisensi?.[8]  || null,  // $38,$39,$40
-        formData.namaPetugas?.[9]  || null, formData.berbadanSehat?.[9]  ?? false, formData.fotoLisensi?.[9]  || null,  // $41,$42,$43
+        // $14–$43: petugas 1–10
+        formData.namaPetugas?.[0]  || null, formData.berbadanSehat?.[0]  ?? false, formData.fotoLisensi?.[0]  || null,
+        formData.namaPetugas?.[1]  || null, formData.berbadanSehat?.[1]  ?? false, formData.fotoLisensi?.[1]  || null,
+        formData.namaPetugas?.[2]  || null, formData.berbadanSehat?.[2]  ?? false, formData.fotoLisensi?.[2]  || null,
+        formData.namaPetugas?.[3]  || null, formData.berbadanSehat?.[3]  ?? false, formData.fotoLisensi?.[3]  || null,
+        formData.namaPetugas?.[4]  || null, formData.berbadanSehat?.[4]  ?? false, formData.fotoLisensi?.[4]  || null,
+        formData.namaPetugas?.[5]  || null, formData.berbadanSehat?.[5]  ?? false, formData.fotoLisensi?.[5]  || null,
+        formData.namaPetugas?.[6]  || null, formData.berbadanSehat?.[6]  ?? false, formData.fotoLisensi?.[6]  || null,
+        formData.namaPetugas?.[7]  || null, formData.berbadanSehat?.[7]  ?? false, formData.fotoLisensi?.[7]  || null,
+        formData.namaPetugas?.[8]  || null, formData.berbadanSehat?.[8]  ?? false, formData.fotoLisensi?.[8]  || null,
+        formData.namaPetugas?.[9]  || null, formData.berbadanSehat?.[9]  ?? false, formData.fotoLisensi?.[9]  || null,
 
         // $44–$50: APD
-        formData.kunceePagar            ?? false,                                              // $44
-        formData.rompiKetinggian        ?? false,                                              // $45
-        formData.rompiAngka ? parseFloat(formData.rompiAngka) : null,                          // $46
-        formData.safetyHelmetCount      ? true  : false,                                       // $47
-        formData.safetyHelmetCount      ? parseFloat(formData.safetyHelmetCount)    : null,    // $48
-        formData.fullBodyHarnessCount   ? true  : false,                                       // $49
-        formData.fullBodyHarnessCount   ? parseFloat(formData.fullBodyHarnessCount) : null,    // $50
+        formData.kunceePagar            ?? false,
+        formData.rompiKetinggian        ?? false,
+        formData.rompiAngka ? parseFloat(formData.rompiAngka) : null,
+        formData.safetyHelmetCount      ? true  : false,
+        formData.safetyHelmetCount      ? parseFloat(formData.safetyHelmetCount)    : null,
+        formData.fullBodyHarnessCount   ? true  : false,
+        formData.fullBodyHarnessCount   ? parseFloat(formData.fullBodyHarnessCount) : null,
 
         // $51–$61: keselamatan
-        formData.areaKerjaAman      ?? false,   // $51
-        formData.kebakaranProcedure ?? false,   // $52
-        formData.pekerjaanListrik   ?? false,   // $53
-        formData.prosedurLoto       ?? false,   // $54
-        formData.perisakArea        ?? false,   // $55
-        formData.safetyLineLine     ?? false,   // $56
-        formData.alatBantuKerja     ?? false,   // $57
-        formData.rompiSaatBekerja   ?? false,   // $58
-        formData.bebanBeratTubuh    ?? false,   // $59
-        formData.helmStandar        ?? false,   // $60
-        formData.rambuSafetyWarning ?? false,   // $61
+        formData.areaKerjaAman      ?? false,
+        formData.kebakaranProcedure ?? false,
+        formData.pekerjaanListrik   ?? false,
+        formData.prosedurLoto       ?? false,
+        formData.perisakArea        ?? false,
+        formData.safetyLineLine     ?? false,
+        formData.alatBantuKerja     ?? false,
+        formData.rompiSaatBekerja   ?? false,
+        formData.bebanBeratTubuh    ?? false,
+        formData.helmStandar        ?? false,
+        formData.rambuSafetyWarning ?? false,
 
         // $62–$67: body harness & lanyard
-        formData.bodyHarnessWebbing    ?? false,  // $62
-        formData.bodyHarnessDRing      ?? false,  // $63
-        formData.bodyHarnessAdjustment ?? false,  // $64
-        formData.lanyardAbsorber       ?? false,  // $65
-        formData.lanyardSnapHook       ?? false,  // $66
-        formData.lanyardRope           ?? false,  // $67
+        formData.bodyHarnessWebbing    ?? false,
+        formData.bodyHarnessDRing      ?? false,
+        formData.bodyHarnessAdjustment ?? false,
+        formData.lanyardAbsorber       ?? false,
+        formData.lanyardSnapHook       ?? false,
+        formData.lanyardRope           ?? false,
 
-        // $68–$71: persetujuan — NULL, diisi otomatis saat approval
-        null, // spv_terkait      $68
-        null, // nama_kontraktor  $69
-        null, // sfo              $70
-        null, // mr_pga_mgr       $71
+        // $68–$71: persetujuan — NULL
+        null,
+        null,
+        null,
+        null,
 
-        // $72: user_id
+        // $72–$73: JSA ← BARU
+        perluJsa,
+        jsaFileUrl,
+
+        // $74: user_id
         userId,
       ]
     );

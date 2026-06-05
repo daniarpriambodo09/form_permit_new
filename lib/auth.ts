@@ -1,4 +1,15 @@
 // lib/auth.ts
+// REFACTOR: Hapus Fire Watch dari approval workflow.
+// Fire Watch sekarang hanya sebagai informasi di form (nama + NIK tersimpan di DB),
+// bukan sebagai approver. Role 'firewatch' tetap ada untuk keperluan login,
+// tapi tidak punya stage approval.
+//
+// WORKFLOW BARU:
+//   Hot-work & Workshop INTERNAL:  spv(1) → admin_k3(2) → sfo(3) → mr_pga(4)
+//   Hot-work & Workshop EKSTERNAL: kontraktor(1) → spv(2) → admin_k3(3) → sfo(4) → mr_pga(5)
+//   Height-work INTERNAL:          spv(1) → admin_k3(2) → sfo(3) → mr_pga(4)
+//   Height-work EKSTERNAL:         kontraktor(1) → spv(2) → admin_k3(3) → sfo(4) → mr_pga(5)
+
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 
@@ -8,7 +19,7 @@ const JWT_EXPIRES = '8h';
 // ── Role Definitions ────────────────────────────────────────
 export type UserRole =
   | 'worker'
-  | 'firewatch'
+  | 'firewatch'   // tetap ada untuk login, tapi tidak bisa approve
   | 'spv'
   | 'kontraktor'
   | 'admin_k3'
@@ -16,25 +27,41 @@ export type UserRole =
   | 'pga'
   | 'admin';
 
+// ROLE_ORDER: dipakai untuk perbandingan hierarki role (bukan stage approval).
+// firewatch = 0, sama dengan worker — tidak punya hak approve.
 export const ROLE_ORDER: Record<UserRole, number> = {
-  worker:    0,
-  firewatch: 0,
-  spv:       1,
+  worker:     0,
+  firewatch:  0,  // tidak punya hak approve
+  spv:        1,
   kontraktor: 2,
-  admin_k3:  3,
-  sfo:       4,
-  pga:       5,
-  admin:     99,
+  admin_k3:   3,
+  sfo:        4,
+  pga:        5,
+  admin:      99,
 };
 
-export const STAGE_TO_ROLE: Record<number, UserRole> = {
-  0: 'firewatch',
+// ── Stage maps HOT-WORK & WORKSHOP ───────────────────────────
+// Stage dimulai dari 1 (tidak ada stage 0 untuk firewatch lagi).
+// Internal:  1=spv, 2=admin_k3, 3=sfo, 4=pga
+// Eksternal: 1=kontraktor, 2=spv, 3=admin_k3, 4=sfo, 5=pga
+export const STAGE_TO_ROLE_FW_INTERNAL: Record<number, UserRole> = {
   1: 'spv',
-  2: 'kontraktor',
+  2: 'admin_k3',
   3: 'sfo',
   4: 'pga',
 };
 
+export const STAGE_TO_ROLE_FW_EKSTERNAL: Record<number, UserRole> = {
+  1: 'kontraktor',
+  2: 'spv',
+  3: 'admin_k3',
+  4: 'sfo',
+  5: 'pga',
+};
+
+// ── Stage maps HEIGHT-WORK ────────────────────────────────────
+// Internal:  1=spv, 2=admin_k3, 3=sfo, 4=pga
+// Eksternal: 1=kontraktor, 2=spv, 3=admin_k3, 4=sfo, 5=pga
 export const STAGE_TO_ROLE_HW_INTERNAL: Record<number, UserRole> = {
   1: 'spv',
   2: 'admin_k3',
@@ -50,15 +77,23 @@ export const STAGE_TO_ROLE_HW_EKSTERNAL: Record<number, UserRole> = {
   5: 'pga',
 };
 
+// ── STAGE_TO_ROLE default (backward-compat, dipakai getStageToRoleMap) ───
+// Alias ke FW_INTERNAL karena hot-work/workshop internal adalah default.
+export const STAGE_TO_ROLE = STAGE_TO_ROLE_FW_INTERNAL;
+
+// ── ROLE_TO_STAGE ─────────────────────────────────────────────
+// Mapping role → stage default untuk hot-work/workshop internal.
+// firewatch diberi -1 karena tidak punya stage approval.
+// worker diberi -1 karena tidak punya hak approve.
 export const ROLE_TO_STAGE: Record<UserRole, number> = {
-  worker:    -1,
-  firewatch:  0,
-  spv:        1,
-  kontraktor: 2,
-  admin_k3:   3,
-  sfo:        4,
-  pga:        5,
-  admin:      99,
+  worker:     -1,
+  firewatch:  -1,  // TIDAK punya stage approval
+  spv:         1,
+  kontraktor:  1,  // stage 1 di alur eksternal
+  admin_k3:    2,
+  sfo:         3,
+  pga:         4,
+  admin:       99,
 };
 
 // ── Password ──────────────────────────────────────────────────
@@ -102,40 +137,35 @@ export function generateEditToken(): string {
 // ── Cookie helpers ────────────────────────────────────────────
 export const COOKIE_NAME = 'jai_auth_token';
 
-// FIX #1: path di-set ke '/form-permit' agar cookie hanya dikirim
-// untuk request di bawah basePath ini. Sebelumnya path='/' menyebabkan
-// cookie dikirim ke semua path dan bisa konflik dengan aplikasi lain
-// di server yang sama (mis. /review-prosedur).
-// FIX #2: sameSite diubah ke 'strict' untuk keamanan extra karena
-// aplikasi ini berjalan di internal network.
 export function getCookieOptions(maxAge?: number) {
   return {
     httpOnly: true,
     secure:   process.env.NODE_ENV === 'production',
     sameSite: 'lax' as const,
-    // PERBAIKAN KRITIS: path harus '/form-permit' bukan '/'
-    // Ini memastikan cookie hanya dikirim untuk request ke /form-permit/*
-    // dan middleware Next.js selalu bisa membacanya dengan konsisten.
     path:     '/',
     maxAge:   maxAge ?? 60 * 60 * 8, // 8 jam
   };
 }
 
 // ── Helper: dapatkan stage map yang sesuai ────────────────────
+// Mengembalikan mapping stage → role berdasarkan jenis form dan tipe perusahaan.
 export function getStageToRoleMap(
   formType: string,
   tipePerusahaan?: string
 ): Record<number, UserRole> {
   if (formType === 'height-work') {
-    if (tipePerusahaan === 'eksternal') {
-      return STAGE_TO_ROLE_HW_EKSTERNAL;
-    }
-    return STAGE_TO_ROLE_HW_INTERNAL;
+    return tipePerusahaan === 'eksternal'
+      ? STAGE_TO_ROLE_HW_EKSTERNAL
+      : STAGE_TO_ROLE_HW_INTERNAL;
   }
-  return STAGE_TO_ROLE;
+  // hot-work & workshop
+  return tipePerusahaan === 'eksternal'
+    ? STAGE_TO_ROLE_FW_EKSTERNAL
+    : STAGE_TO_ROLE_FW_INTERNAL;
 }
 
 // ── Helper: cek apakah role bisa approve di stage tertentu ───
+// firewatch TIDAK PERNAH bisa approve — selalu return false kecuali admin.
 export function canUserApproveAtStage(
   userRole: UserRole,
   currentStage: number,
@@ -144,16 +174,16 @@ export function canUserApproveAtStage(
 ): boolean {
   if (userRole === 'admin') return true;
 
-  if (currentStage === 0) {
-    return userRole === 'firewatch';
-  }
+  // firewatch tidak punya hak approve sama sekali
+  if (userRole === 'firewatch' || userRole === 'worker') return false;
 
-  const stageMap = getStageToRoleMap(formType || '', tipePerusahaan);
+  const stageMap   = getStageToRoleMap(formType || '', tipePerusahaan);
   const requiredRole = stageMap[currentStage];
   return userRole === requiredRole;
 }
 
 // ── Helper: stage config per form type ───────────────────────
+// startStage selalu 1 (tidak ada stage 0 untuk firewatch).
 export function getStageConfig(
   formType: string,
   tipePerusahaan?: string
@@ -176,13 +206,25 @@ export function getStageConfig(
       stages: ['spv', 'admin_k3', 'sfo', 'mr_pga'],
     };
   }
+  // hot-work & workshop
+  if (tipePerusahaan === 'eksternal') {
+    return {
+      totalStages: 5,
+      startStage:  1,
+      stages: ['kontraktor', 'spv', 'admin_k3', 'sfo', 'mr_pga'],
+    };
+  }
   return {
-    totalStages: 5,
-    startStage:  0,
-    stages: ['firewatch', 'spv', 'kontraktor', 'sfo', 'pga'],
+    totalStages: 4,
+    startStage:  1,
+    stages: ['spv', 'admin_k3', 'sfo', 'mr_pga'],
   };
 }
 
+// ── Helper: apakah form membutuhkan Fire Watch ───────────────
+// Fire Watch sekarang hanya sebagai informasi di form, bukan approver.
+// Fungsi ini mengembalikan true untuk form yang MENAMPILKAN kolom fire watch,
+// bukan untuk menentukan alur approval.
 export function requiresFireWatch(formType: string): boolean {
   return formType === 'hot-work' || formType === 'workshop';
 }

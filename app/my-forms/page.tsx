@@ -91,7 +91,6 @@ const getApprovalStages = (form: FormItem): { key: keyof FormItem; label: string
   if (isEksternal) {
     return [
       { key: "kontraktor_approved", label: "Kontraktor" },
-      { key: "fw_approved",         label: "Fire Watch" },
       { key: "spv_approved",        label: "SPV" },
       { key: "admin_k3_approved",   label: "Admin K3" },
       { key: "sfo_approved",        label: "SFO" },
@@ -100,7 +99,6 @@ const getApprovalStages = (form: FormItem): { key: keyof FormItem; label: string
   }
 
   return [
-    { key: "fw_approved",       label: "Fire Watch" },
     { key: "spv_approved",      label: "SPV" },
     { key: "admin_k3_approved", label: "Admin K3" },
     { key: "sfo_approved",      label: "SFO" },
@@ -136,8 +134,8 @@ const renderApprovalProgress = (form: FormItem) => {
       {(form.jenis_form === "hot-work" || form.jenis_form === "workshop") && form.tipe_perusahaan && (
         <p className="text-[10px] text-slate-400 mt-1">
           Alur: {isEksternal
-            ? "Kontraktor → Fire Watch → SPV → Admin K3 → SFO → MR/PGA"
-            : "Fire Watch → SPV → Admin K3 → SFO → MR/PGA"
+            ? "Kontraktor → SPV → Admin K3 → SFO → MR/PGA"
+            : "SPV → Admin K3 → SFO → MR/PGA"
           }
         </p>
       )}
@@ -288,7 +286,7 @@ export default function MyFormsPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <Link href="/" className="p-2 hover:bg-slate-100 rounded-lg transition-colors">
+              <Link href="/home" className="p-2 hover:bg-slate-100 rounded-lg transition-colors">
                 <Home className="w-5 h-5 text-slate-600" />
               </Link>
               <div className="flex items-center gap-3">

@@ -9,12 +9,10 @@ export default function WorkerLoginPage() {
   const router       = useRouter();
   const searchParams = useSearchParams();
   const expired      = searchParams.get("expired") === "1";
-  // FIX: Default target harus memakai path relatif terhadap basePath.
-  // Karena Next.js basePath='/form-permit', router.push('/my-forms')
-  // akan otomatis menjadi /form-permit/my-forms.
-  // Validasi 'from' param untuk mencegah open redirect.
+
   const rawFrom = searchParams.get("from") || "";
-  const target  = rawFrom.startsWith("/form-permit/") ? rawFrom : "/my-forms";
+  // UBAH: default target sekarang /home, bukan /my-forms
+  const target  = rawFrom.startsWith("/form-permit/") ? rawFrom : "/home";
 
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -33,12 +31,10 @@ export default function WorkerLoginPage() {
 
     try {
       const res = await fetch("/form-permit/api/auth/login", {
-        method:  "POST",
-        // FIX: credentials: "include" wajib ada agar browser menyimpan
-        // cookie Set-Cookie dari response. Tanpa ini cookie tidak akan tersimpan.
+        method:      "POST",
         credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({ username, password }),
+        headers:     { "Content-Type": "application/json" },
+        body:        JSON.stringify({ username, password }),
       });
 
       const data = await res.json();
@@ -48,9 +44,7 @@ export default function WorkerLoginPage() {
         return;
       }
 
-      // Cek apakah user adalah worker
       if (data.user.role !== "worker") {
-        // Role bukan worker — hapus cookie yang baru saja diset
         await fetch("/form-permit/api/auth/logout", {
           method: "POST",
           credentials: "include",
@@ -60,20 +54,13 @@ export default function WorkerLoginPage() {
         return;
       }
 
-      // Simpan data user ke sessionStorage
       sessionStorage.setItem("user_nama",    data.user.nama);
       sessionStorage.setItem("user_jabatan", data.user.jabatan);
       sessionStorage.setItem("user_role",    data.user.role);
 
-      // FIX: Gunakan router.replace() bukan router.push() untuk menghindari
-      // history entry login yang bisa menyebabkan back-button loop.
-      // router.replace dengan path tanpa basePath — Next.js otomatis
-      // menambahkan basePath di depan.
-      //
-      // Jika target sudah mengandung basePath (/form-permit/...), strip dulu
-      // karena router.replace sudah otomatis prepend basePath.
+      // UBAH: fallback /home, bukan /my-forms
       const cleanTarget = target.startsWith("/form-permit")
-        ? target.replace("/form-permit", "") || "/my-forms"
+        ? target.replace("/form-permit", "") || "/home"
         : target;
 
       router.replace(cleanTarget);
@@ -93,7 +80,6 @@ export default function WorkerLoginPage() {
       }}
     >
       <div className="w-full max-w-sm">
-        {/* Logo area */}
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-16 h-16 bg-orange-500 rounded-2xl shadow-lg shadow-orange-500/30 mb-4">
             <Shield className="w-8 h-8 text-white" />
@@ -102,7 +88,6 @@ export default function WorkerLoginPage() {
           <p className="text-slate-400 text-sm mt-1">PT Jatim Autocomp Indonesia</p>
         </div>
 
-        {/* Card */}
         <div className="bg-slate-800 border border-slate-700 rounded-2xl p-8 shadow-2xl">
           <div className="mb-6">
             <div className="flex items-center gap-2 bg-slate-700/50 rounded-lg px-3 py-2 mb-1">
@@ -116,7 +101,6 @@ export default function WorkerLoginPage() {
             </p>
           </div>
 
-          {/* Error alert */}
           {error && (
             <div className="flex items-start gap-2 bg-red-500/10 border border-red-500/30 rounded-lg px-3 py-3 mb-5">
               <AlertCircle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
@@ -188,28 +172,15 @@ export default function WorkerLoginPage() {
             </button>
           </form>
         </div>
-
-        {/* Footer links */}
-        <div className="text-center text-slate-500 text-xs mt-6 space-y-2">
-          <p>
-            Belum punya akun?{" "}
-            <Link
-              href="/register"
-              className="text-orange-400 hover:text-orange-300 transition-colors"
-            >
-              Daftar di sini →
-            </Link>
-          </p>
-          <p>
-            <Link
-              href="/"
-              onClick={() => sessionStorage.clear()}
-              className="text-orange-400 hover:text-orange-300 transition-colors"
-            >
-              Kembali ke halaman utama →
-            </Link>
-          </p>
-        </div>
+        <p className="text-center text-slate-500 text-xs mt-6">
+          <Link
+            href="/"
+            onClick={() => sessionStorage.clear()}
+            className="text-orange-400 hover:text-orange-300 transition-colors"
+          >
+            Kembali ke halaman utama →
+          </Link>
+        </p>
       </div>
     </div>
   );

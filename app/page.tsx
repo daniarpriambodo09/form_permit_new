@@ -1,10 +1,9 @@
 // app/page.tsx
-// Landing page dengan redirect otomatis berdasarkan role
 "use client";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Flame, Shield, AlertTriangle, LogIn, UserPlus, Loader2, ShieldCheck } from "lucide-react";
+import { Flame, Shield, AlertTriangle, LogIn, Loader2, ShieldCheck } from "lucide-react";
 
 export default function HomePage() {
   const router = useRouter();
@@ -12,19 +11,14 @@ export default function HomePage() {
   const [user, setUser] = useState<any>(null);
 
   useEffect(() => {
-    // Cek apakah user sudah login
     const checkAuth = async () => {
       try {
         const res = await fetch("/form-permit/api/auth/me");
         if (res.ok) {
           const data = await res.json();
           setUser(data.user);
-          // Auto-redirect berdasarkan role
-          if (data.user.role === "worker") {
-            router.push("/my-forms");
-          } else if (["approver", "admin"].includes(data.user.role)) {
-            router.push("/approval");
-          }
+          // UBAH: semua role redirect ke /home
+          router.push("/home");
         }
       } catch {
         // User belum login, tampilkan landing page
@@ -43,7 +37,6 @@ export default function HomePage() {
     );
   }
 
-  // Jika sudah ada user tapi belum redirect, tampilkan sebentar
   if (user) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50">
@@ -55,7 +48,6 @@ export default function HomePage() {
     );
   }
 
-  // Landing page untuk user yang belum login
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-orange-900">
       <div className="max-w-6xl mx-auto px-4 py-12">
@@ -75,28 +67,21 @@ export default function HomePage() {
           </p>
         </div>
 
-        {/* CTA Buttons */}
+        {/* CTA Buttons — HAPUS tombol register, grid 2 kolom tetap rapi */}
         <div className="max-w-2xl mx-auto grid md:grid-cols-2 gap-4 mb-16">
           <Link href="/login/worker"
             className="flex items-center justify-center gap-3 py-4 bg-orange-600 hover:bg-orange-500
                        text-white rounded-xl font-semibold text-lg transition-colors shadow-lg shadow-orange-600/30"
           >
             <LogIn className="w-5 h-5" />
-            Login Pekerja
+            Login Administrator Departmen
           </Link>
           <Link href="/login/approver"
             className="flex items-center justify-center gap-3 py-4 bg-slate-700 hover:bg-slate-600
                        text-white rounded-xl font-semibold text-lg transition-colors shadow-lg shadow-slate-700/30 border border-slate-600"
           >
             <ShieldCheck className="w-5 h-5" />
-            Login Approver
-          </Link>
-          <Link href="/register"
-            className="md:col-span-2 flex items-center justify-center gap-3 py-4 bg-white/10 hover:bg-white/20
-                       text-white rounded-xl font-semibold text-lg transition-colors border border-white/20"
-          >
-            <UserPlus className="w-5 h-5" />
-            Daftar Akun Baru (Pekerja)
+            Login Approver / Admin
           </Link>
         </div>
 
@@ -133,11 +118,10 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* Notice */}
+        {/* Notice — UBAH: hapus referensi ke /register */}
         <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-6 text-center">
           <p className="text-amber-300 text-sm">
-            <strong>Catatan:</strong> Untuk mengisi form izin kerja, Anda harus login terlebih dahulu.
-            Jika belum memiliki akun, silakan <Link href="/register" className="underline hover:text-amber-200">daftar di sini</Link>.
+            <strong>Catatan:</strong> Untuk mengisi form izin kerja, silakan login menggunakan akun yang telah diberikan oleh administrator.
           </p>
         </div>
       </div>

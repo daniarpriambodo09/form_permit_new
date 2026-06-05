@@ -16,9 +16,9 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
   }
 
-  // Ambil data lengkap user dari DB termasuk NIK
-  const user = await queryOne<{ nik: string | null }>(
-    `SELECT nik FROM users WHERE id = $1`,
+  // Ambil data lengkap user dari DB termasuk NIK dan departmen
+  const user = await queryOne<{ nik: string | null; departmen: string | null }>(
+    `SELECT nik, departmen FROM users WHERE id = $1`,
     [payload.userId]
   );
 
@@ -30,6 +30,7 @@ export async function GET(req: NextRequest) {
       jabatan:  payload.jabatan,
       role:     payload.role,
       nik:      user?.nik ?? null,
+      departmen: user?.departmen ?? null,
     },
   });
 }

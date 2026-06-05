@@ -98,14 +98,14 @@ function getStageLabelForForm(form: FormItem): string {
   if (isEksternal) {
     // Eksternal: stage 0=Kontraktor, 1=FireWatch, 2=SPV, 3=AdminK3, 4=SFO, 5=MR/PGA
     const map: Record<number, string> = {
-      0: "Kontraktor", 1: "Fire Watch", 2: "SPV", 3: "Admin K3", 4: "SFO", 5: "MR/PGA",
+      1: "Kontraktor", 2: "SPV", 3: "Admin K3", 4: "SFO", 5: "MR/PGA",
     };
     return map[stage] ?? `Tahap ${stage}`;
   }
 
   // Internal: stage 0=FireWatch, 1=SPV, 2=AdminK3, 3=SFO, 4=MR/PGA
   const map: Record<number, string> = {
-    0: "Fire Watch", 1: "SPV", 2: "Admin K3", 3: "SFO", 4: "MR/PGA",
+    1: "SPV", 2: "Admin K3", 3: "SFO", 4: "MR/PGA",
   };
   return map[stage] ?? `Tahap ${stage}`;
 }
@@ -136,21 +136,19 @@ function getApprovalStages(form: FormItem): { key: keyof FormItem; label: string
   if (isEksternal) {
     return [
       { key: "kontraktor_approved", label: "Kontraktor" },
-      { key: "fw_approved",         label: "Fire Watch" },
-      { key: "spv_approved",        label: "SPV" },
-      { key: "admin_k3_approved",   label: "Admin K3" },
-      { key: "sfo_approved",        label: "SFO" },
-      { key: "mr_pga_approved",     label: "MR/PGA" },
+      { key: "spv_approved", label: "SPV" },
+      { key: "admin_k3_approved", label: "Admin K3" },
+      { key: "sfo_approved", label: "SFO" },
+      { key: "mr_pga_approved", label: "MR/PGA" },
     ];
   }
 
   // Internal
   return [
-    { key: "fw_approved",       label: "Fire Watch" },
-    { key: "spv_approved",      label: "SPV" },
+    { key: "spv_approved", label: "SPV" },
     { key: "admin_k3_approved", label: "Admin K3" },
-    { key: "sfo_approved",      label: "SFO" },
-    { key: "mr_pga_approved",   label: "MR/PGA" },
+    { key: "sfo_approved", label: "SFO" },
+    { key: "mr_pga_approved", label: "MR/PGA" },
   ];
 }
 
@@ -215,7 +213,6 @@ export default function ApprovalPage() {
   const handleRefresh = async () => {
     await Promise.all([loadFormCounts(), loadForms(activeTab)]);
   };
-
   const handleLogout = async () => {
     await fetch("/form-permit/api/auth/logout", { method: "POST" });
     sessionStorage.clear();
@@ -231,7 +228,7 @@ export default function ApprovalPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <Link href="/" className="p-2 hover:bg-slate-100 rounded-lg transition-colors">
+              <Link href="/home" className="p-2 hover:bg-slate-100 rounded-lg transition-colors">
                 <Home className="w-5 h-5 text-slate-600" />
               </Link>
               <div className="flex items-center gap-3">
@@ -420,8 +417,8 @@ export default function ApprovalPage() {
                       {isFwForm && form.tipe_perusahaan && (
                         <p className="text-[10px] text-slate-400 mt-1">
                           Alur: {isEksternal
-                            ? "Kontraktor → Fire Watch → SPV → Admin K3 → SFO → MR/PGA"
-                            : "Fire Watch → SPV → Admin K3 → SFO → MR/PGA"}
+                            ? "Kontraktor → SPV → Admin K3 → SFO → MR/PGA"
+                            : "SPV → Admin K3 → SFO → MR/PGA"}
                         </p>
                       )}
                       {isHeightWork && form.tipe_perusahaan && (
