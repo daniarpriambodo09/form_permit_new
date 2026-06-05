@@ -9,6 +9,7 @@ const APPROVER_ROLES = [
   'admin_k3',
   'sfo',
   'pga',
+  'admin',
 ] as const;
 
 type ApproverRole = (typeof APPROVER_ROLES)[number];
@@ -30,6 +31,7 @@ const JABATAN_LABEL: Record<ApproverRole, string> = {
   admin_k3:  'Admin K3',
   sfo:       'SFO',
   pga:       'PGA',
+  admin:     'Administrator',
 };
 
 export async function POST(req: NextRequest) {

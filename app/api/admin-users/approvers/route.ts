@@ -44,7 +44,7 @@ export async function GET(req: NextRequest) {
          is_active,
          created_at
        FROM users
-       WHERE role IN ('spv', 'kontraktor', 'admin_k3', 'sfo', 'pga')
+       WHERE role IN ('spv', 'kontraktor', 'admin_k3', 'sfo', 'pga', 'admin')
        ORDER BY role ASC, created_at DESC`,
       []
     );

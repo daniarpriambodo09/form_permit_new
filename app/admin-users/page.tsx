@@ -47,6 +47,7 @@ const APPROVER_ROLE_OPTIONS = [
   { value: "admin_k3", label: "Admin K3" },
   { value: "sfo",      label: "SFO" },
   { value: "pga",      label: "PGA" },
+  { value: "admin",    label: "Admin" },
 ] as const;
 
 const ROLE_LABEL: Record<string, string> = {
@@ -55,6 +56,7 @@ const ROLE_LABEL: Record<string, string> = {
   admin_k3:  "Admin K3",
   sfo:       "SFO",
   pga:       "PGA",
+  admin:     "Admin",
 };
 
 const ROLE_COLOR: Record<string, string> = {
@@ -63,6 +65,7 @@ const ROLE_COLOR: Record<string, string> = {
   admin_k3:  "bg-orange-50 text-orange-700 border-orange-200",
   sfo:       "bg-teal-50 text-teal-700 border-teal-200",
   pga:       "bg-rose-50 text-rose-700 border-rose-200",
+  admin:     "bg-slate-50 text-slate-700 border-slate-300",
 };
 
 // ── Format tanggal ────────────────────────────────────────────
