@@ -1,9 +1,19 @@
-// app/api/auth/register/route.ts
+// app/api/auth/register-approver/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { query, queryOne } from '@/lib/db';
 import { hashPassword, verifyToken, COOKIE_NAME } from '@/lib/auth';
 
-const ALLOWED_DEPARTMENTS = [
+const APPROVER_ROLES = [
+  'spv',
+  'kontraktor',
+  'admin_k3',
+  'sfo',
+  'pga',
+] as const;
+
+type ApproverRole = (typeof APPROVER_ROLES)[number];
+
+const DEPARTMENT_OPTIONS = [
   "QA",
   "ENG",
   "MTC",
@@ -14,8 +24,16 @@ const ALLOWED_DEPARTMENTS = [
   "PGA",
 ] as const;
 
+const JABATAN_LABEL: Record<ApproverRole, string> = {
+  spv:       'Supervisor',
+  kontraktor: 'Kontraktor',
+  admin_k3:  'Admin K3',
+  sfo:       'SFO',
+  pga:       'PGA',
+};
+
 export async function POST(req: NextRequest) {
-  // ── Validasi admin sebelum apapun ────────────────────────────
+  // ── Validasi admin ────────────────────────────────────────────
   const token = req.cookies.get(COOKIE_NAME)?.value;
   if (!token) {
     return NextResponse.json(
@@ -33,7 +51,8 @@ export async function POST(req: NextRequest) {
   // ── AKHIR validasi admin ──────────────────────────────────────
 
   try {
-    const { nama, username, perusahaan, departmen, email, no_telp, password } = await req.json();
+    const { nama, username, role, departmen, email, no_telp, password } =
+      await req.json();
 
     // Validasi password
     if (!password || password.length < 6) {
@@ -49,18 +68,28 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Validasi departemen — wajib & harus nilai yang diizinkan
-    if (!departmen) {
-      return NextResponse.json({ error: 'Departemen wajib dipilih' }, { status: 400 });
-    }
-    if (!(ALLOWED_DEPARTMENTS as readonly string[]).includes(departmen)) {
-      return NextResponse.json({ error: 'Departemen tidak valid' }, { status: 400 });
+    // Validasi role
+    if (!role || !(APPROVER_ROLES as readonly string[]).includes(role)) {
+      return NextResponse.json({ error: 'Role approver tidak valid' }, { status: 400 });
     }
 
-    // Validasi email — opsional, tapi jika diisi harus valid format
-    const emailValue: string | null = email && typeof email === 'string' && email.trim() !== ''
-      ? email.trim()
-      : null;
+    const approverRole = role as ApproverRole;
+
+    // Validasi departemen — wajib hanya untuk SPV
+    if (approverRole === 'spv') {
+      if (!departmen) {
+        return NextResponse.json({ error: 'Departemen wajib dipilih untuk role SPV' }, { status: 400 });
+      }
+      if (!(DEPARTMENT_OPTIONS as readonly string[]).includes(departmen)) {
+        return NextResponse.json({ error: 'Departemen tidak valid' }, { status: 400 });
+      }
+    }
+
+    // Validasi email — opsional, tapi jika diisi harus valid
+    const emailValue: string | null =
+      email && typeof email === 'string' && email.trim() !== ''
+        ? email.trim()
+        : null;
 
     if (emailValue) {
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -78,7 +107,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Username sudah digunakan' }, { status: 409 });
     }
 
-    // Cek duplikat email (hanya jika email diisi)
+    // Cek duplikat email
     if (emailValue) {
       const existingEmail = await queryOne(
         `SELECT id FROM users WHERE LOWER(email) = LOWER($1)`,
@@ -91,29 +120,32 @@ export async function POST(req: NextRequest) {
 
     const hashedPassword = await hashPassword(password);
 
+    // departemen: diisi untuk SPV, null untuk role lainnya
+    const departmenValue =
+      approverRole === 'spv' ? departmen : null;
+
     await query(
-      `INSERT INTO users (username, password, nama, perusahaan, departmen, email, no_telp, jabatan, role, is_active)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+      `INSERT INTO users (username, password, nama, departmen, email, no_telp, jabatan, role, is_active)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
       [
         username.toLowerCase().trim(),
         hashedPassword,
         nama,
-        perusahaan,
-        departmen,
+        departmenValue ?? null,
         emailValue ? emailValue.toLowerCase() : null,
         no_telp || null,
-        'Administrator Departemen',
-        'worker',
+        JABATAN_LABEL[approverRole],
+        approverRole,
         true,
       ]
     );
 
     return NextResponse.json({
       success: true,
-      message: 'Akun Administrator Departemen berhasil dibuat.',
+      message: `Akun ${JABATAN_LABEL[approverRole]} berhasil dibuat.`,
     }, { status: 201 });
   } catch (err: unknown) {
-    console.error('[POST /api/auth/register]', err);
+    console.error('[POST /api/auth/register-approver]', err);
     return NextResponse.json({ error: 'Terjadi kesalahan server' }, { status: 500 });
   }
 }
