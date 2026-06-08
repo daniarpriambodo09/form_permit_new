@@ -38,7 +38,7 @@ const getStages = (
       { role: "spv",        label: "SPV",        isApproved: false },
       { role: "admin_k3",   label: "Admin K3",  isApproved: false },
       { role: "sfo",        label: "SFO",        isApproved: false },
-      { role: "mr_pga",     label: "MR/PGA",    isApproved: false },
+      { role: "mr_pga",     label: "SMR",    isApproved: false },
     ];
   }
 
@@ -47,7 +47,7 @@ const getStages = (
     { role: "spv",      label: "SPV",       isApproved: false },
     { role: "admin_k3", label: "Admin K3", isApproved: false },
     { role: "sfo",      label: "SFO",       isApproved: false },
-    { role: "mr_pga",   label: "MR/PGA",   isApproved: false },
+    { role: "mr_pga",   label: "SMR",   isApproved: false },
   ];
 };
 

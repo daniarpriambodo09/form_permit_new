@@ -1,8 +1,8 @@
 // app/form/hot-work/page.tsx
 // UPDATED: Tambah Bagian 5 — Upload JSA
 // Alur baru (UPDATED):
-//   Internal:  SPV → Admin K3 → SFO → MR/PGA
-//   Eksternal: Kontraktor → SPV → Admin K3 → SFO → MR/PGA
+//   Internal:  SPV → Admin K3 → SFO → SMR
+//   Eksternal: Kontraktor → SPV → Admin K3 → SFO → SMR
 // Fire Watch dipilih saat form dibuat, tidak lagi menjadi approver
 "use client";
 import { useState, useEffect } from "react";
@@ -17,7 +17,7 @@ import JsaUploadSection, {
 type WorkDetail = { detail: string; mulai: string; selesai: string };
 
 interface FormData {
-  tipePerusahaan: "internal" | "eksternal";
+  tipePerusahaan: "internal" | "eksternal"; 
   namaKontraktor: string;
   namaPekerjaNIK: string;
   lokasi: string;
@@ -239,8 +239,8 @@ export default function HotWorkPermitForm() {
               <label className="block text-sm font-semibold text-slate-700 mb-2">Tipe Pekerja / Perusahaan <span className="text-red-500">*</span></label>
               <div className="grid grid-cols-2 gap-3">
                 {[
-                  { value: "internal",  label: "Internal / Karyawan PT.JAI", desc: "Alur: SPV → Admin K3 → SFO → MR/PGA" },
-                  { value: "eksternal", label: "Eksternal / Subkontraktor",   desc: "Alur: Kontraktor → SPV → Admin K3 → SFO → MR/PGA" },
+                  { value: "internal",  label: "Internal / Karyawan PT.JAI", desc: "Alur: SPV → Admin K3 → SFO → SMR" },
+                  { value: "eksternal", label: "Eksternal / Subkontraktor",   desc: "Alur: Kontraktor → SPV → Admin K3 → SFO → SMR" },
                 ].map(opt => (
                   <label key={opt.value}
                     className={`flex flex-col gap-1 p-3 rounded-xl border-2 cursor-pointer transition-all ${

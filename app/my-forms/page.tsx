@@ -77,14 +77,14 @@ const getApprovalStages = (form: FormItem): { key: keyof FormItem; label: string
         { key: "spv_approved",        label: "SPV" },
         { key: "admin_k3_approved",   label: "Admin K3" },
         { key: "sfo_approved",        label: "SFO" },
-        { key: "mr_pga_approved",     label: "MR/PGA" },
+        { key: "mr_pga_approved",     label: "SMR" },
       ];
     }
     return [
       { key: "spv_approved",      label: "SPV" },
       { key: "admin_k3_approved", label: "Admin K3" },
       { key: "sfo_approved",      label: "SFO" },
-      { key: "mr_pga_approved",   label: "MR/PGA" },
+      { key: "mr_pga_approved",   label: "SMR" },
     ];
   }
 
@@ -94,7 +94,7 @@ const getApprovalStages = (form: FormItem): { key: keyof FormItem; label: string
       { key: "spv_approved",        label: "SPV" },
       { key: "admin_k3_approved",   label: "Admin K3" },
       { key: "sfo_approved",        label: "SFO" },
-      { key: "mr_pga_approved",     label: "MR/PGA" },
+      { key: "mr_pga_approved",     label: "SMR" },
     ];
   }
 
@@ -102,7 +102,7 @@ const getApprovalStages = (form: FormItem): { key: keyof FormItem; label: string
     { key: "spv_approved",      label: "SPV" },
     { key: "admin_k3_approved", label: "Admin K3" },
     { key: "sfo_approved",      label: "SFO" },
-    { key: "mr_pga_approved",   label: "MR/PGA" },
+    { key: "mr_pga_approved",   label: "SMR" },
   ];
 };
 
@@ -134,16 +134,16 @@ const renderApprovalProgress = (form: FormItem) => {
       {(form.jenis_form === "hot-work" || form.jenis_form === "workshop") && form.tipe_perusahaan && (
         <p className="text-[10px] text-slate-400 mt-1">
           Alur: {isEksternal
-            ? "Kontraktor → SPV → Admin K3 → SFO → MR/PGA"
-            : "SPV → Admin K3 → SFO → MR/PGA"
+            ? "Kontraktor → SPV → Admin K3 → SFO → SMR"
+            : "SPV → Admin K3 → SFO → SMR"
           }
         </p>
       )}
       {form.jenis_form === "height-work" && form.tipe_perusahaan && (
         <p className="text-[10px] text-slate-400 mt-1">
           Alur: {isEksternal
-            ? "Kontraktor → SPV → Admin K3 → SFO → MR/PGA"
-            : "SPV → Admin K3 → SFO → MR/PGA"
+            ? "Kontraktor → SPV → Admin K3 → SFO → SMR"
+            : "SPV → Admin K3 → SFO → SMR"
           }
         </p>
       )}

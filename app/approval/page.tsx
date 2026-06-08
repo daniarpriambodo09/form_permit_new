@@ -83,29 +83,29 @@ function getStageLabelForForm(form: FormItem): string {
   if (isHw) {
     if (isEksternal) {
       const map: Record<number, string> = {
-        1: "Kontraktor", 2: "SPV", 3: "Admin K3", 4: "SFO", 5: "MR/PGA",
+        1: "Kontraktor", 2: "SPV", 3: "Admin K3", 4: "SFO", 5: "SMR",
       };
       return map[stage] ?? `Tahap ${stage}`;
     }
     // height-work internal
     const map: Record<number, string> = {
-      1: "SPV", 2: "Admin K3", 3: "SFO", 4: "MR/PGA",
+      1: "SPV", 2: "Admin K3", 3: "SFO", 4: "SMR",
     };
     return map[stage] ?? `Tahap ${stage}`;
   }
 
   // hot-work & workshop — aware tipe_perusahaan
   if (isEksternal) {
-    // Eksternal: stage 0=Kontraktor, 1=FireWatch, 2=SPV, 3=AdminK3, 4=SFO, 5=MR/PGA
+    // Eksternal: stage 0=Kontraktor, 1=FireWatch, 2=SPV, 3=AdminK3, 4=SFO, 5=SMR
     const map: Record<number, string> = {
-      1: "Kontraktor", 2: "SPV", 3: "Admin K3", 4: "SFO", 5: "MR/PGA",
+      1: "Kontraktor", 2: "SPV", 3: "Admin K3", 4: "SFO", 5: "SMR",
     };
     return map[stage] ?? `Tahap ${stage}`;
   }
 
-  // Internal: stage 0=FireWatch, 1=SPV, 2=AdminK3, 3=SFO, 4=MR/PGA
+  // Internal: stage 0=FireWatch, 1=SPV, 2=AdminK3, 3=SFO, 4=SMR
   const map: Record<number, string> = {
-    1: "SPV", 2: "Admin K3", 3: "SFO", 4: "MR/PGA",
+    1: "SPV", 2: "Admin K3", 3: "SFO", 4: "SMR",
   };
   return map[stage] ?? `Tahap ${stage}`;
 }
@@ -121,14 +121,14 @@ function getApprovalStages(form: FormItem): { key: keyof FormItem; label: string
         { key: "spv_approved",        label: "SPV" },
         { key: "admin_k3_approved",   label: "Admin K3" },
         { key: "sfo_approved",        label: "SFO" },
-        { key: "mr_pga_approved",     label: "MR/PGA" },
+        { key: "mr_pga_approved",     label: "SMR" },
       ];
     }
     return [
       { key: "spv_approved",      label: "SPV" },
       { key: "admin_k3_approved", label: "Admin K3" },
       { key: "sfo_approved",      label: "SFO" },
-      { key: "mr_pga_approved",   label: "MR/PGA" },
+      { key: "mr_pga_approved",   label: "SMR" },
     ];
   }
 
@@ -139,7 +139,7 @@ function getApprovalStages(form: FormItem): { key: keyof FormItem; label: string
       { key: "spv_approved", label: "SPV" },
       { key: "admin_k3_approved", label: "Admin K3" },
       { key: "sfo_approved", label: "SFO" },
-      { key: "mr_pga_approved", label: "MR/PGA" },
+      { key: "mr_pga_approved", label: "SMR" },
     ];
   }
 
@@ -148,7 +148,7 @@ function getApprovalStages(form: FormItem): { key: keyof FormItem; label: string
     { key: "spv_approved", label: "SPV" },
     { key: "admin_k3_approved", label: "Admin K3" },
     { key: "sfo_approved", label: "SFO" },
-    { key: "mr_pga_approved", label: "MR/PGA" },
+    { key: "mr_pga_approved", label: "SMR" },
   ];
 }
 
@@ -417,15 +417,15 @@ export default function ApprovalPage() {
                       {isFwForm && form.tipe_perusahaan && (
                         <p className="text-[10px] text-slate-400 mt-1">
                           Alur: {isEksternal
-                            ? "Kontraktor → SPV → Admin K3 → SFO → MR/PGA"
-                            : "SPV → Admin K3 → SFO → MR/PGA"}
+                            ? "Kontraktor → SPV → Admin K3 → SFO → SMR"
+                            : "SPV → Admin K3 → SFO → SMR"}
                         </p>
                       )}
                       {isHeightWork && form.tipe_perusahaan && (
                         <p className="text-[10px] text-slate-400 mt-1">
                           Alur: {isEksternal
-                            ? "Kontraktor → SPV → Admin K3 → SFO → MR/PGA"
-                            : "SPV → Admin K3 → SFO → MR/PGA"}
+                            ? "Kontraktor → SPV → Admin K3 → SFO → SMR"
+                            : "SPV → Admin K3 → SFO → SMR"}
                         </p>
                       )}
 

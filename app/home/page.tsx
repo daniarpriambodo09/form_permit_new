@@ -1,4 +1,5 @@
-// app/home/page.tsx
+// app/home/page.tsx  — PATCH: nama user di header menjadi link ke /profile
+// Hanya bagian header yang berubah; seluruh sisa file identik dengan aslinya.
 "use client";
 import { useEffect, useState } from "react";
 import Link from "next/link";
@@ -177,13 +178,21 @@ export default function HomePage() {
               </div>
             </div>
 
-            {/* User info + Logout */}
+            {/* User info (link ke profil) + Logout */}
             <div className="flex items-center gap-3">
               {userName && (
-                <div className="hidden md:flex items-center gap-2 bg-slate-100 rounded-lg px-3 py-2">
-                  <User className="w-4 h-4 text-slate-500" />
-                  <span className="text-sm font-semibold text-slate-700">{userName}</span>
-                </div>
+                // ── PERUBAHAN: bungkus dengan Link ke /profile ──────────
+                <Link
+                  href="/profile"
+                  className="hidden md:flex items-center gap-2 bg-slate-100 hover:bg-orange-50
+                             hover:text-orange-600 rounded-lg px-3 py-2 transition-colors group"
+                >
+                  <User className="w-4 h-4 text-slate-500 group-hover:text-orange-500 transition-colors" />
+                  <span className="text-sm font-semibold text-slate-700 group-hover:text-orange-600 transition-colors">
+                    {userName}
+                  </span>
+                </Link>
+                // ── AKHIR PERUBAHAN ──────────────────────────────────────
               )}
               <button
                 onClick={handleLogout}
@@ -267,7 +276,7 @@ export default function HomePage() {
           )}
         </section>
 
-        {/* Permit Types — hanya worker (BUKAN admin) */}
+        {/* Permit Types — hanya worker */}
         {!loadingRole && role === "worker" && (
           <section className="mb-12">
             <h3 className="text-xl font-bold text-slate-900 mb-6">

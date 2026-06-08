@@ -7,6 +7,7 @@ import {
   Shield, UserPlus, Eye, EyeOff, AlertCircle,
   CheckCircle, X, Users, ChevronLeft, Search,
   Building2, Mail, Phone, Calendar, BadgeCheck, BadgeX,
+  Trash2,
 } from "lucide-react";
 
 // ── Types ─────────────────────────────────────────────────────
@@ -34,6 +35,14 @@ interface ApproverUser {
   created_at: string;
 }
 
+// ── BARU: Delete target ───────────────────────────────────────
+interface DeleteTarget {
+  id:       number;
+  nama:     string;
+  username: string;
+  role:     string;
+}
+
 type ActiveTab = "admin" | "approver";
 
 const DEPARTMENT_OPTIONS = [
@@ -42,30 +51,32 @@ const DEPARTMENT_OPTIONS = [
 ] as const;
 
 const APPROVER_ROLE_OPTIONS = [
-  { value: "spv",      label: "SPV" },
+  { value: "spv",        label: "SPV" },
   { value: "kontraktor", label: "Kontraktor" },
-  { value: "admin_k3", label: "Admin K3" },
-  { value: "sfo",      label: "SFO" },
-  { value: "pga",      label: "PGA" },
-  { value: "admin",    label: "Admin" },
+  { value: "admin_k3",   label: "Admin K3" },
+  { value: "sfo",        label: "SFO" },
+  { value: "pga",        label: "PGA" },
+  { value: "admin",      label: "Admin" },
 ] as const;
 
 const ROLE_LABEL: Record<string, string> = {
-  spv:       "SPV",
+  spv:        "SPV",
   kontraktor: "Kontraktor",
-  admin_k3:  "Admin K3",
-  sfo:       "SFO",
-  pga:       "PGA",
-  admin:     "Admin",
+  admin_k3:   "Admin K3",
+  sfo:        "SFO",
+  pga:        "PGA",
+  admin:      "Admin",
+  worker:     "Worker",
+  firewatch:  "Fire Watch",
 };
 
 const ROLE_COLOR: Record<string, string> = {
-  spv:       "bg-blue-50 text-blue-700 border-blue-200",
+  spv:        "bg-blue-50 text-blue-700 border-blue-200",
   kontraktor: "bg-purple-50 text-purple-700 border-purple-200",
-  admin_k3:  "bg-orange-50 text-orange-700 border-orange-200",
-  sfo:       "bg-teal-50 text-teal-700 border-teal-200",
-  pga:       "bg-rose-50 text-rose-700 border-rose-200",
-  admin:     "bg-slate-50 text-slate-700 border-slate-300",
+  admin_k3:   "bg-orange-50 text-orange-700 border-orange-200",
+  sfo:        "bg-teal-50 text-teal-700 border-teal-200",
+  pga:        "bg-rose-50 text-rose-700 border-rose-200",
+  admin:      "bg-slate-50 text-slate-700 border-slate-300",
 };
 
 // ── Format tanggal ────────────────────────────────────────────
@@ -77,11 +88,101 @@ function formatDate(iso: string): string {
   });
 }
 
+// ── BARU: Delete Confirmation Modal ──────────────────────────
+function DeleteModal({
+  target,
+  onConfirm,
+  onCancel,
+  loading,
+}: {
+  target:    DeleteTarget;
+  onConfirm: () => void;
+  onCancel:  () => void;
+  loading:   boolean;
+}) {
+  return (
+    <div
+      className="fixed inset-0 z-[60] flex items-center justify-center p-4"
+      style={{ backgroundColor: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)" }}
+    >
+      <div className="bg-slate-800 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-sm p-6">
+        {/* Header */}
+        <div className="flex items-start justify-between mb-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-red-500/20 rounded-xl flex items-center justify-center flex-shrink-0">
+              <Trash2 className="w-5 h-5 text-red-400" />
+            </div>
+            <div>
+              <h3 className="text-sm font-bold text-white">Hapus Akun</h3>
+              <p className="text-xs text-slate-400">Tindakan ini tidak dapat dibatalkan</p>
+            </div>
+          </div>
+          <button
+            onClick={onCancel}
+            disabled={loading}
+            className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-colors"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        <p className="text-sm text-slate-300 mb-4">
+          Yakin ingin menghapus akun ini? Histori form yang sudah dibuat akan tetap tersimpan.
+        </p>
+
+        {/* User info */}
+        <div className="bg-slate-700/50 border border-slate-600 rounded-xl p-4 mb-5 space-y-2">
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-slate-400 font-medium">Nama</span>
+            <span className="font-bold text-white">{target.nama}</span>
+          </div>
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-slate-400 font-medium">Username</span>
+            <code className="text-xs bg-slate-600 text-slate-200 px-2 py-0.5 rounded font-mono">
+              @{target.username}
+            </code>
+          </div>
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-slate-400 font-medium">Role</span>
+            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border
+              ${ROLE_COLOR[target.role] ?? "bg-slate-600 text-slate-200 border-slate-500"}`}>
+              {ROLE_LABEL[target.role] ?? target.role}
+            </span>
+          </div>
+        </div>
+
+        <div className="flex gap-3">
+          <button
+            onClick={onCancel}
+            disabled={loading}
+            className="flex-1 py-2.5 bg-slate-700 hover:bg-slate-600 text-slate-300
+                       font-semibold rounded-lg text-sm transition-colors disabled:opacity-60"
+          >
+            Batal
+          </button>
+          <button
+            onClick={onConfirm}
+            disabled={loading}
+            className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-red-600
+                       hover:bg-red-500 text-white font-bold rounded-lg text-sm transition-colors
+                       disabled:opacity-60"
+          >
+            {loading
+              ? <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              : <Trash2 className="w-4 h-4" />}
+            Hapus Akun
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ═══════════════════════════════════════════════════════════════
 export default function AdminUsersPage() {
-  const router       = useRouter();
+  const router = useRouter();
 
-  // ── Tab state — baca dari query param ─────────────────────
+  // ── Tab state ─────────────────────────────────────────────
   const [activeTab, setActiveTab] = useState<ActiveTab>("admin");
 
   const switchTab = (tab: ActiveTab) => {
@@ -94,12 +195,8 @@ export default function AdminUsersPage() {
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-
     const params = new URLSearchParams(window.location.search);
-
-    if (params.get("tab") === "approver") {
-      setActiveTab("approver");
-    }
+    if (params.get("tab") === "approver") setActiveTab("approver");
   }, []);
 
   useEffect(() => {
@@ -174,7 +271,6 @@ export default function AdminUsersPage() {
   const [filterDept, setFilterDept] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
 
-  // Reset filter when tab changes
   useEffect(() => {
     setSearch("");
     setFilterDept("");
@@ -202,6 +298,45 @@ export default function AdminUsersPage() {
     return matchSearch && matchDept;
   });
 
+  // ── BARU: Delete state ────────────────────────────────────────
+  const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
+  const [deleting,     setDeleting]     = useState(false);
+
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      const res = await fetch(`/form-permit/api/admin-users/${deleteTarget.id}`, {
+        method:      "DELETE",
+        credentials: "include",
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setSuccessMsg(""); // clear any old msg
+        // tampilkan error lewat successMsg dengan prefix khusus
+        setDeleteTarget(null);
+        setSuccessMsg(`ERROR: ${data.error || "Gagal menghapus akun."}`);
+        setTimeout(() => setSuccessMsg(""), 5000);
+        return;
+      }
+      setDeleteTarget(null);
+      setSuccessMsg("Akun berhasil dihapus.");
+      setTimeout(() => setSuccessMsg(""), 4000);
+      // Refresh tabel yang relevan
+      if (deleteTarget.role === "worker") {
+        fetchAdminUsers();
+      } else {
+        fetchApproverUsers();
+      }
+    } catch {
+      setDeleteTarget(null);
+      setSuccessMsg("ERROR: Terjadi kesalahan koneksi.");
+      setTimeout(() => setSuccessMsg(""), 5000);
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   // ── Modal state ───────────────────────────────────────────────
   const [modalOpen, setModalOpen] = useState(false);
 
@@ -214,11 +349,11 @@ export default function AdminUsersPage() {
     departmen: "", email: "", no_telp: "",
     password: "", password2: "",
   };
-  const [adminForm,    setAdminForm]    = useState(emptyAdminForm);
-  const [showPass,     setShowPass]     = useState(false);
-  const [submitting,   setSubmitting]   = useState(false);
-  const [formError,    setFormError]    = useState("");
-  const [formSuccess,  setFormSuccess]  = useState(false);
+  const [adminForm,   setAdminForm]   = useState(emptyAdminForm);
+  const [showPass,    setShowPass]    = useState(false);
+  const [submitting,  setSubmitting]  = useState(false);
+  const [formError,   setFormError]   = useState("");
+  const [formSuccess, setFormSuccess] = useState(false);
 
   // ── Form state — Approver ─────────────────────────────────────
   const emptyApproverForm = {
@@ -228,7 +363,7 @@ export default function AdminUsersPage() {
   };
   const [approverForm, setApproverForm] = useState(emptyApproverForm);
 
-  // ── Username check (shared) ───────────────────────────────────
+  // ── Username check ────────────────────────────────────────────
   const [checkingUsername, setCheckingUsername] = useState(false);
   const [usernameStatus,   setUsernameStatus]   =
     useState<"available" | "taken" | "invalid" | null>(null);
@@ -256,14 +391,12 @@ export default function AdminUsersPage() {
   const handleApproverChange = (key: string, value: string) => {
     setApproverForm(prev => ({ ...prev, [key]: value }));
     if (key === "username") { setUsernameStatus(null); setUsernameError(""); }
-    // Reset departemen jika role bukan SPV
     if (key === "role" && value !== "spv") {
       setApproverForm(prev => ({ ...prev, role: value, departmen: "" }));
       return;
     }
   };
 
-  // Username debounce check
   useEffect(() => {
     if (!currentUsername) { setUsernameStatus(null); setUsernameError(""); return; }
     const regex = /^[a-zA-Z0-9_]{3,20}$/;
@@ -293,16 +426,15 @@ export default function AdminUsersPage() {
   const handleAdminSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError("");
-
-    if (!adminForm.username)                { setFormError("Username wajib diisi"); return; }
-    if (usernameStatus !== "available")     { setFormError("Username tidak tersedia atau tidak valid"); return; }
-    if (!adminForm.departmen)               { setFormError("Departemen wajib dipilih"); return; }
+    if (!adminForm.username)             { setFormError("Username wajib diisi"); return; }
+    if (usernameStatus !== "available")  { setFormError("Username tidak tersedia atau tidak valid"); return; }
+    if (!adminForm.departmen)            { setFormError("Departemen wajib dipilih"); return; }
     if (adminForm.email) {
       const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!emailRe.test(adminForm.email))   { setFormError("Format email tidak valid"); return; }
+      if (!emailRe.test(adminForm.email)) { setFormError("Format email tidak valid"); return; }
     }
     if (adminForm.password !== adminForm.password2) { setFormError("Password dan konfirmasi password tidak cocok"); return; }
-    if (adminForm.password.length < 6)      { setFormError("Password minimal 6 karakter"); return; }
+    if (adminForm.password.length < 6)   { setFormError("Password minimal 6 karakter"); return; }
 
     setSubmitting(true);
     try {
@@ -314,7 +446,6 @@ export default function AdminUsersPage() {
       });
       const data = await res.json();
       if (!res.ok) { setFormError(data.error || "Registrasi gagal"); return; }
-
       setFormSuccess(true);
       await fetchAdminUsers();
       setTimeout(() => {
@@ -333,10 +464,9 @@ export default function AdminUsersPage() {
   const handleApproverSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError("");
-
-    if (!approverForm.username)             { setFormError("Username wajib diisi"); return; }
-    if (usernameStatus !== "available")     { setFormError("Username tidak tersedia atau tidak valid"); return; }
-    if (!approverForm.role)                 { setFormError("Role Approver wajib dipilih"); return; }
+    if (!approverForm.username)            { setFormError("Username wajib diisi"); return; }
+    if (usernameStatus !== "available")    { setFormError("Username tidak tersedia atau tidak valid"); return; }
+    if (!approverForm.role)                { setFormError("Role Approver wajib dipilih"); return; }
     if (approverForm.role === "spv" && !approverForm.departmen) {
                                              setFormError("Departemen wajib dipilih untuk SPV"); return; }
     if (approverForm.email) {
@@ -344,7 +474,7 @@ export default function AdminUsersPage() {
       if (!emailRe.test(approverForm.email)) { setFormError("Format email tidak valid"); return; }
     }
     if (approverForm.password !== approverForm.password2) { setFormError("Password dan konfirmasi password tidak cocok"); return; }
-    if (approverForm.password.length < 6)   { setFormError("Password minimal 6 karakter"); return; }
+    if (approverForm.password.length < 6)  { setFormError("Password minimal 6 karakter"); return; }
 
     setSubmitting(true);
     try {
@@ -356,7 +486,6 @@ export default function AdminUsersPage() {
       });
       const data = await res.json();
       if (!res.ok) { setFormError(data.error || "Registrasi gagal"); return; }
-
       setFormSuccess(true);
       await fetchApproverUsers();
       setTimeout(() => {
@@ -386,6 +515,8 @@ export default function AdminUsersPage() {
 
   const isAdminTab    = activeTab === "admin";
   const isApproverTab = activeTab === "approver";
+
+  const isErrorMsg = successMsg.startsWith("ERROR:");
 
   // ── Render ────────────────────────────────────────────────────
   return (
@@ -466,11 +597,18 @@ export default function AdminUsersPage() {
           </button>
         </div>
 
-        {/* Success toast */}
+        {/* Success / Error toast */}
         {successMsg && (
-          <div className="flex items-center gap-2 bg-green-50 border border-green-200 rounded-xl px-4 py-3 mb-5">
-            <CheckCircle className="w-4 h-4 text-green-600 shrink-0" />
-            <p className="text-green-700 text-sm font-medium">{successMsg}</p>
+          <div className={`flex items-center gap-2 border rounded-xl px-4 py-3 mb-5
+            ${isErrorMsg
+              ? "bg-red-50 border-red-200"
+              : "bg-green-50 border-green-200"}`}>
+            {isErrorMsg
+              ? <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
+              : <CheckCircle className="w-4 h-4 text-green-600 shrink-0" />}
+            <p className={`text-sm font-medium ${isErrorMsg ? "text-red-700" : "text-green-700"}`}>
+              {isErrorMsg ? successMsg.replace("ERROR: ", "") : successMsg}
+            </p>
           </div>
         )}
 
@@ -492,28 +630,25 @@ export default function AdminUsersPage() {
                          focus:ring-orange-400 focus:border-transparent transition-colors"
             />
           </div>
-          {/* Dept filter — hanya tampil jika relevan */}
-          {(isAdminTab || (isApproverTab)) && (
-            <div className="relative">
-              <select
-                value={filterDept}
-                onChange={e => setFilterDept(e.target.value)}
-                className="pl-4 pr-8 py-2.5 bg-white border border-slate-200 rounded-xl text-sm
-                           text-slate-700 focus:outline-none focus:ring-2 focus:ring-orange-400
-                           focus:border-transparent transition-colors appearance-none cursor-pointer"
-              >
-                <option value="">Semua Departemen</option>
-                {DEPARTMENT_OPTIONS.map(d => (
-                  <option key={d} value={d}>{d}</option>
-                ))}
-              </select>
-              <div className="pointer-events-none absolute inset-y-0 right-2.5 flex items-center">
-                <svg className="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                </svg>
-              </div>
+          <div className="relative">
+            <select
+              value={filterDept}
+              onChange={e => setFilterDept(e.target.value)}
+              className="pl-4 pr-8 py-2.5 bg-white border border-slate-200 rounded-xl text-sm
+                         text-slate-700 focus:outline-none focus:ring-2 focus:ring-orange-400
+                         focus:border-transparent transition-colors appearance-none cursor-pointer"
+            >
+              <option value="">Semua Departemen</option>
+              {DEPARTMENT_OPTIONS.map(d => (
+                <option key={d} value={d}>{d}</option>
+              ))}
+            </select>
+            <div className="pointer-events-none absolute inset-y-0 right-2.5 flex items-center">
+              <svg className="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
             </div>
-          )}
+          </div>
         </div>
 
         {/* ── TAB: Administrator Departemen ── */}
@@ -557,6 +692,8 @@ export default function AdminUsersPage() {
                         <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">No. Telepon</th>
                         <th className="text-center px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Status</th>
                         <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Dibuat Pada</th>
+                        {/* BARU: kolom Aksi */}
+                        <th className="text-center px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Aksi</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
@@ -622,6 +759,22 @@ export default function AdminUsersPage() {
                               <span className="text-xs">{formatDate(user.created_at)}</span>
                             </div>
                           </td>
+                          {/* BARU: tombol Hapus */}
+                          <td className="px-4 py-4 text-center">
+                            <button
+                              onClick={() => setDeleteTarget({
+                                id:       user.id,
+                                nama:     user.nama,
+                                username: user.username,
+                                role:     "worker",
+                              })}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold
+                                         text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors
+                                         border border-red-200"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" /> Hapus
+                            </button>
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -673,6 +826,8 @@ export default function AdminUsersPage() {
                         <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">No. Telepon</th>
                         <th className="text-center px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Status</th>
                         <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Dibuat Pada</th>
+                        {/* BARU: kolom Aksi */}
+                        <th className="text-center px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Aksi</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
@@ -737,6 +892,22 @@ export default function AdminUsersPage() {
                               <span className="text-xs">{formatDate(user.created_at)}</span>
                             </div>
                           </td>
+                          {/* BARU: tombol Hapus */}
+                          <td className="px-4 py-4 text-center">
+                            <button
+                              onClick={() => setDeleteTarget({
+                                id:       user.id,
+                                nama:     user.nama,
+                                username: user.username,
+                                role:     user.role,
+                              })}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold
+                                         text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors
+                                         border border-red-200"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" /> Hapus
+                            </button>
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -749,7 +920,7 @@ export default function AdminUsersPage() {
       </main>
 
       {/* ══════════════════════════════════════════════════════════
-          Modal
+          Modal Register (tidak berubah)
       ══════════════════════════════════════════════════════════ */}
       {modalOpen && (
         <div
@@ -807,7 +978,6 @@ export default function AdminUsersPage() {
                   {/* ── FORM: Administrator Departemen ── */}
                   {isAdminTab && (
                     <form onSubmit={handleAdminSubmit} className="space-y-4">
-                      {/* Nama */}
                       <div>
                         <label className="block text-sm font-medium text-slate-300 mb-1.5">
                           Nama Lengkap <span className="text-red-400">*</span>
@@ -816,8 +986,6 @@ export default function AdminUsersPage() {
                           onChange={e => handleAdminChange("nama", e.target.value)}
                           placeholder="Nama sesuai KTP" required className={inputCls} />
                       </div>
-
-                      {/* Username */}
                       <div>
                         <label className="block text-sm font-medium text-slate-300 mb-1.5">
                           Username <span className="text-red-400">*</span>
@@ -845,8 +1013,6 @@ export default function AdminUsersPage() {
                           )}
                         </div>
                       </div>
-
-                      {/* Perusahaan */}
                       <div>
                         <label className="block text-sm font-medium text-slate-300 mb-1.5">
                           Perusahaan / Kontraktor <span className="text-red-400">*</span>
@@ -855,15 +1021,12 @@ export default function AdminUsersPage() {
                           onChange={e => handleAdminChange("perusahaan", e.target.value)}
                           placeholder="PT JAI / PT Kontraktor ABC" required className={inputCls} />
                       </div>
-
-                      {/* Departemen */}
                       <div>
                         <label className="block text-sm font-medium text-slate-300 mb-1.5">
                           Departemen <span className="text-red-400">*</span>
                         </label>
                         <div className="relative">
-                          <select
-                            value={adminForm.departmen}
+                          <select value={adminForm.departmen}
                             onChange={e => handleAdminChange("departmen", e.target.value)}
                             required
                             className={`${selectCls} ${adminForm.departmen ? "text-white" : "text-slate-500"}`}
@@ -880,24 +1043,18 @@ export default function AdminUsersPage() {
                           </div>
                         </div>
                       </div>
-
-                      {/* Email */}
                       <div>
                         <label className="block text-sm font-medium text-slate-300 mb-1.5">Email</label>
                         <input type="email" value={adminForm.email}
                           onChange={e => handleAdminChange("email", e.target.value)}
                           placeholder="user@company.com (opsional)" className={inputCls} />
                       </div>
-
-                      {/* No Telepon */}
                       <div>
                         <label className="block text-sm font-medium text-slate-300 mb-1.5">No. Telepon</label>
                         <input type="text" value={adminForm.no_telp}
                           onChange={e => handleAdminChange("no_telp", e.target.value)}
                           placeholder="08xx-xxxx-xxxx (opsional)" className={inputCls} />
                       </div>
-
-                      {/* Password */}
                       <div>
                         <label className="block text-sm font-medium text-slate-300 mb-1.5">
                           Password <span className="text-red-400">*</span>
@@ -912,8 +1069,6 @@ export default function AdminUsersPage() {
                           </button>
                         </div>
                       </div>
-
-                      {/* Konfirmasi Password */}
                       <div>
                         <label className="block text-sm font-medium text-slate-300 mb-1.5">
                           Konfirmasi Password <span className="text-red-400">*</span>
@@ -922,26 +1077,16 @@ export default function AdminUsersPage() {
                           onChange={e => handleAdminChange("password2", e.target.value)}
                           placeholder="Ulangi password" required className={inputCls} />
                       </div>
-
-                      {/* Actions */}
                       <div className="flex gap-3 pt-2">
                         <button type="button" onClick={closeModal}
-                          className="flex-1 py-2.5 bg-slate-700 hover:bg-slate-600 text-slate-300
-                                     font-semibold rounded-lg text-sm transition-colors">
+                          className="flex-1 py-2.5 bg-slate-700 hover:bg-slate-600 text-slate-300 font-semibold rounded-lg text-sm transition-colors">
                           Batal
                         </button>
                         <button type="submit" disabled={submitting}
-                          className="flex-1 py-2.5 bg-orange-600 hover:bg-orange-500 disabled:bg-orange-600/50
-                                     text-white font-semibold rounded-lg text-sm transition-colors
-                                     flex items-center justify-center gap-2">
-                          {submitting ? (
-                            <>
-                              <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                              Memproses…
-                            </>
-                          ) : (
-                            <><UserPlus className="w-4 h-4" /> Buat Akun</>
-                          )}
+                          className="flex-1 py-2.5 bg-orange-600 hover:bg-orange-500 disabled:bg-orange-600/50 text-white font-semibold rounded-lg text-sm transition-colors flex items-center justify-center gap-2">
+                          {submitting
+                            ? <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Memproses…</>
+                            : <><UserPlus className="w-4 h-4" /> Buat Akun</>}
                         </button>
                       </div>
                     </form>
@@ -950,7 +1095,6 @@ export default function AdminUsersPage() {
                   {/* ── FORM: Approver ── */}
                   {isApproverTab && (
                     <form onSubmit={handleApproverSubmit} className="space-y-4">
-                      {/* Nama */}
                       <div>
                         <label className="block text-sm font-medium text-slate-300 mb-1.5">
                           Nama Lengkap <span className="text-red-400">*</span>
@@ -959,8 +1103,6 @@ export default function AdminUsersPage() {
                           onChange={e => handleApproverChange("nama", e.target.value)}
                           placeholder="Nama sesuai KTP" required className={inputCls} />
                       </div>
-
-                      {/* Username */}
                       <div>
                         <label className="block text-sm font-medium text-slate-300 mb-1.5">
                           Username <span className="text-red-400">*</span>
@@ -988,24 +1130,19 @@ export default function AdminUsersPage() {
                           )}
                         </div>
                       </div>
-
-                      {/* Role Approver */}
                       <div>
                         <label className="block text-sm font-medium text-slate-300 mb-1.5">
                           Role Approver <span className="text-red-400">*</span>
                         </label>
                         <div className="relative">
-                          <select
-                            value={approverForm.role}
+                          <select value={approverForm.role}
                             onChange={e => handleApproverChange("role", e.target.value)}
                             required
                             className={`${selectCls} ${approverForm.role ? "text-white" : "text-slate-500"}`}
                           >
                             <option value="" disabled>- Pilih Role -</option>
                             {APPROVER_ROLE_OPTIONS.map(r => (
-                              <option key={r.value} value={r.value} className="text-white bg-slate-700">
-                                {r.label}
-                              </option>
+                              <option key={r.value} value={r.value} className="text-white bg-slate-700">{r.label}</option>
                             ))}
                           </select>
                           <div className="pointer-events-none absolute inset-y-0 right-3 flex items-center">
@@ -1015,16 +1152,13 @@ export default function AdminUsersPage() {
                           </div>
                         </div>
                       </div>
-
-                      {/* Departemen — hanya muncul jika role = SPV */}
                       {approverForm.role === "spv" && (
                         <div>
                           <label className="block text-sm font-medium text-slate-300 mb-1.5">
                             Departemen <span className="text-red-400">*</span>
                           </label>
                           <div className="relative">
-                            <select
-                              value={approverForm.departmen}
+                            <select value={approverForm.departmen}
                               onChange={e => handleApproverChange("departmen", e.target.value)}
                               required
                               className={`${selectCls} ${approverForm.departmen ? "text-white" : "text-slate-500"}`}
@@ -1042,24 +1176,18 @@ export default function AdminUsersPage() {
                           </div>
                         </div>
                       )}
-
-                      {/* Email */}
                       <div>
                         <label className="block text-sm font-medium text-slate-300 mb-1.5">Email</label>
                         <input type="email" value={approverForm.email}
                           onChange={e => handleApproverChange("email", e.target.value)}
                           placeholder="user@company.com (opsional)" className={inputCls} />
                       </div>
-
-                      {/* No Telepon */}
                       <div>
                         <label className="block text-sm font-medium text-slate-300 mb-1.5">No. Telepon</label>
                         <input type="text" value={approverForm.no_telp}
                           onChange={e => handleApproverChange("no_telp", e.target.value)}
                           placeholder="08xx-xxxx-xxxx (opsional)" className={inputCls} />
                       </div>
-
-                      {/* Password */}
                       <div>
                         <label className="block text-sm font-medium text-slate-300 mb-1.5">
                           Password <span className="text-red-400">*</span>
@@ -1074,8 +1202,6 @@ export default function AdminUsersPage() {
                           </button>
                         </div>
                       </div>
-
-                      {/* Konfirmasi Password */}
                       <div>
                         <label className="block text-sm font-medium text-slate-300 mb-1.5">
                           Konfirmasi Password <span className="text-red-400">*</span>
@@ -1084,26 +1210,16 @@ export default function AdminUsersPage() {
                           onChange={e => handleApproverChange("password2", e.target.value)}
                           placeholder="Ulangi password" required className={inputCls} />
                       </div>
-
-                      {/* Actions */}
                       <div className="flex gap-3 pt-2">
                         <button type="button" onClick={closeModal}
-                          className="flex-1 py-2.5 bg-slate-700 hover:bg-slate-600 text-slate-300
-                                     font-semibold rounded-lg text-sm transition-colors">
+                          className="flex-1 py-2.5 bg-slate-700 hover:bg-slate-600 text-slate-300 font-semibold rounded-lg text-sm transition-colors">
                           Batal
                         </button>
                         <button type="submit" disabled={submitting}
-                          className="flex-1 py-2.5 bg-orange-600 hover:bg-orange-500 disabled:bg-orange-600/50
-                                     text-white font-semibold rounded-lg text-sm transition-colors
-                                     flex items-center justify-center gap-2">
-                          {submitting ? (
-                            <>
-                              <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                              Memproses…
-                            </>
-                          ) : (
-                            <><UserPlus className="w-4 h-4" /> Buat Akun</>
-                          )}
+                          className="flex-1 py-2.5 bg-orange-600 hover:bg-orange-500 disabled:bg-orange-600/50 text-white font-semibold rounded-lg text-sm transition-colors flex items-center justify-center gap-2">
+                          {submitting
+                            ? <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Memproses…</>
+                            : <><UserPlus className="w-4 h-4" /> Buat Akun</>}
                         </button>
                       </div>
                     </form>
@@ -1114,6 +1230,20 @@ export default function AdminUsersPage() {
           </div>
         </div>
       )}
+
+      {/* ══════════════════════════════════════════════════════════
+          BARU: Delete Confirmation Modal
+          z-index [60] agar tampil di atas modal register [50]
+      ══════════════════════════════════════════════════════════ */}
+      {deleteTarget && (
+        <DeleteModal
+          target={deleteTarget}
+          onConfirm={handleDelete}
+          onCancel={() => !deleting && setDeleteTarget(null)}
+          loading={deleting}
+        />
+      )}
+
     </div>
   );
 }

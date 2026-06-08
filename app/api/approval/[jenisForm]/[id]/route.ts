@@ -1,16 +1,11 @@
 // app/api/approval/[jenisForm]/[id]/route.ts
-// REFACTOR: Hapus Fire Watch dari approval workflow.
+// UPDATED: Simpan NIK approver dan timestamp per-role saat melakukan approval.
 //
-// WORKFLOW BARU — stage dimulai dari 1:
+// WORKFLOW — stage dimulai dari 1:
 //   Hot-work & Workshop INTERNAL:  1=spv → 2=admin_k3 → 3=sfo → 4=pga(mr_pga)
 //   Hot-work & Workshop EKSTERNAL: 1=kontraktor → 2=spv → 3=admin_k3 → 4=sfo → 5=pga(mr_pga)
 //   Height-work INTERNAL:          1=spv → 2=admin_k3 → 3=sfo → 4=pga(mr_pga)
 //   Height-work EKSTERNAL:         1=kontraktor → 2=spv → 3=admin_k3 → 4=sfo → 5=pga(mr_pga)
-//
-// Catatan penting:
-// - firewatch TIDAK BISA approve. Request dari role firewatch akan ditolak 403.
-// - Form hot-work & workshop yang di-submit: current_stage dimulai dari 1 (SPV/Kontraktor).
-// - Form yang sudah ada di DB dengan current_stage=0 (lama) harus di-migrate ke 1.
 
 import { NextRequest, NextResponse } from 'next/server';
 import { query, queryOne } from '@/lib/db';
@@ -24,12 +19,11 @@ function getUser(req: NextRequest) {
 
 type FormType = 'hot-work' | 'workshop' | 'height-work';
 
-// ── Konfigurasi per form type ────────────────────────────────
 const FORM_CONFIG: Record<FormType, {
-  table:        string;
-  idColumn:     string;
-  pgaApprCol:   string;   // kolom boolean approved terakhir
-  pgaByCol:     string;   // kolom nama approver terakhir
+  table:      string;
+  idColumn:   string;
+  pgaApprCol: string;
+  pgaByCol:   string;
 }> = {
   'hot-work': {
     table:      'form_kerja_panas',
@@ -51,7 +45,6 @@ const FORM_CONFIG: Record<FormType, {
   },
 };
 
-// SQL normalisasi tipe_perusahaan
 const TIPE_EXPR = `CASE
   WHEN tipe_perusahaan IN ('internal','eksternal') THEN tipe_perusahaan
   WHEN petugas_ketinggian ILIKE '%eksternal%' THEN 'eksternal'
@@ -63,32 +56,60 @@ const TIPE_EXPR_FW = `CASE
   ELSE 'internal'
 END`;
 
-// ── Mapping role → kolom DB (approved & approved_by) ────────
-// Dipakai saat PATCH untuk menentukan kolom apa yang harus di-UPDATE.
+// ── Mapping role → kolom DB (approved, approved_by, approved_at, nik) ──
 function getRoleApprovalColumns(role: UserRole, formType: FormType, isLastStage: boolean): {
   approvedCol:   string;
   approvedByCol: string;
+  approvedAtCol: string;
+  approvedNikCol: string;
 } | null {
   const config = FORM_CONFIG[formType];
 
   if (isLastStage) {
     return {
-      approvedCol:   config.pgaApprCol,
-      approvedByCol: config.pgaByCol,
+      approvedCol:    config.pgaApprCol,
+      approvedByCol:  config.pgaByCol,
+      approvedAtCol:  'mr_pga_approved_at',
+      approvedNikCol: 'mr_pga_nik',
     };
   }
 
-  const map: Partial<Record<UserRole, { approvedCol: string; approvedByCol: string }>> = {
-    kontraktor: { approvedCol: 'kontraktor_approved', approvedByCol: 'kontraktor_approved_by' },
-    spv:        { approvedCol: 'spv_approved',        approvedByCol: 'spv_approved_by' },
-    admin_k3:   { approvedCol: 'admin_k3_approved',   approvedByCol: 'admin_k3_approved_by' },
-    sfo:        { approvedCol: 'sfo_approved',        approvedByCol: 'sfo_approved_by' },
+  const map: Partial<Record<UserRole, {
+    approvedCol:    string;
+    approvedByCol:  string;
+    approvedAtCol:  string;
+    approvedNikCol: string;
+  }>> = {
+    kontraktor: {
+      approvedCol:    'kontraktor_approved',
+      approvedByCol:  'kontraktor_approved_by',
+      approvedAtCol:  'kontraktor_approved_at',
+      approvedNikCol: 'kontraktor_nik',
+    },
+    spv: {
+      approvedCol:    'spv_approved',
+      approvedByCol:  'spv_approved_by',
+      approvedAtCol:  'spv_approved_at',
+      approvedNikCol: 'spv_nik',
+    },
+    admin_k3: {
+      approvedCol:    'admin_k3_approved',
+      approvedByCol:  'admin_k3_approved_by',
+      approvedAtCol:  'admin_k3_approved_at',
+      approvedNikCol: 'admin_k3_nik',
+    },
+    sfo: {
+      approvedCol:    'sfo_approved',
+      approvedByCol:  'sfo_approved_by',
+      approvedAtCol:  'sfo_approved_at',
+      approvedNikCol: 'sfo_nik',
+    },
   };
 
   return map[role] ?? null;
 }
 
-// ── GET: Detail satu form untuk halaman approval ─────────────
+// ── GET ──────────────────────────────────────────────────────
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ jenisForm: string; id: string }> }
@@ -111,7 +132,6 @@ export async function GET(
     );
     if (!row) return NextResponse.json({ error: 'Form tidak ditemukan' }, { status: 404 });
 
-    // Normalisasi: pakai tipe_perusahaan_normalized sebagai tipe_perusahaan
     row.tipe_perusahaan = row.tipe_perusahaan_normalized ?? row.tipe_perusahaan;
     return NextResponse.json({ success: true, data: row });
   } catch (err: any) {
@@ -135,7 +155,6 @@ export async function PATCH(
 
   const userRole = user.role as UserRole;
 
-  // HARD BLOCK: firewatch tidak bisa approve sama sekali
   if (userRole === 'firewatch' || userRole === 'worker') {
     return NextResponse.json(
       { error: 'Role Anda tidak memiliki hak untuk melakukan approval.' },
@@ -155,14 +174,12 @@ export async function PATCH(
       return NextResponse.json({ error: 'Catatan reject wajib diisi' }, { status: 400 });
     }
 
-    // Baca form dari DB
     const tipeExpr = formType === 'height-work' ? TIPE_EXPR : TIPE_EXPR_FW;
     const form = await queryOne<{
-      id_form: string;
-      status: string;
-      current_stage: number;
+      id_form:         string;
+      status:          string;
+      current_stage:   number;
       tipe_perusahaan: string;
-      jabatan_pemberi_izin?: string | null;
     }>(
       `SELECT id_form, status, current_stage, (${tipeExpr}) AS tipe_perusahaan
        FROM ${config.table}
@@ -178,7 +195,6 @@ export async function PATCH(
     const tipePerusahaan = form.tipe_perusahaan;
     const currentStage   = form.current_stage;
 
-    // Cek apakah user berhak approve di stage ini
     const canApprove = userRole === 'admin' || canUserApproveAtStage(userRole, currentStage, formType, tipePerusahaan);
     if (!canApprove) {
       const stageMap   = getStageToRoleMap(formType, tipePerusahaan);
@@ -191,6 +207,8 @@ export async function PATCH(
 
     const now      = new Date().toISOString();
     const userName = user.nama || user.username;
+    // Ambil NIK dari user token (pastikan auth.ts include nik)
+    const userNik  = (user as any).nik ?? null;
 
     // ── REJECT ───────────────────────────────────────────────
     if (action === 'reject') {
@@ -207,47 +225,44 @@ export async function PATCH(
     }
 
     // ── APPROVE ──────────────────────────────────────────────
-    const stageConfig  = getStageConfig(formType, tipePerusahaan);
-    const maxStage     = stageConfig.totalStages; // stage terakhir (inklusif)
-    const isLastStage  = currentStage === maxStage;
-    const nextStage    = currentStage + 1;
+    const stageConfig = getStageConfig(formType, tipePerusahaan);
+    const maxStage    = stageConfig.totalStages;
+    const isLastStage = currentStage === maxStage;
+    const nextStage   = currentStage + 1;
 
-    // Kolom yang perlu di-update untuk role ini
     const cols = getRoleApprovalColumns(userRole, formType, isLastStage);
     if (!cols && userRole !== 'admin') {
       return NextResponse.json({ error: 'Tidak dapat menentukan kolom approval untuk role ini' }, { status: 500 });
     }
 
-    // Bangun SET clause dinamis
     const setClauses: string[] = [];
     const queryParams: any[]   = [];
     let   paramIdx             = 1;
 
-    // Mark kolom approval role ini
+    // Mark kolom approval role ini + simpan NIK + timestamp
     if (cols) {
-      setClauses.push(`${cols.approvedCol} = $${paramIdx++}`);   queryParams.push(true);
-      setClauses.push(`${cols.approvedByCol} = $${paramIdx++}`); queryParams.push(userName);
+      setClauses.push(`${cols.approvedCol}    = $${paramIdx++}`); queryParams.push(true);
+      setClauses.push(`${cols.approvedByCol}  = $${paramIdx++}`); queryParams.push(userName);
+      setClauses.push(`${cols.approvedAtCol}  = $${paramIdx++}`); queryParams.push(now);
+      setClauses.push(`${cols.approvedNikCol} = $${paramIdx++}`); queryParams.push(userNik);
     }
 
     // SPV hot-work/workshop: simpan jabatan & NIK pemberi izin
     if (userRole === 'spv' && (formType === 'hot-work' || formType === 'workshop')) {
       setClauses.push(`jabatan_pemberi_izin = $${paramIdx++}`); queryParams.push(user.jabatan || null);
-      setClauses.push(`nik_pemberi_ijin = $${paramIdx++}`);     queryParams.push(String(user.userId) || null);
+      setClauses.push(`nik_pemberi_ijin     = $${paramIdx++}`); queryParams.push(String(user.userId) || null);
     }
 
     if (isLastStage) {
-      // Form selesai disetujui seluruh chain
-      setClauses.push(`status = $${paramIdx++}`);      queryParams.push('approved');
+      setClauses.push(`status      = $${paramIdx++}`); queryParams.push('approved');
       setClauses.push(`approved_by = $${paramIdx++}`); queryParams.push(userName);
       setClauses.push(`approved_at = $${paramIdx++}`); queryParams.push(now);
     } else {
-      // Lanjut ke stage berikutnya
       setClauses.push(`current_stage = $${paramIdx++}`); queryParams.push(nextStage);
     }
 
     setClauses.push(`updated_at = $${paramIdx++}`); queryParams.push(now);
-
-    queryParams.push(id); // untuk WHERE
+    queryParams.push(id);
 
     await query(
       `UPDATE ${config.table} SET ${setClauses.join(', ')} WHERE id_form = $${paramIdx}`,

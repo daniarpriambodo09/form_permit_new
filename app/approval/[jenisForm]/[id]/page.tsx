@@ -3,10 +3,10 @@
 // ADD: Tampilkan section Dokumen JSA untuk semua jenis form.
 //
 // WORKFLOW BARU:
-//   Hot-work & Workshop INTERNAL:  SPV(1) → Admin K3(2) → SFO(3) → MR/PGA(4)
-//   Hot-work & Workshop EKSTERNAL: Kontraktor(1) → SPV(2) → Admin K3(3) → SFO(4) → MR/PGA(5)
-//   Height-work INTERNAL:          SPV(1) → Admin K3(2) → SFO(3) → MR/PGA(4)
-//   Height-work EKSTERNAL:         Kontraktor(1) → SPV(2) → Admin K3(3) → SFO(4) → MR/PGA(5)
+//   Hot-work & Workshop INTERNAL:  SPV(1) → Admin K3(2) → SFO(3) → SMR(4)
+//   Hot-work & Workshop EKSTERNAL: Kontraktor(1) → SPV(2) → Admin K3(3) → SFO(4) → SMR(5)
+//   Height-work INTERNAL:          SPV(1) → Admin K3(2) → SFO(3) → SMR(4)
+//   Height-work EKSTERNAL:         Kontraktor(1) → SPV(2) → Admin K3(3) → SFO(4) → SMR(5)
 "use client";
 import { useState, useEffect, use } from "react";
 import Link from "next/link";
@@ -124,14 +124,14 @@ const renderApprovalChain = (form: any, jenisForm: string) => {
         { label: "SPV", key: "spv", icon: "", dbStage: 2 },
         { label: "Admin K3", key: "admin_k3", icon: "🛡️", dbStage: 3 },
         { label: "SFO", key: "sfo", icon: "", dbStage: 4 },
-        { label: "MR/PGA", key: "mr_pga", icon: "✅", dbStage: 5 },
+        { label: "SMR", key: "mr_pga", icon: "✅", dbStage: 5 },
       ];
     } else {
       stages = [
         { label: "SPV", key: "spv", icon: "👷", dbStage: 1 },
         { label: "Admin K3", key: "admin_k3", icon: "🛡️", dbStage: 2 },
         { label: "SFO", key: "sfo", icon: "🔒", dbStage: 3 },
-        { label: "MR/PGA", key: "mr_pga", icon: "✅", dbStage: 4 },
+        { label: "SMR", key: "mr_pga", icon: "✅", dbStage: 4 },
       ];
     }
   } else {
@@ -141,14 +141,14 @@ const renderApprovalChain = (form: any, jenisForm: string) => {
         { label: "SPV", key: "spv", icon: "", dbStage: 2 },
         { label: "Admin K3", key: "admin_k3", icon: "🛡️", dbStage: 3 },
         { label: "SFO", key: "sfo", icon: "🔒", dbStage: 4 },
-        { label: "MR/PGA", key: "mr_pga", icon: "✅", dbStage: 5 },
+        { label: "SMR", key: "mr_pga", icon: "✅", dbStage: 5 },
       ];
     } else {
       stages = [
         { label: "SPV", key: "spv", icon: "👷", dbStage: 1 },
         { label: "Admin K3", key: "admin_k3", icon: "🛡️", dbStage: 2 },
         { label: "SFO", key: "sfo", icon: "🔒", dbStage: 3 },
-        { label: "MR/PGA", key: "mr_pga", icon: "✅", dbStage: 4 },
+        { label: "SMR", key: "mr_pga", icon: "✅", dbStage: 4 },
       ];
     }
   }
@@ -343,7 +343,7 @@ export default function ApprovalDetailPage({
     kontraktor: "Kontraktor",
     admin_k3: "Admin K3",
     sfo: "SFO",
-    pga: "MR/PGA",
+    pga: "SMR",
     admin: "Admin",
     firewatch: "Fire Watch (Tidak bisa approve)",
     worker: "Worker",
@@ -354,7 +354,7 @@ export default function ApprovalDetailPage({
     if (userRole === "spv") return "Setujui (SPV)";
     if (userRole === "admin_k3") return "Setujui (Admin K3)";
     if (userRole === "sfo") return "Setujui (SFO)";
-    if (userRole === "pga") return "Setujui (MR/PGA)";
+    if (userRole === "pga") return "Setujui (SMR)";
     return "Setujui Form";
   };
 
@@ -435,8 +435,8 @@ export default function ApprovalDetailPage({
               <p className={`text-xs mt-0.5 ${isEksternal ? "text-purple-700" : "text-blue-700"}`}>
                 Alur approval: {" "}
                 {isEksternal
-                  ? "Kontraktor → SPV → Admin K3 → SFO → MR/PGA"
-                  : "SPV → Admin K3 → SFO → MR/PGA"
+                  ? "Kontraktor → SPV → Admin K3 → SFO → SMR"
+                  : "SPV → Admin K3 → SFO → SMR"
                 }
               </p>
             </div>

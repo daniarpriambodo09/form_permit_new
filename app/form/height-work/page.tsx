@@ -351,7 +351,7 @@ export default function HeightWorkFormPage() {
           <p className="text-slate-500 text-sm mb-2">Form izin kerja ketinggian Anda telah berhasil diajukan dan sedang menunggu persetujuan.</p>
           <div className={`text-xs px-3 py-2 rounded-lg mb-4 ${tipePerusahaan === "eksternal" ? "bg-purple-50 text-purple-700 border border-purple-200" : "bg-blue-50 text-blue-700 border border-blue-200"}`}>
             <strong>Alur Approval ({tipePerusahaan === "eksternal" ? "Eksternal" : "Internal"}):</strong>
-            <p className="mt-1">{tipePerusahaan === "eksternal" ? "Kontraktor → SPV → Admin K3 → SFO → MR/PGA" : "SPV → Admin K3 → SFO → MR/PGA"}</p>
+            <p className="mt-1">{tipePerusahaan === "eksternal" ? "Kontraktor → SPV → Admin K3 → SFO → SMR" : "SPV → Admin K3 → SFO → SMR"}</p>
           </div>
           {successId && <p className="text-xs text-slate-400 mb-6">ID Form: <span className="font-mono font-bold text-slate-700">{successId}</span></p>}
           <div className="flex gap-3">
@@ -406,8 +406,8 @@ export default function HeightWorkFormPage() {
                 <label className="block text-sm font-semibold text-slate-700 mb-2">Tipe Petugas Ketinggian <span className="text-red-500">*</span></label>
                 <div className="grid grid-cols-2 gap-3">
                   {[
-                    { value: "internal", label: "Internal / Karyawan PT.JAI", desc: "Alur: SPV → Admin K3 → SFO → MR/PGA" },
-                    { value: "eksternal", label: "Eksternal / Subkontraktor", desc: "Alur: Kontraktor → SPV → Admin K3 → SFO → MR/PGA" },
+                    { value: "internal", label: "Internal / Karyawan PT.JAI", desc: "Alur: SPV → Admin K3 → SFO → SMR" },
+                    { value: "eksternal", label: "Eksternal / Subkontraktor", desc: "Alur: Kontraktor → SPV → Admin K3 → SFO → SMR" },
                   ].map((opt) => (
                     <label key={opt.value} className={`flex flex-col gap-1 p-3 rounded-xl border-2 cursor-pointer transition-all ${tipePerusahaan === opt.value ? "border-orange-400 bg-orange-50" : "border-slate-200 hover:border-orange-200"}`}>
                       <div className="flex items-center gap-2">
