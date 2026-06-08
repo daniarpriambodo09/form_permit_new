@@ -78,17 +78,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Username sudah digunakan' }, { status: 409 });
     }
 
-    // Cek duplikat email (hanya jika email diisi)
-    if (emailValue) {
-      const existingEmail = await queryOne(
-        `SELECT id FROM users WHERE LOWER(email) = LOWER($1)`,
-        [emailValue]
-      );
-      if (existingEmail) {
-        return NextResponse.json({ error: 'Email sudah digunakan' }, { status: 409 });
-      }
-    }
-
     const hashedPassword = await hashPassword(password);
 
     await query(

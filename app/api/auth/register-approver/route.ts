@@ -9,6 +9,7 @@ const APPROVER_ROLES = [
   'admin_k3',
   'sfo',
   'pga',
+  'admin',
 ] as const;
 
 type ApproverRole = (typeof APPROVER_ROLES)[number];
@@ -30,6 +31,7 @@ const JABATAN_LABEL: Record<ApproverRole, string> = {
   admin_k3:  'Admin K3',
   sfo:       'SFO',
   pga:       'PGA',
+  admin:     'Administrator',
 };
 
 export async function POST(req: NextRequest) {
@@ -105,17 +107,6 @@ export async function POST(req: NextRequest) {
     );
     if (existingUsername) {
       return NextResponse.json({ error: 'Username sudah digunakan' }, { status: 409 });
-    }
-
-    // Cek duplikat email
-    if (emailValue) {
-      const existingEmail = await queryOne(
-        `SELECT id FROM users WHERE LOWER(email) = LOWER($1)`,
-        [emailValue]
-      );
-      if (existingEmail) {
-        return NextResponse.json({ error: 'Email sudah digunakan' }, { status: 409 });
-      }
     }
 
     const hashedPassword = await hashPassword(password);
