@@ -174,7 +174,7 @@ async function loadLogoBase64(): Promise<string | null> {
 // ═══════════════════════════════════════════════════════════════════════════
 
 // Logo dimensions di header (kotak 20×15 mm → sesuaikan proporsional 1:1)
-const LOGO_SIZE = 24; // mm — lebar & tinggi sama (gambar safety_first.png square)
+const LOGO_SIZE = 20; // mm — lebar & tinggi sama (gambar safety_first.png square)
 const LOGO_X    = ML;
 const LOGO_Y    = 1;  // vertikal center dalam band 22 mm
 
