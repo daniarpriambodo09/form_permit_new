@@ -1,7 +1,13 @@
 // app/api/profile/password/route.ts
+// FIX: Update password_encrypted bersamaan dengan kolom password (bcrypt).
+//      Sebelumnya hanya kolom `password` yang diupdate, sehingga fitur
+//      "Lihat Password" di /admin-users selalu mengembalikan NO_ENCRYPTED_PASSWORD
+//      setelah user mengganti password.
+
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyToken, verifyPassword, hashPassword, COOKIE_NAME } from '@/lib/auth';
 import { query, queryOne } from '@/lib/db';
+import { encryptPassword } from '@/lib/crypto';
 
 export async function PATCH(req: NextRequest) {
   const token = req.cookies.get(COOKIE_NAME)?.value;
@@ -39,8 +45,17 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: 'Password lama tidak cocok.' }, { status: 400 });
   }
 
-  const newHash = await hashPassword(newPassword);
-  await query(`UPDATE users SET password = $1 WHERE id = $2`, [newHash, payload.userId]);
+  // ── Buat hash bcrypt + enkripsi AES baru ─────────────────────
+  // newHash         → untuk login (bcrypt, one-way) — tidak berubah dari sebelumnya
+  // encryptedPassword → untuk fitur "Lihat Password" (AES-GCM, reversible) — FIX
+  const newHash          = await hashPassword(newPassword);
+  const encryptedPassword = encryptPassword(newPassword);
+
+  // Update kedua kolom sekaligus dalam satu query
+  await query(
+    `UPDATE users SET password = $1, password_encrypted = $2 WHERE id = $3`,
+    [newHash, encryptedPassword, payload.userId]
+  );
 
   return NextResponse.json({ message: 'Password berhasil diubah.' });
 }

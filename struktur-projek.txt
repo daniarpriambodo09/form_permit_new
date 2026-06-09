@@ -1,0 +1,204 @@
+├── app
+│   ├── admin-users
+│   │   ├── page.tsx
+│   ├── api
+│   │   ├── admin-users
+│   │   │   ├── [id]
+│   │   │   ├── approvers
+│   │   │   │   ├── route.ts
+│   │   │   ├── testinggg
+│   │   │   ├── route.ts
+│   │   ├── approval
+│   │   │   ├── [jenisForm]
+│   │   │   ├── route.ts
+│   │   ├── approval-verification
+│   │   │   ├── [jenisForm]
+│   │   ├── auth
+│   │   │   ├── check-username
+│   │   │   │   ├── route.ts
+│   │   │   ├── login
+│   │   │   │   ├── route.ts
+│   │   │   ├── logout
+│   │   │   │   ├── route.ts
+│   │   │   ├── me
+│   │   │   │   ├── route.ts
+│   │   │   ├── register
+│   │   │   │   ├── route.ts
+│   │   │   ├── register-approver
+│   │   │   │   ├── route.ts
+│   │   ├── dashboard
+│   │   │   ├── stats
+│   │   │   │   ├── route.ts
+│   │   ├── files
+│   │   │   ├── lisensi
+│   │   │   │   ├── [...path]
+│   │   ├── form-files
+│   │   │   ├── route.ts
+│   │   ├── forms
+│   │   │   ├── height-work
+│   │   │   │   ├── [id]
+│   │   │   │   ├── by-token
+│   │   │   │   │   ├── route.ts
+│   │   │   │   ├── route.ts
+│   │   │   ├── hot-work
+│   │   │   │   ├── [id]
+│   │   │   │   ├── by-token
+│   │   │   │   │   ├── route.ts
+│   │   │   │   ├── route.ts
+│   │   │   ├── track
+│   │   │   │   ├── route.ts
+│   │   │   ├── workshop
+│   │   │   │   ├── [id]
+│   │   │   │   ├── by-token
+│   │   │   │   │   ├── route.ts
+│   │   │   │   ├── route.ts
+│   │   ├── health
+│   │   │   ├── route.ts
+│   │   ├── my-forms
+│   │   │   ├── route.ts
+│   │   ├── profile
+│   │   │   ├── password
+│   │   │   │   ├── route.ts
+│   │   │   ├── username
+│   │   │   │   ├── route.ts
+│   │   ├── upload
+│   │   │   ├── jsa
+│   │   │   │   ├── [filename]
+│   │   │   │   ├── route.ts
+│   │   │   ├── lisensi
+│   │   │   │   ├── route.ts
+│   ├── approval
+│   │   ├── [jenisForm]
+│   │   ├── page.tsx
+│   ├── approval-verification
+│   │   ├── [jenisForm]
+│   ├── dashboard
+│   │   ├── page.tsx
+│   ├── form
+│   │   ├── height-work
+│   │   │   ├── page.tsx
+│   │   │   ├── page.txt
+│   │   ├── hot-work
+│   │   │   ├── edit
+│   │   │   │   ├── [token]
+│   │   │   ├── page.tsx
+│   │   │   ├── page.txt
+│   │   ├── track
+│   │   │   ├── page.tsx
+│   │   ├── workshop
+│   │   │   ├── page.tsx
+│   │   │   ├── page.txt
+│   ├── form-files
+│   │   ├── page.tsx
+│   ├── history
+│   │   ├── page.tsx
+│   ├── home
+│   │   ├── page.tsx
+│   ├── login
+│   │   ├── approver
+│   │   │   ├── ApproverLoginPage.tsx
+│   │   │   ├── page.tsx
+│   │   ├── worker
+│   │   │   ├── page.tsx
+│   │   │   ├── WorkerLoginPage.tsx
+│   │   ├── LoginPage.tsx
+│   │   ├── page.tsx
+│   ├── my-forms
+│   │   ├── page.tsx
+│   ├── profile
+│   │   ├── page.tsx
+│   ├── register
+│   │   ├── page.tsx
+│   ├── favicon.ico
+│   ├── globals.css
+│   ├── layout.tsx
+│   ├── page.tsx
+│   ├── README.md
+├── components
+│   ├── ApprovalQRCard.tsx
+│   ├── ApprovalStatusChain.tsx
+│   ├── DetailModal.tsx
+│   ├── EditableForms.tsx
+│   ├── EditModal.tsx
+│   ├── form-selection-modal.tsx
+│   ├── JsaUploadSection.tsx
+│   ├── PetugasLisensiSection.tsx
+├── lib
+│   ├── auth.ts
+│   ├── crypto.ts
+│   ├── db.ts
+│   ├── firewatch.ts
+│   ├── generatePermitPdf.ts
+│   ├── supabase.ts
+├── public
+│   ├── images
+│   │   ├── Cek_Body_Harness.jpg
+│   │   ├── safety_first.png
+│   ├── uploads
+│   │   ├── jsa
+│   │   │   ├── jsa_1780463711183_Firewatch_per_dept.xlsx
+│   │   │   ├── jsa_1780476744987_Firewatch_per_dept.xlsx
+│   │   │   ├── jsa_1780477774948_Firewatch_per_dept.xlsx
+│   │   │   ├── jsa_1780734698974_jsa_1780477774948_Firewatch_per_dept.xlsx
+│   │   │   ├── jsa_1780885928946_dokumen-prosedur-2026-06-07__2_.xlsx
+│   │   ├── lisensi
+│   │   │   ├── temp
+│   │   │   │   ├── petugas_01_1775905102860.png
+│   │   │   │   ├── petugas_01_1775905952363.png
+│   │   │   │   ├── petugas_01_1775923655392.png
+│   │   │   │   ├── petugas_01_1775938447699.png
+│   │   │   │   ├── petugas_01_1776325604617.png
+│   │   │   │   ├── petugas_01_1776842156348.png
+│   │   │   │   ├── petugas_01_1777883755124.png
+│   │   │   │   ├── petugas_01_1777884217556.png
+│   │   │   │   ├── petugas_01_1777884689465.png
+│   │   │   │   ├── petugas_01_1777885731526.png
+│   │   │   │   ├── petugas_01_1777885824898.png
+│   │   │   │   ├── petugas_01_1777886506692.png
+│   │   │   │   ├── petugas_01_1777886822259.png
+│   │   │   │   ├── petugas_01_1777904402792.png
+│   │   │   │   ├── petugas_02_1775923661140.png
+│   │   │   │   ├── petugas_02_1775938450940.png
+│   │   │   │   ├── petugas_03_1775938453859.png
+│   ├── file.svg
+│   ├── globe.svg
+│   ├── logo-k3.png
+│   ├── next.svg
+│   ├── vercel.svg
+│   ├── window.svg
+├── uploads
+│   ├── lisensi
+│   │   ├── temp
+│   │   │   ├── petugas_01_1777905439359.png
+│   │   │   ├── petugas_01_1777905613384.png
+│   │   │   ├── petugas_01_1780459905989.png
+│   │   │   ├── petugas_01_1780885872032.png
+│   │   │   ├── petugas_02_1777905452809.png
+│   │   │   ├── petugas_02_1777905620198.png
+│   │   │   ├── petugas_02_1780459909768.png
+│   │   │   ├── petugas_02_1780885880201.png
+│   │   │   ├── petugas_03_1777905633273.png
+│   │   │   ├── petugas_03_1780459914223.png
+│   │   │   ├── petugas_03_1780885904851.png
+├── .env.local
+├── .gitignore
+├── backup_before_remove_firewatch.sql
+├── backup_ga.sql
+├── backup_pemit.sql
+├── daftar_kode.txt
+├── daftar-tabel.txt
+├── database.txt
+├── eslint.config.mjs
+├── form-permit.zip
+├── middleware.ts
+├── migration_remove_firewatch_stage.sql
+├── next-env.d.ts
+├── next.config.ts
+├── package-lock.json
+├── package.json
+├── postcss.config.mjs
+├── README.md
+├── struktur-database.txt
+├── struktur-projek.txt
+├── struktur.txt
+├── tsconfig.json

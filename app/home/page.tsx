@@ -1,5 +1,6 @@
-// app/home/page.tsx  — PATCH: nama user di header menjadi link ke /profile
-// Hanya bagian header yang berubah; seluruh sisa file identik dengan aslinya.
+// app/home/page.tsx
+// PATCH: nama user di header menjadi link ke /profile
+// PATCH: SPV mendapat quick access card "Kelola Akun Departemen" → /admin-users
 "use client";
 import { useEffect, useState } from "react";
 import Link from "next/link";
@@ -56,6 +57,24 @@ function getQuickAccessCards(role: UserRole): QuickAccessCard[] {
         description: "Lihat dan buka file PDF form tanpa perlu mengunduh terlebih dahulu.",
         href: "/form-files",
         icon: FileText,
+      },
+    ];
+  }
+
+  if (role === "spv") {
+    return [
+      {
+        title: "Daftar Form",
+        description: "Lihat dan proses form yang memerlukan approval dari departemen Anda",
+        href: "/approval",
+        icon: ClipboardList,
+      },
+      // ── BARU: SPV bisa kelola akun departemennya ──────────────
+      {
+        title: "Kelola Akun Departemen",
+        description: "Tambah atau hapus akun Administrator di departemen Anda",
+        href: "/admin-users",
+        icon: Users,
       },
     ];
   }
@@ -181,7 +200,6 @@ export default function HomePage() {
             {/* User info (link ke profil) + Logout */}
             <div className="flex items-center gap-3">
               {userName && (
-                // ── PERUBAHAN: bungkus dengan Link ke /profile ──────────
                 <Link
                   href="/profile"
                   className="hidden md:flex items-center gap-2 bg-slate-100 hover:bg-orange-50
@@ -192,7 +210,6 @@ export default function HomePage() {
                     {userName}
                   </span>
                 </Link>
-                // ── AKHIR PERUBAHAN ──────────────────────────────────────
               )}
               <button
                 onClick={handleLogout}

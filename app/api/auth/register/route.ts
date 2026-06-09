@@ -1,25 +1,16 @@
 // app/api/auth/register/route.ts
-// UPDATED: SPV dapat membuat Administrator Departemen untuk departemennya sendiri.
-//
-// Behavior:
-//   role = admin  → boleh pilih departemen bebas (seperti sebelumnya)
-//   role = spv    → departemen DIPAKSA = departmen SPV dari DB
-//                   (field 'departmen' dari request body diabaikan)
-//   role lain     → 403
+// UPDATED: Simpan password_encrypted (AES-256-GCM) bersamaan dengan hash bcrypt.
+//          Kolom password_encrypted TIDAK dipakai untuk login.
+//          Login tetap menggunakan kolom password (bcrypt hash).
 
 import { NextRequest, NextResponse } from 'next/server';
 import { query, queryOne } from '@/lib/db';
 import { hashPassword, verifyToken, COOKIE_NAME } from '@/lib/auth';
+import { encryptPassword } from '@/lib/crypto';
 
 const ALLOWED_DEPARTMENTS = [
-  "QA",
-  "ENG",
-  "MTC",
-  "PRODUKSI",
-  "NYS",
-  "FATP-Exim",
-  "MPC-WHS",
-  "PGA",
+  "QA", "ENG", "MTC", "PRODUKSI",
+  "NYS", "FATP-Exim", "MPC-WHS", "PGA",
 ] as const;
 
 export async function POST(req: NextRequest) {
@@ -54,14 +45,11 @@ export async function POST(req: NextRequest) {
     let finalDepartmen: string;
 
     if (role === 'spv') {
-      // SPV: ambil departmen dari DB — ABAIKAN bodyDepartmen
-      // Ini mencegah privilege escalation meski request dimanipulasi
       const spvRow = await queryOne<{ departmen: string | null }>(
         `SELECT departmen FROM users WHERE id = $1`,
         [userId]
       );
       const spvDepartmen = spvRow?.departmen ?? null;
-
       if (!spvDepartmen) {
         return NextResponse.json(
           { error: 'Akun SPV Anda tidak memiliki departemen. Hubungi administrator.' },
@@ -70,7 +58,6 @@ export async function POST(req: NextRequest) {
       }
       finalDepartmen = spvDepartmen;
     } else {
-      // Admin: gunakan departmen dari body, validasi seperti semula
       if (!bodyDepartmen) {
         return NextResponse.json({ error: 'Departemen wajib dipilih' }, { status: 400 });
       }
@@ -116,17 +103,24 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Username sudah digunakan' }, { status: 409 });
     }
 
-    const hashedPassword = await hashPassword(password);
+    // ── Hash + enkripsi password ─────────────────────────────
+    // hashedPassword → untuk login (bcrypt, one-way)
+    // encryptedPassword → untuk fitur "Lihat Password" (AES-GCM, reversible)
+    const hashedPassword    = await hashPassword(password);
+    const encryptedPassword = encryptPassword(password);
 
     await query(
-      `INSERT INTO users (username, password, nama, perusahaan, departmen, email, no_telp, jabatan, role, is_active)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+      `INSERT INTO users
+         (username, password, password_encrypted, nama, perusahaan, departmen,
+          email, no_telp, jabatan, role, is_active)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
       [
         username.toLowerCase().trim(),
         hashedPassword,
+        encryptedPassword,           // AES-GCM — BUKAN untuk login
         nama,
         perusahaan,
-        finalDepartmen,                                // selalu dari DB untuk SPV
+        finalDepartmen,
         emailValue ? emailValue.toLowerCase() : null,
         no_telp || null,
         'Administrator Departemen',
@@ -136,9 +130,9 @@ export async function POST(req: NextRequest) {
     );
 
     return NextResponse.json({
-      success:    true,
-      message:    'Akun Administrator Departemen berhasil dibuat.',
-      departmen:  finalDepartmen,                      // kembalikan ke frontend untuk konfirmasi
+      success:   true,
+      message:   'Akun Administrator Departemen berhasil dibuat.',
+      departmen: finalDepartmen,
     }, { status: 201 });
 
   } catch (err: unknown) {

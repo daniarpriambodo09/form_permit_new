@@ -81,7 +81,7 @@ export default function HomePage() {
                        text-white rounded-xl font-semibold text-lg transition-colors shadow-lg shadow-slate-700/30 border border-slate-600"
           >
             <ShieldCheck className="w-5 h-5" />
-            Login Approver / Admin
+            Login Approver
           </Link>
         </div>
 

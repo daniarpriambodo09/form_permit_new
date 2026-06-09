@@ -1,37 +1,30 @@
 // app/api/auth/register-approver/route.ts
+// UPDATED: Simpan password_encrypted (AES-256-GCM) bersamaan dengan hash bcrypt.
+//          Kolom password_encrypted TIDAK dipakai untuk login.
+
 import { NextRequest, NextResponse } from 'next/server';
 import { query, queryOne } from '@/lib/db';
 import { hashPassword, verifyToken, COOKIE_NAME } from '@/lib/auth';
+import { encryptPassword } from '@/lib/crypto';
 
 const APPROVER_ROLES = [
-  'spv',
-  'kontraktor',
-  'admin_k3',
-  'sfo',
-  'pga',
-  'admin',
+  'spv', 'kontraktor', 'admin_k3', 'sfo', 'smr', 'admin',
 ] as const;
 
 type ApproverRole = (typeof APPROVER_ROLES)[number];
 
 const DEPARTMENT_OPTIONS = [
-  "QA",
-  "ENG",
-  "MTC",
-  "PRODUKSI",
-  "NYS",
-  "FATP-Exim",
-  "MPC-WHS",
-  "PGA",
+  "QA", "ENG", "MTC", "PRODUKSI",
+  "NYS", "FATP-Exim", "MPC-WHS", "PGA",
 ] as const;
 
 const JABATAN_LABEL: Record<ApproverRole, string> = {
-  spv:       'Supervisor',
+  spv:        'Supervisor',
   kontraktor: 'Kontraktor',
-  admin_k3:  'Admin K3',
-  sfo:       'SFO',
-  pga:       'PGA',
-  admin:     'Administrator',
+  admin_k3:   'Admin K3',
+  sfo:        'SFO',
+  smr:        'SMR',
+  admin:      'Administrator',
 };
 
 export async function POST(req: NextRequest) {
@@ -50,18 +43,17 @@ export async function POST(req: NextRequest) {
       { status: 403 }
     );
   }
-  // ── AKHIR validasi admin ──────────────────────────────────────
 
   try {
     const { nama, username, role, departmen, email, no_telp, password } =
       await req.json();
 
-    // Validasi password
+    // ── Validasi password ────────────────────────────────────
     if (!password || password.length < 6) {
       return NextResponse.json({ error: 'Password minimal 6 karakter' }, { status: 400 });
     }
 
-    // Validasi username
+    // ── Validasi username ────────────────────────────────────
     const usernameRegex = /^[a-zA-Z0-9_]{3,20}$/;
     if (!usernameRegex.test(username)) {
       return NextResponse.json(
@@ -70,14 +62,14 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Validasi role
+    // ── Validasi role ────────────────────────────────────────
     if (!role || !(APPROVER_ROLES as readonly string[]).includes(role)) {
       return NextResponse.json({ error: 'Role approver tidak valid' }, { status: 400 });
     }
 
     const approverRole = role as ApproverRole;
 
-    // Validasi departemen — wajib hanya untuk SPV
+    // ── Validasi departemen (wajib untuk SPV) ────────────────
     if (approverRole === 'spv') {
       if (!departmen) {
         return NextResponse.json({ error: 'Departemen wajib dipilih untuk role SPV' }, { status: 400 });
@@ -87,7 +79,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Validasi email — opsional, tapi jika diisi harus valid
+    // ── Validasi email (opsional) ────────────────────────────
     const emailValue: string | null =
       email && typeof email === 'string' && email.trim() !== ''
         ? email.trim()
@@ -100,7 +92,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Cek duplikat username
+    // ── Cek duplikat username ────────────────────────────────
     const existingUsername = await queryOne(
       `SELECT id FROM users WHERE username = $1`,
       [username.toLowerCase().trim()]
@@ -109,18 +101,21 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Username sudah digunakan' }, { status: 409 });
     }
 
-    const hashedPassword = await hashPassword(password);
+    // ── Hash + enkripsi password ─────────────────────────────
+    const hashedPassword    = await hashPassword(password);
+    const encryptedPassword = encryptPassword(password);
 
-    // departemen: diisi untuk SPV, null untuk role lainnya
-    const departmenValue =
-      approverRole === 'spv' ? departmen : null;
+    const departmenValue = approverRole === 'spv' ? departmen : null;
 
     await query(
-      `INSERT INTO users (username, password, nama, departmen, email, no_telp, jabatan, role, is_active)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+      `INSERT INTO users
+         (username, password, password_encrypted, nama, departmen,
+          email, no_telp, jabatan, role, is_active)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
       [
         username.toLowerCase().trim(),
         hashedPassword,
+        encryptedPassword,           // AES-GCM — BUKAN untuk login
         nama,
         departmenValue ?? null,
         emailValue ? emailValue.toLowerCase() : null,
@@ -135,6 +130,7 @@ export async function POST(req: NextRequest) {
       success: true,
       message: `Akun ${JABATAN_LABEL[approverRole]} berhasil dibuat.`,
     }, { status: 201 });
+
   } catch (err: unknown) {
     console.error('[POST /api/auth/register-approver]', err);
     return NextResponse.json({ error: 'Terjadi kesalahan server' }, { status: 500 });

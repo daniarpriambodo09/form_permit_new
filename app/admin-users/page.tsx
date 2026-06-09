@@ -1,5 +1,12 @@
 // app/admin-users/page.tsx
-// UPDATED: Halaman sekarang mendukung dua mode berdasarkan role login:
+// UPDATED v3: Tambah fitur "Lihat Password" per baris.
+//   - Password diambil on-demand (klik tombol mata), tidak di-load semua sekaligus.
+//   - State per row disimpan di Map<id, { visible, password, loading, error }>.
+//   - Backend /api/admin-users/[id]/password memvalidasi ulang role & departmen.
+//   - Kolom Password muncul di tabel Administrator Departemen dan tabel Approver.
+//   - SPV: tombol Password hanya aktif di tabel worker (tabel Approver tidak ada untuk SPV).
+//
+// UPDATED v2: Halaman sekarang mendukung dua mode berdasarkan role login:
 //
 //   role = admin  → tampilan lengkap: Tab "Administrator Departemen" + Tab "Approver"
 //                   Auth check tetap memastikan hanya admin yang bisa akses.
@@ -303,6 +310,54 @@ export default function AdminUsersPage() {
   // ── Delete state ──────────────────────────────────────────────
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
   const [deleting,     setDeleting]     = useState(false);
+
+  // ── Password reveal state ─────────────────────────────────────
+  // Map<userId, { visible, password, loading, error }>
+  // Disimpan per baris, diambil on-demand saat tombol mata diklik.
+  // Tidak pernah dikirim lewat endpoint daftar user.
+  type PassState = { visible: boolean; password: string | null; loading: boolean; error: string | null };
+  const [revealedPasswords, setRevealedPasswords] = useState<Map<number, PassState>>(new Map());
+
+  const getPassState = (id: number): PassState =>
+    revealedPasswords.get(id) ?? { visible: false, password: null, loading: false, error: null };
+
+  const setPassState = (id: number, patch: Partial<PassState>) =>
+    setRevealedPasswords(prev => {
+      const next = new Map(prev);
+      next.set(id, { ...getPassState(id), ...patch });
+      return next;
+    });
+
+  const handleTogglePassword = async (userId: number) => {
+    const state = getPassState(userId);
+
+    // Sudah ada password di state → toggle visible saja, tanpa fetch ulang
+    if (state.password !== null) {
+      setPassState(userId, { visible: !state.visible });
+      return;
+    }
+
+    // Belum ada → fetch dari backend
+    setPassState(userId, { loading: true, error: null, visible: false });
+    try {
+      const res = await fetch(
+        `/form-permit/api/admin-users/${userId}/password`,
+        { credentials: "include" }
+      );
+      const data = await res.json();
+      if (!res.ok) {
+        setPassState(userId, {
+          loading: false,
+          error: data.error ?? "Gagal mengambil password.",
+          visible: false,
+        });
+        return;
+      }
+      setPassState(userId, { loading: false, password: data.password, visible: true, error: null });
+    } catch {
+      setPassState(userId, { loading: false, error: "Terjadi kesalahan koneksi.", visible: false });
+    }
+  };
 
   const handleDelete = async () => {
     if (!deleteTarget) return;
@@ -711,6 +766,7 @@ export default function AdminUsersPage() {
                         <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">No. Telepon</th>
                         <th className="text-center px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Status</th>
                         <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Dibuat Pada</th>
+                        <th className="text-center px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Password</th>
                         <th className="text-center px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Aksi</th>
                       </tr>
                     </thead>
@@ -777,6 +833,50 @@ export default function AdminUsersPage() {
                               <span className="text-xs">{formatDate(user.created_at)}</span>
                             </div>
                           </td>
+                          {/* ── Kolom Password ── */}
+                          <td className="px-4 py-4 text-center">
+                            {(() => {
+                              const ps = getPassState(user.id);
+                              return (
+                                <div className="flex items-center gap-2 justify-center min-w-[120px]">
+                                  {ps.loading ? (
+                                    <span className="w-4 h-4 border-2 border-slate-300 border-t-orange-500 rounded-full animate-spin inline-block" />
+                                  ) : ps.error ? (
+                                    <span
+                                      title={ps.error}
+                                      className="text-xs text-red-500 truncate max-w-[100px]"
+                                    >
+                                      {ps.error.includes("sebelum fitur") ? "Belum tersedia" : ps.error}
+                                    </span>
+                                  ) : ps.visible && ps.password ? (
+                                    <>
+                                      <code className="text-xs font-mono bg-yellow-50 text-yellow-800 border border-yellow-200 px-2 py-0.5 rounded select-all">
+                                        {ps.password}
+                                      </code>
+                                      <button
+                                        onClick={() => handleTogglePassword(user.id)}
+                                        title="Sembunyikan password"
+                                        className="p-1 text-slate-400 hover:text-slate-600 transition-colors flex-shrink-0"
+                                      >
+                                        <EyeOff className="w-3.5 h-3.5" />
+                                      </button>
+                                    </>
+                                  ) : (
+                                    <button
+                                      onClick={() => handleTogglePassword(user.id)}
+                                      title="Lihat password"
+                                      className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium
+                                                 text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg
+                                                 transition-colors border border-slate-200"
+                                    >
+                                      <Eye className="w-3.5 h-3.5" />
+                                      Lihat
+                                    </button>
+                                  )}
+                                </div>
+                              );
+                            })()}
+                          </td>
                           <td className="px-4 py-4 text-center">
                             <button
                               onClick={() => setDeleteTarget({
@@ -842,6 +942,7 @@ export default function AdminUsersPage() {
                         <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">No. Telepon</th>
                         <th className="text-center px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Status</th>
                         <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Dibuat Pada</th>
+                        <th className="text-center px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Password</th>
                         <th className="text-center px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Aksi</th>
                       </tr>
                     </thead>
@@ -906,6 +1007,50 @@ export default function AdminUsersPage() {
                               <Calendar className="w-3.5 h-3.5 shrink-0" />
                               <span className="text-xs">{formatDate(user.created_at)}</span>
                             </div>
+                          </td>
+                          {/* ── Kolom Password (hanya admin) ── */}
+                          <td className="px-4 py-4 text-center">
+                            {(() => {
+                              const ps = getPassState(user.id);
+                              return (
+                                <div className="flex items-center gap-2 justify-center min-w-[120px]">
+                                  {ps.loading ? (
+                                    <span className="w-4 h-4 border-2 border-slate-300 border-t-orange-500 rounded-full animate-spin inline-block" />
+                                  ) : ps.error ? (
+                                    <span
+                                      title={ps.error}
+                                      className="text-xs text-red-500 truncate max-w-[100px]"
+                                    >
+                                      {ps.error.includes("sebelum fitur") ? "Belum tersedia" : ps.error}
+                                    </span>
+                                  ) : ps.visible && ps.password ? (
+                                    <>
+                                      <code className="text-xs font-mono bg-yellow-50 text-yellow-800 border border-yellow-200 px-2 py-0.5 rounded select-all">
+                                        {ps.password}
+                                      </code>
+                                      <button
+                                        onClick={() => handleTogglePassword(user.id)}
+                                        title="Sembunyikan password"
+                                        className="p-1 text-slate-400 hover:text-slate-600 transition-colors flex-shrink-0"
+                                      >
+                                        <EyeOff className="w-3.5 h-3.5" />
+                                      </button>
+                                    </>
+                                  ) : (
+                                    <button
+                                      onClick={() => handleTogglePassword(user.id)}
+                                      title="Lihat password"
+                                      className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium
+                                                 text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg
+                                                 transition-colors border border-slate-200"
+                                    >
+                                      <Eye className="w-3.5 h-3.5" />
+                                      Lihat
+                                    </button>
+                                  )}
+                                </div>
+                              );
+                            })()}
                           </td>
                           <td className="px-4 py-4 text-center">
                             <button
