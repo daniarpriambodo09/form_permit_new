@@ -4,6 +4,10 @@
 //           Kolom DB mr_pga_approved, mr_pga_approved_by, mr_pga_approved_at, mr_pga_nik
 //           TIDAK diubah — tetap digunakan untuk kompatibilitas data lama.
 //
+// ADDED: SPV hanya bisa melihat & approve form dari departemen yang sama dengan pembuatnya.
+//        Filter diterapkan di GET (fetch detail) dan PATCH (approve/reject).
+//        Role lain (admin, admin_k3, sfo, smr, kontraktor) tidak terpengaruh.
+//
 // WORKFLOW — stage dimulai dari 1:
 //   Hot-work & Workshop INTERNAL:  1=spv → 2=admin_k3 → 3=sfo → 4=smr
 //   Hot-work & Workshop EKSTERNAL: 1=kontraktor → 2=spv → 3=admin_k3 → 4=sfo → 5=smr
@@ -25,14 +29,14 @@ type FormType = 'hot-work' | 'workshop' | 'height-work';
 const FORM_CONFIG: Record<FormType, {
   table:      string;
   idColumn:   string;
-  pgaApprCol: string;  // kolom DB tetap mr_pga_* untuk kompatibilitas
+  pgaApprCol: string;
   pgaByCol:   string;
 }> = {
   'hot-work': {
     table:      'form_kerja_panas',
     idColumn:   'id_form',
-    pgaApprCol: 'mr_pga_approved',    // kolom DB tidak diubah
-    pgaByCol:   'mr_pga_approved_by', // kolom DB tidak diubah
+    pgaApprCol: 'mr_pga_approved',
+    pgaByCol:   'mr_pga_approved_by',
   },
   'workshop': {
     table:      'form_kerja_workshop',
@@ -59,23 +63,33 @@ const TIPE_EXPR_FW = `CASE
   ELSE 'internal'
 END`;
 
+// ── Helper: ambil departmen SPV yang sedang login dari DB ────
+// Diperlukan karena JWT payload tidak menyimpan departmen.
+// Mengembalikan null jika bukan SPV (sehingga filter tidak diterapkan).
+async function getSpvDepartmen(userId: number, role: UserRole): Promise<string | null> {
+  if (role !== 'spv') return null;
+  const row = await queryOne<{ departmen: string | null }>(
+    `SELECT departmen FROM users WHERE id = $1`,
+    [userId]
+  );
+  return row?.departmen ?? null;
+}
+
 // ── Mapping role → kolom DB (approved, approved_by, approved_at, nik) ──
-// CATATAN: role 'smr' (dahulu 'pga') memetakan ke kolom mr_pga_* yang tidak diubah.
 function getRoleApprovalColumns(role: UserRole, formType: FormType, isLastStage: boolean): {
-  approvedCol:   string;
-  approvedByCol: string;
-  approvedAtCol: string;
+  approvedCol:    string;
+  approvedByCol:  string;
+  approvedAtCol:  string;
   approvedNikCol: string;
 } | null {
   const config = FORM_CONFIG[formType];
 
-  // Stage terakhir = role 'smr' (dahulu 'pga') → kolom DB mr_pga_* tetap
   if (isLastStage) {
     return {
-      approvedCol:    config.pgaApprCol,       // mr_pga_approved
-      approvedByCol:  config.pgaByCol,          // mr_pga_approved_by
-      approvedAtCol:  'mr_pga_approved_at',     // kolom DB tidak diubah
-      approvedNikCol: 'mr_pga_nik',             // kolom DB tidak diubah
+      approvedCol:    config.pgaApprCol,
+      approvedByCol:  config.pgaByCol,
+      approvedAtCol:  'mr_pga_approved_at',
+      approvedNikCol: 'mr_pga_nik',
     };
   }
 
@@ -109,7 +123,6 @@ function getRoleApprovalColumns(role: UserRole, formType: FormType, isLastStage:
       approvedAtCol:  'sfo_approved_at',
       approvedNikCol: 'sfo_nik',
     },
-    // 'smr' tidak ada di sini karena selalu isLastStage=true saat gilirannya
   };
 
   return map[role] ?? null;
@@ -130,13 +143,41 @@ export async function GET(
 
   try {
     const tipeExpr = formType === 'height-work' ? TIPE_EXPR : TIPE_EXPR_FW;
-    const row = await queryOne(
-      `SELECT *, (${tipeExpr}) AS tipe_perusahaan_normalized
-       FROM ${config.table}
-       WHERE ${config.idColumn} = $1`,
-      [id]
-    );
-    if (!row) return NextResponse.json({ error: 'Form tidak ditemukan' }, { status: 404 });
+
+    // Ambil departmen SPV jika role = spv
+    const spvDepartmen = await getSpvDepartmen(user.userId, user.role as UserRole);
+
+    // Jika SPV: JOIN ke users pembuat form, filter departmen pembuat = departmen SPV
+    // Jika role lain: query biasa tanpa filter departmen
+    let row: any;
+    if (spvDepartmen !== null) {
+      row = await queryOne(
+        `SELECT f.*, (${tipeExpr.replace(/tipe_perusahaan/g, 'f.tipe_perusahaan').replace(/petugas_ketinggian/g, 'f.petugas_ketinggian')}) AS tipe_perusahaan_normalized
+         FROM ${config.table} f
+         JOIN users creator ON creator.id = f.user_id
+         WHERE f.${config.idColumn} = $1
+           AND creator.departmen = $2`,
+        [id, spvDepartmen]
+      );
+    } else {
+      row = await queryOne(
+        `SELECT *, (${tipeExpr}) AS tipe_perusahaan_normalized
+         FROM ${config.table}
+         WHERE ${config.idColumn} = $1`,
+        [id]
+      );
+    }
+
+    if (!row) {
+      // SPV: kembalikan 403 (bukan 404) agar tidak leak bahwa form ada tapi beda departmen
+      if (spvDepartmen !== null) {
+        return NextResponse.json(
+          { error: 'Form tidak ditemukan atau bukan dari departemen Anda.' },
+          { status: 403 }
+        );
+      }
+      return NextResponse.json({ error: 'Form tidak ditemukan' }, { status: 404 });
+    }
 
     row.tipe_perusahaan = row.tipe_perusahaan_normalized ?? row.tipe_perusahaan;
     return NextResponse.json({ success: true, data: row });
@@ -181,19 +222,41 @@ export async function PATCH(
     }
 
     const tipeExpr = formType === 'height-work' ? TIPE_EXPR : TIPE_EXPR_FW;
-    const form = await queryOne<{
-      id_form:         string;
-      status:          string;
-      current_stage:   number;
-      tipe_perusahaan: string;
-    }>(
-      `SELECT id_form, status, current_stage, (${tipeExpr}) AS tipe_perusahaan
-       FROM ${config.table}
-       WHERE id_form = $1`,
-      [id]
-    );
 
-    if (!form) return NextResponse.json({ error: 'Form tidak ditemukan' }, { status: 404 });
+    // Ambil departmen SPV jika role = spv
+    const spvDepartmen = await getSpvDepartmen(user.userId, userRole);
+
+    // Fetch form — dengan atau tanpa departmen filter
+    let form: { id_form: string; status: string; current_stage: number; tipe_perusahaan: string } | null;
+
+    if (spvDepartmen !== null) {
+      form = await queryOne<{ id_form: string; status: string; current_stage: number; tipe_perusahaan: string }>(
+        `SELECT f.id_form, f.status, f.current_stage, (${tipeExpr.replace(/tipe_perusahaan/g, 'f.tipe_perusahaan').replace(/petugas_ketinggian/g, 'f.petugas_ketinggian')}) AS tipe_perusahaan
+         FROM ${config.table} f
+         JOIN users creator ON creator.id = f.user_id
+         WHERE f.id_form = $1
+           AND creator.departmen = $2`,
+        [id, spvDepartmen]
+      );
+    } else {
+      form = await queryOne<{ id_form: string; status: string; current_stage: number; tipe_perusahaan: string }>(
+        `SELECT id_form, status, current_stage, (${tipeExpr}) AS tipe_perusahaan
+         FROM ${config.table}
+         WHERE id_form = $1`,
+        [id]
+      );
+    }
+
+    if (!form) {
+      if (spvDepartmen !== null) {
+        return NextResponse.json(
+          { error: 'Form tidak ditemukan atau bukan dari departemen Anda.' },
+          { status: 403 }
+        );
+      }
+      return NextResponse.json({ error: 'Form tidak ditemukan' }, { status: 404 });
+    }
+
     if (form.status !== 'submitted') {
       return NextResponse.json({ error: `Form status "${form.status}" tidak bisa di-approve/reject` }, { status: 400 });
     }
@@ -213,7 +276,6 @@ export async function PATCH(
 
     const now      = new Date().toISOString();
     const userName = user.nama || user.username;
-    // Ambil NIK dari user token (pastikan auth.ts include nik)
     const userNik  = (user as any).nik ?? null;
 
     // ── REJECT ───────────────────────────────────────────────
@@ -245,7 +307,6 @@ export async function PATCH(
     const queryParams: any[]   = [];
     let   paramIdx             = 1;
 
-    // Mark kolom approval role ini + simpan NIK + timestamp
     if (cols) {
       setClauses.push(`${cols.approvedCol}    = $${paramIdx++}`); queryParams.push(true);
       setClauses.push(`${cols.approvedByCol}  = $${paramIdx++}`); queryParams.push(userName);
@@ -253,7 +314,6 @@ export async function PATCH(
       setClauses.push(`${cols.approvedNikCol} = $${paramIdx++}`); queryParams.push(userNik);
     }
 
-    // SPV hot-work/workshop: simpan jabatan & NIK pemberi izin
     if (userRole === 'spv' && (formType === 'hot-work' || formType === 'workshop')) {
       setClauses.push(`jabatan_pemberi_izin = $${paramIdx++}`); queryParams.push(user.jabatan || null);
       setClauses.push(`nik_pemberi_ijin     = $${paramIdx++}`); queryParams.push(String(user.userId) || null);
@@ -287,4 +347,4 @@ export async function PATCH(
     console.error(`[PATCH /api/approval/${jenisForm}/${id}]`, err);
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
-}
+} 

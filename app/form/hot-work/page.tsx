@@ -116,8 +116,8 @@ const defaultForm = (): FormData => ({
 });
 
 const getApproverLabels = (isInternal: boolean) => isInternal
-  ? ["SPV / Pemberi Izin", "Admin K3", "SFO", "MR I/PGA MGR"]
-  : ["Kontraktor", "SPV / Pemberi Izin", "Admin K3", "SFO", "MR I/PGA MGR"];
+  ? ["SPV / Pemberi Izin", "Admin K3", "SFO", "SMR / PGA SMGR"]
+  : ["Kontraktor", "SPV / Pemberi Izin", "Admin K3", "SFO", "SMR / PGA SMGR"];
 
 export default function HotWorkPermitForm() {
   const [formData, setFormData] = useState(defaultForm);
@@ -263,7 +263,7 @@ export default function HotWorkPermitForm() {
               </div>
               <div className={`mt-3 px-3 py-2 rounded-lg text-xs font-medium ${isInternal ? "bg-blue-50 text-blue-700 border border-blue-200" : "bg-purple-50 text-purple-700 border border-purple-200"}`}>
                 <strong>Alur approval yang akan diterapkan:</strong>
-                <span className="ml-1">{isInternal ? "SPV → Admin K3 → SFO → MR I/PGA MGR" : "Kontraktor → SPV → Admin K3 → SFO → MR I/PGA MGR"}</span>
+                <span className="ml-1">{isInternal ? "SPV → Admin K3 → SFO → SMR / PGA SMGR" : "Kontraktor → SPV → Admin K3 → SFO → SMR / PGA SMGR"}</span>
               </div>
             </div>
 
@@ -472,7 +472,7 @@ export default function HotWorkPermitForm() {
               <div>
                 <p className="text-sm font-semibold text-blue-800 mb-1">Alur Approval yang Diterapkan:</p>
                 <p className={`text-sm font-bold ${isInternal ? "text-blue-700" : "text-purple-700"}`}>
-                  {isInternal ? "SPV → Admin K3 → SFO → MR I/PGA MGR" : "Kontraktor → SPV → Admin K3 → SFO → MR I/PGA MGR"}
+                  {isInternal ? "SPV → Admin K3 → SFO → SMR / PGA SMGR" : "Kontraktor → SPV → Admin K3 → SFO → SMR / PGA SMGR"}
                 </p>
                 <p className="text-xs text-blue-700 mt-1">🔒 Kolom persetujuan terisi otomatis saat masing-masing approver menyetujui.</p>
               </div>

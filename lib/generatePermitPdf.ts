@@ -143,10 +143,42 @@ function drawWatermark(d: jsPDFType) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
+// LOGO LOADER — lazy-load + cache Safety First PNG sebagai base64
+// ═══════════════════════════════════════════════════════════════════════════
+
+let _logoCache: string | null = null;
+
+async function loadLogoBase64(): Promise<string | null> {
+  if (_logoCache !== null) return _logoCache;
+  try {
+    const url = "/form-permit/images/safety_first.png";
+    const resp = await fetch(url);
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const blob = await resp.blob();
+    const b64  = await new Promise<string>((res, rej) => {
+      const r = new FileReader();
+      r.onload  = () => res((r.result as string).split(",")[1]);
+      r.onerror = () => rej(new Error("FileReader failed"));
+      r.readAsDataURL(blob);
+    });
+    _logoCache = b64;
+    return b64;
+  } catch (e) {
+    console.warn("[generatePermitPdf] Logo gagal dimuat:", e);
+    return null;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 // HEADER — compact ~34mm
 // ═══════════════════════════════════════════════════════════════════════════
 
-function drawHeader(
+// Logo dimensions di header (kotak 20×15 mm → sesuaikan proporsional 1:1)
+const LOGO_SIZE = 24; // mm — lebar & tinggi sama (gambar safety_first.png square)
+const LOGO_X    = ML;
+const LOGO_Y    = 1;  // vertikal center dalam band 22 mm
+
+async function drawHeader(
   doc: Doc,
   jenisPermit: string,
   idForm: string,
@@ -165,24 +197,32 @@ function drawHeader(
   d.setFillColor(...C.gold);
   d.rect(0, 22, PW, 0.8, "F");
 
-  // Logo box
-  d.setFillColor(...C.gold);
-  d.roundedRect(ML, 3.5, 20, 15, 1.5, 1.5, "F");
-  d.setFont(FF, "bold");
-  d.setFontSize(9);
-  d.setTextColor(...C.navyDark);
-  d.text("JAI", ML + 10, 13, { align: "center" });
+  // ── Logo Safety First ──────────────────────────────────
+  const logoB64 = await loadLogoBase64();
+  if (logoB64) {
+    d.addImage(
+      `data:image/png;base64,${logoB64}`,
+      "PNG",
+      LOGO_X,
+      LOGO_Y,
+      LOGO_SIZE,
+      LOGO_SIZE,
+      undefined,
+      "FAST",
+    );
+  }
 
-  // Company name + jenis permit
+  // Company name + jenis permit (digeser menyesuaikan lebar logo baru)
+  const textX = LOGO_X + LOGO_SIZE + 4; // 3 mm gap setelah logo
   d.setFont(FF, "bold");
   d.setFontSize(10);
   d.setTextColor(...C.white);
-  d.text("PT JATIM AUTOCOMP INDONESIA", ML + 24, 10);
+  d.text("PT JATIM AUTOCOMP INDONESIA", textX, 10);
 
   d.setFont(FF, "normal");
   d.setFontSize(7);
   d.setTextColor(...C.goldPale);
-  d.text("Sistem Izin Kerja Digital — Safety Management", ML + 24, 15);
+  d.text("Sistem Izin Kerja Digital — Safety Management", textX, 15);
 
   // Permit type right-aligned
   d.setFont(FF, "bold");
@@ -1170,7 +1210,7 @@ export async function generatePermitPdf(data: any, formType: FormType): Promise<
 
   // ── Halaman 1: Header ──────────────────────────────────
   drawWatermark(doc.d);
-  drawHeader(doc, jenisPermit, data.id_form ?? "-", data.status ?? "submitted",
+  await drawHeader(doc, jenisPermit, data.id_form ?? "-", data.status ?? "submitted",
     data.tanggal ?? null, data.tanggal_pelaksanaan ?? null, data.tipe_perusahaan ?? "internal");
 
   // ── Konten form ────────────────────────────────────────
@@ -1260,7 +1300,7 @@ export async function generatePermitPdfBlob(data: any, formType: FormType): Prom
  
   // ── Halaman 1: Header ──────────────────────────────────
   drawWatermark(doc.d);
-  drawHeader(doc, jenisPermit, data.id_form ?? "-", data.status ?? "submitted",
+  await drawHeader(doc, jenisPermit, data.id_form ?? "-", data.status ?? "submitted",
     data.tanggal ?? null, data.tanggal_pelaksanaan ?? null, data.tipe_perusahaan ?? "internal");
  
   // ── Konten form ────────────────────────────────────────

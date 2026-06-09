@@ -424,7 +424,7 @@ export default function HeightWorkFormPage() {
                 </div>
                 <div className={`mt-3 px-3 py-2 rounded-lg text-xs ${tipePerusahaan === "eksternal" ? "bg-purple-50 text-purple-700 border border-purple-200" : "bg-blue-50 text-blue-700 border border-blue-200"}`}>
                   <strong>Alur approval yang akan diterapkan:</strong>
-                  <span className="ml-1">{tipePerusahaan === "eksternal" ? "Kontraktor → SPV → Admin K3 → SFO → MR I/PGA MGR" : "SPV → Admin K3 → SFO → MR I/PGA MGR"}</span>
+                  <span className="ml-1">{tipePerusahaan === "eksternal" ? "Kontraktor → SPV → Admin K3 → SFO → SMR / PGA SMGR" : "SPV → Admin K3 → SFO → SMR / PGA SMGR"}</span>
                 </div>
               </div>
 
@@ -448,7 +448,6 @@ export default function HeightWorkFormPage() {
                 <div>
                   <label className="block text-sm font-semibold text-slate-700 mb-2">Waktu Mulai</label>
                   <input type="time" step="60" value={waktuMulai} onChange={(e) => setWaktuMulai(e.target.value)} className={inputCls} />
-...
                 </div>
                 <div>
                   <label className="block text-sm font-semibold text-slate-700 mb-2">Waktu Selesai</label>

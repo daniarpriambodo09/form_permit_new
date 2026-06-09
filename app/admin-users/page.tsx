@@ -1,4 +1,18 @@
 // app/admin-users/page.tsx
+// UPDATED: Halaman sekarang mendukung dua mode berdasarkan role login:
+//
+//   role = admin  → tampilan lengkap: Tab "Administrator Departemen" + Tab "Approver"
+//                   Auth check tetap memastikan hanya admin yang bisa akses.
+//
+//   role = spv    → hanya tampil tab "Kelola Akun Departemen"
+//                   Tidak ada tab Approver.
+//                   Form tambah tidak menampilkan field departemen
+//                   (otomatis mengikuti departemen SPV dari backend).
+//
+// SECURITY:
+//   - Departemen TIDAK dikirim dari form SPV ke backend.
+//   - Backend (/api/auth/register) memaksa departemen = departemen SPV dari DB.
+//   - Middleware tetap melindungi route /admin-users hanya untuk approver roles.
 "use client";
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
@@ -10,7 +24,7 @@ import {
   Trash2,
 } from "lucide-react";
 
-// ── Types ─────────────────────────────────────────────────────
+// ── Types ──────────────────────────────────────────────────────
 interface AdminUser {
   id:         number;
   nama:       string;
@@ -35,7 +49,6 @@ interface ApproverUser {
   created_at: string;
 }
 
-// ── BARU: Delete target ───────────────────────────────────────
 interface DeleteTarget {
   id:       number;
   nama:     string;
@@ -43,11 +56,13 @@ interface DeleteTarget {
   role:     string;
 }
 
+// Mode tampilan halaman
+type PageMode = "admin" | "spv" | null;
 type ActiveTab = "admin" | "approver";
 
 const DEPARTMENT_OPTIONS = [
   "QA", "ENG", "MTC", "PRODUKSI",
-  "NYS", "FATP-Exim", "MPC-WHS", "SMR",
+  "NYS", "FATP-Exim", "MPC-WHS", "PGA",
 ] as const;
 
 const APPROVER_ROLE_OPTIONS = [
@@ -79,21 +94,15 @@ const ROLE_COLOR: Record<string, string> = {
   admin:      "bg-slate-50 text-slate-700 border-slate-300",
 };
 
-// ── Format tanggal ────────────────────────────────────────────
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString("id-ID", {
-    day:   "2-digit",
-    month: "short",
-    year:  "numeric",
+    day: "2-digit", month: "short", year: "numeric",
   });
 }
 
-// ── BARU: Delete Confirmation Modal ──────────────────────────
+// ── Delete Modal (tidak berubah) ──────────────────────────────
 function DeleteModal({
-  target,
-  onConfirm,
-  onCancel,
-  loading,
+  target, onConfirm, onCancel, loading,
 }: {
   target:    DeleteTarget;
   onConfirm: () => void;
@@ -106,7 +115,6 @@ function DeleteModal({
       style={{ backgroundColor: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)" }}
     >
       <div className="bg-slate-800 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-sm p-6">
-        {/* Header */}
         <div className="flex items-start justify-between mb-4">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-red-500/20 rounded-xl flex items-center justify-center flex-shrink-0">
@@ -117,20 +125,14 @@ function DeleteModal({
               <p className="text-xs text-slate-400">Tindakan ini tidak dapat dibatalkan</p>
             </div>
           </div>
-          <button
-            onClick={onCancel}
-            disabled={loading}
-            className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-colors"
-          >
+          <button onClick={onCancel} disabled={loading}
+            className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-colors">
             <X className="w-4 h-4" />
           </button>
         </div>
-
         <p className="text-sm text-slate-300 mb-4">
           Yakin ingin menghapus akun ini? Histori form yang sudah dibuat akan tetap tersimpan.
         </p>
-
-        {/* User info */}
         <div className="bg-slate-700/50 border border-slate-600 rounded-xl p-4 mb-5 space-y-2">
           <div className="flex items-center justify-between text-sm">
             <span className="text-slate-400 font-medium">Nama</span>
@@ -150,23 +152,16 @@ function DeleteModal({
             </span>
           </div>
         </div>
-
         <div className="flex gap-3">
-          <button
-            onClick={onCancel}
-            disabled={loading}
+          <button onClick={onCancel} disabled={loading}
             className="flex-1 py-2.5 bg-slate-700 hover:bg-slate-600 text-slate-300
-                       font-semibold rounded-lg text-sm transition-colors disabled:opacity-60"
-          >
+                       font-semibold rounded-lg text-sm transition-colors disabled:opacity-60">
             Batal
           </button>
-          <button
-            onClick={onConfirm}
-            disabled={loading}
+          <button onClick={onConfirm} disabled={loading}
             className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-red-600
                        hover:bg-red-500 text-white font-bold rounded-lg text-sm transition-colors
-                       disabled:opacity-60"
-          >
+                       disabled:opacity-60">
             {loading
               ? <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
               : <Trash2 className="w-4 h-4" />}
@@ -182,16 +177,40 @@ function DeleteModal({
 export default function AdminUsersPage() {
   const router = useRouter();
 
-  // ── Tab state ─────────────────────────────────────────────
+  // ── Auth: tentukan mode halaman ───────────────────────────────
+  const [pageMode,     setPageMode]     = useState<PageMode>(null);
+  const [authChecked,  setAuthChecked]  = useState(false);
+  // Departemen SPV yang sedang login (dipakai untuk label di UI)
+  const [spvDepartmen, setSpvDepartmen] = useState<string | null>(null);
+
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const res = await fetch("/form-permit/api/auth/me", { credentials: "include" });
+        if (!res.ok) { router.replace("/login/approver"); return; }
+        const data = await res.json();
+        const role = data.user?.role;
+
+        if (role === "admin") {
+          setPageMode("admin");
+          setAuthChecked(true);
+        } else if (role === "spv") {
+          setPageMode("spv");
+          setSpvDepartmen(data.user?.departmen ?? null);
+          setAuthChecked(true);
+        } else {
+          // Role lain tidak boleh akses halaman ini
+          router.replace("/home");
+        }
+      } catch {
+        router.replace("/home");
+      }
+    };
+    checkAuth();
+  }, [router]);
+
+  // ── Tab state (hanya untuk admin) ────────────────────────────
   const [activeTab, setActiveTab] = useState<ActiveTab>("admin");
-
-  const switchTab = (tab: ActiveTab) => {
-    setActiveTab(tab);
-    router.replace(`/admin-users${tab === "approver" ? "?tab=approver" : ""}`);
-  };
-
-  // ── Auth guard ────────────────────────────────────────────────
-  const [authChecked, setAuthChecked] = useState(false);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -199,26 +218,10 @@ export default function AdminUsersPage() {
     if (params.get("tab") === "approver") setActiveTab("approver");
   }, []);
 
-  useEffect(() => {
-    const checkAdmin = async () => {
-      const cachedRole = sessionStorage.getItem("user_role");
-      if (cachedRole) {
-        if (cachedRole !== "admin") { router.replace("/home"); return; }
-        setAuthChecked(true);
-        return;
-      }
-      try {
-        const res = await fetch("/form-permit/api/auth/me", { credentials: "include" });
-        if (!res.ok) { router.replace("/login/approver"); return; }
-        const data = await res.json();
-        if (data.user?.role !== "admin") { router.replace("/home"); return; }
-        setAuthChecked(true);
-      } catch {
-        router.replace("/home");
-      }
-    };
-    checkAdmin();
-  }, [router]);
+  const switchTab = (tab: ActiveTab) => {
+    setActiveTab(tab);
+    router.replace(`/admin-users${tab === "approver" ? "?tab=approver" : ""}`);
+  };
 
   // ── Data: Administrator Departemen (worker) ───────────────────
   const [adminUsers,   setAdminUsers]   = useState<AdminUser[]>([]);
@@ -233,6 +236,8 @@ export default function AdminUsersPage() {
       if (!res.ok) { setAdminError("Gagal memuat data."); return; }
       const data = await res.json();
       setAdminUsers(data.users ?? []);
+      // Update spvDepartmen dari response jika ada (fresh dari DB)
+      if (data.spv_departmen) setSpvDepartmen(data.spv_departmen);
     } catch {
       setAdminError("Terjadi kesalahan koneksi.");
     } finally {
@@ -240,7 +245,7 @@ export default function AdminUsersPage() {
     }
   }, []);
 
-  // ── Data: Approver ────────────────────────────────────────────
+  // ── Data: Approver (hanya untuk admin) ───────────────────────
   const [approverUsers,   setApproverUsers]   = useState<ApproverUser[]>([]);
   const [approverLoading, setApproverLoading] = useState(true);
   const [approverError,   setApproverError]   = useState("");
@@ -263,18 +268,15 @@ export default function AdminUsersPage() {
   useEffect(() => {
     if (!authChecked) return;
     fetchAdminUsers();
-    fetchApproverUsers();
-  }, [authChecked, fetchAdminUsers, fetchApproverUsers]);
+    if (pageMode === "admin") fetchApproverUsers();
+  }, [authChecked, pageMode, fetchAdminUsers, fetchApproverUsers]);
 
   // ── Shared filter state ───────────────────────────────────────
   const [search,     setSearch]     = useState("");
   const [filterDept, setFilterDept] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
 
-  useEffect(() => {
-    setSearch("");
-    setFilterDept("");
-  }, [activeTab]);
+  useEffect(() => { setSearch(""); setFilterDept(""); }, [activeTab]);
 
   // ── Filtered lists ────────────────────────────────────────────
   const filteredAdmin = adminUsers.filter(u => {
@@ -298,7 +300,7 @@ export default function AdminUsersPage() {
     return matchSearch && matchDept;
   });
 
-  // ── BARU: Delete state ────────────────────────────────────────
+  // ── Delete state ──────────────────────────────────────────────
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
   const [deleting,     setDeleting]     = useState(false);
 
@@ -307,13 +309,10 @@ export default function AdminUsersPage() {
     setDeleting(true);
     try {
       const res = await fetch(`/form-permit/api/admin-users/${deleteTarget.id}`, {
-        method:      "DELETE",
-        credentials: "include",
+        method: "DELETE", credentials: "include",
       });
       const data = await res.json();
       if (!res.ok) {
-        setSuccessMsg(""); // clear any old msg
-        // tampilkan error lewat successMsg dengan prefix khusus
         setDeleteTarget(null);
         setSuccessMsg(`ERROR: ${data.error || "Gagal menghapus akun."}`);
         setTimeout(() => setSuccessMsg(""), 5000);
@@ -322,12 +321,8 @@ export default function AdminUsersPage() {
       setDeleteTarget(null);
       setSuccessMsg("Akun berhasil dihapus.");
       setTimeout(() => setSuccessMsg(""), 4000);
-      // Refresh tabel yang relevan
-      if (deleteTarget.role === "worker") {
-        fetchAdminUsers();
-      } else {
-        fetchApproverUsers();
-      }
+      if (deleteTarget.role === "worker") fetchAdminUsers();
+      else fetchApproverUsers();
     } catch {
       setDeleteTarget(null);
       setSuccessMsg("ERROR: Terjadi kesalahan koneksi.");
@@ -339,7 +334,6 @@ export default function AdminUsersPage() {
 
   // ── Modal state ───────────────────────────────────────────────
   const [modalOpen, setModalOpen] = useState(false);
-
   const openModal  = () => { resetForm(); setModalOpen(true); };
   const closeModal = () => { setModalOpen(false); resetForm(); };
 
@@ -369,7 +363,10 @@ export default function AdminUsersPage() {
     useState<"available" | "taken" | "invalid" | null>(null);
   const [usernameError, setUsernameError] = useState("");
 
-  const currentUsername = activeTab === "admin"
+  // Mode SPV selalu di tab "admin"; mode admin ikut activeTab
+  const isAdminFormActive = pageMode === "spv" || activeTab === "admin";
+
+  const currentUsername = isAdminFormActive
     ? adminForm.username
     : approverForm.username;
 
@@ -426,23 +423,37 @@ export default function AdminUsersPage() {
   const handleAdminSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError("");
-    if (!adminForm.username)             { setFormError("Username wajib diisi"); return; }
-    if (usernameStatus !== "available")  { setFormError("Username tidak tersedia atau tidak valid"); return; }
-    if (!adminForm.departmen)            { setFormError("Departemen wajib dipilih"); return; }
+    if (!adminForm.username)            { setFormError("Username wajib diisi"); return; }
+    if (usernameStatus !== "available") { setFormError("Username tidak tersedia atau tidak valid"); return; }
+    // Departemen wajib hanya untuk mode admin (SPV: backend tentukan sendiri)
+    if (pageMode === "admin" && !adminForm.departmen) {
+      setFormError("Departemen wajib dipilih"); return;
+    }
     if (adminForm.email) {
       const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       if (!emailRe.test(adminForm.email)) { setFormError("Format email tidak valid"); return; }
     }
     if (adminForm.password !== adminForm.password2) { setFormError("Password dan konfirmasi password tidak cocok"); return; }
-    if (adminForm.password.length < 6)   { setFormError("Password minimal 6 karakter"); return; }
+    if (adminForm.password.length < 6)  { setFormError("Password minimal 6 karakter"); return; }
 
     setSubmitting(true);
     try {
+      // SECURITY: SPV tidak mengirim field departemen — backend akan tentukan sendiri
+      const payload: Record<string, string> = {
+        nama:      adminForm.nama,
+        username:  adminForm.username,
+        perusahaan: adminForm.perusahaan,
+        email:     adminForm.email,
+        no_telp:   adminForm.no_telp,
+        password:  adminForm.password,
+      };
+      // Hanya admin yang boleh mengirim departemen
+      if (pageMode === "admin") payload.departmen = adminForm.departmen;
+
       const res = await fetch("/form-permit/api/auth/register", {
-        method:      "POST",
-        credentials: "include",
-        headers:     { "Content-Type": "application/json" },
-        body:        JSON.stringify(adminForm),
+        method: "POST", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
       });
       const data = await res.json();
       if (!res.ok) { setFormError(data.error || "Registrasi gagal"); return; }
@@ -450,7 +461,8 @@ export default function AdminUsersPage() {
       await fetchAdminUsers();
       setTimeout(() => {
         closeModal();
-        setSuccessMsg(`Akun "${adminForm.nama}" berhasil dibuat.`);
+        const dept = data.departmen ? ` (${data.departmen})` : "";
+        setSuccessMsg(`Akun "${adminForm.nama}"${dept} berhasil dibuat.`);
         setTimeout(() => setSuccessMsg(""), 4000);
       }, 1200);
     } catch {
@@ -460,29 +472,28 @@ export default function AdminUsersPage() {
     }
   };
 
-  // ── Submit: Approver ──────────────────────────────────────────
+  // ── Submit: Approver (hanya untuk admin) ──────────────────────
   const handleApproverSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError("");
-    if (!approverForm.username)            { setFormError("Username wajib diisi"); return; }
-    if (usernameStatus !== "available")    { setFormError("Username tidak tersedia atau tidak valid"); return; }
-    if (!approverForm.role)                { setFormError("Role Approver wajib dipilih"); return; }
+    if (!approverForm.username)           { setFormError("Username wajib diisi"); return; }
+    if (usernameStatus !== "available")   { setFormError("Username tidak tersedia atau tidak valid"); return; }
+    if (!approverForm.role)               { setFormError("Role Approver wajib dipilih"); return; }
     if (approverForm.role === "spv" && !approverForm.departmen) {
-                                             setFormError("Departemen wajib dipilih untuk SPV"); return; }
+                                            setFormError("Departemen wajib dipilih untuk SPV"); return; }
     if (approverForm.email) {
       const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       if (!emailRe.test(approverForm.email)) { setFormError("Format email tidak valid"); return; }
     }
     if (approverForm.password !== approverForm.password2) { setFormError("Password dan konfirmasi password tidak cocok"); return; }
-    if (approverForm.password.length < 6)  { setFormError("Password minimal 6 karakter"); return; }
+    if (approverForm.password.length < 6) { setFormError("Password minimal 6 karakter"); return; }
 
     setSubmitting(true);
     try {
       const res = await fetch("/form-permit/api/auth/register-approver", {
-        method:      "POST",
-        credentials: "include",
-        headers:     { "Content-Type": "application/json" },
-        body:        JSON.stringify(approverForm),
+        method: "POST", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(approverForm),
       });
       const data = await res.json();
       if (!res.ok) { setFormError(data.error || "Registrasi gagal"); return; }
@@ -509,14 +520,22 @@ export default function AdminUsersPage() {
     );
   }
 
-  // ── Styles ────────────────────────────────────────────────────
   const inputCls  = "w-full px-4 py-2.5 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-500 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-colors";
   const selectCls = "w-full px-4 py-2.5 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-colors appearance-none";
 
   const isAdminTab    = activeTab === "admin";
   const isApproverTab = activeTab === "approver";
+  const isErrorMsg    = successMsg.startsWith("ERROR:");
 
-  const isErrorMsg = successMsg.startsWith("ERROR:");
+  // Tombol CTA berganti label sesuai mode & tab
+  const ctaLabel = pageMode === "spv"
+    ? "Tambah Akun"
+    : isAdminTab ? "Tambah Administrator" : "Tambah Approver";
+
+  // Judul tabel untuk mode SPV
+  const spvPageTitle = spvDepartmen
+    ? `Kelola Akun Departemen ${spvDepartmen}`
+    : "Kelola Akun Departemen";
 
   // ── Render ────────────────────────────────────────────────────
   return (
@@ -537,11 +556,9 @@ export default function AdminUsersPage() {
                 <p className="text-xs text-slate-500">WIRING HARNESS MANUFACTURER</p>
               </div>
             </div>
-            <Link
-              href="/home"
+            <Link href="/home"
               className="flex items-center gap-1.5 px-3 py-2 text-sm text-slate-600
-                         hover:bg-slate-100 rounded-lg transition-colors"
-            >
+                         hover:bg-slate-100 rounded-lg transition-colors">
               <ChevronLeft className="w-4 h-4" /> Kembali
             </Link>
           </div>
@@ -556,53 +573,51 @@ export default function AdminUsersPage() {
           <div>
             <div className="flex items-center gap-2 mb-1">
               <Users className="w-5 h-5 text-orange-500" />
-              <h2 className="text-2xl font-bold text-slate-900">Manajemen Pengguna</h2>
+              <h2 className="text-2xl font-bold text-slate-900">
+                {pageMode === "spv" ? spvPageTitle : "Manajemen Pengguna"}
+              </h2>
             </div>
             <p className="text-sm text-slate-500">
-              Kelola akun administrator departemen dan approver sistem izin kerja.
+              {pageMode === "spv"
+                ? `Kelola akun yang bertugas membuat Form Permit di departemen ${spvDepartmen ?? "Anda"}.`
+                : "Kelola akun administrator departemen dan approver sistem izin kerja."}
             </p>
           </div>
-          <button
-            onClick={openModal}
+          <button onClick={openModal}
             className="inline-flex items-center gap-2 px-5 py-2.5 bg-orange-600 hover:bg-orange-500
                        text-white font-semibold rounded-xl text-sm transition-colors
-                       shadow-md shadow-orange-600/20 whitespace-nowrap self-start sm:self-auto"
-          >
+                       shadow-md shadow-orange-600/20 whitespace-nowrap self-start sm:self-auto">
             <UserPlus className="w-4 h-4" />
-            {isAdminTab ? "Tambah Administrator" : "Tambah Approver"}
+            {ctaLabel}
           </button>
         </div>
 
-        {/* Tab Switch */}
-        <div className="flex gap-1 bg-slate-100 rounded-xl p-1 mb-6 w-fit">
-          <button
-            onClick={() => switchTab("admin")}
-            className={`px-5 py-2 rounded-lg text-sm font-semibold transition-all duration-200 ${
-              isAdminTab
-                ? "bg-white text-slate-900 shadow-sm"
-                : "text-slate-500 hover:text-slate-700"
-            }`}
-          >
-            Administrator Departemen
-          </button>
-          <button
-            onClick={() => switchTab("approver")}
-            className={`px-5 py-2 rounded-lg text-sm font-semibold transition-all duration-200 ${
-              isApproverTab
-                ? "bg-white text-slate-900 shadow-sm"
-                : "text-slate-500 hover:text-slate-700"
-            }`}
-          >
-            Approver
-          </button>
-        </div>
+        {/* Tab Switch — hanya untuk admin */}
+        {pageMode === "admin" && (
+          <div className="flex gap-1 bg-slate-100 rounded-xl p-1 mb-6 w-fit">
+            <button onClick={() => switchTab("admin")}
+              className={`px-5 py-2 rounded-lg text-sm font-semibold transition-all duration-200 ${
+                isAdminTab
+                  ? "bg-white text-slate-900 shadow-sm"
+                  : "text-slate-500 hover:text-slate-700"
+              }`}>
+              Administrator Departemen
+            </button>
+            <button onClick={() => switchTab("approver")}
+              className={`px-5 py-2 rounded-lg text-sm font-semibold transition-all duration-200 ${
+                isApproverTab
+                  ? "bg-white text-slate-900 shadow-sm"
+                  : "text-slate-500 hover:text-slate-700"
+              }`}>
+              Approver
+            </button>
+          </div>
+        )}
 
         {/* Success / Error toast */}
         {successMsg && (
           <div className={`flex items-center gap-2 border rounded-xl px-4 py-3 mb-5
-            ${isErrorMsg
-              ? "bg-red-50 border-red-200"
-              : "bg-green-50 border-green-200"}`}>
+            ${isErrorMsg ? "bg-red-50 border-red-200" : "bg-green-50 border-green-200"}`}>
             {isErrorMsg
               ? <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
               : <CheckCircle className="w-4 h-4 text-green-600 shrink-0" />}
@@ -616,12 +631,9 @@ export default function AdminUsersPage() {
         <div className="flex flex-col sm:flex-row gap-3 mb-5">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-            <input
-              type="text"
-              value={search}
-              onChange={e => setSearch(e.target.value)}
+            <input type="text" value={search} onChange={e => setSearch(e.target.value)}
               placeholder={
-                isAdminTab
+                pageMode === "spv" || isAdminTab
                   ? "Cari nama, username, perusahaan, email..."
                   : "Cari nama, username, email..."
               }
@@ -630,32 +642,35 @@ export default function AdminUsersPage() {
                          focus:ring-orange-400 focus:border-transparent transition-colors"
             />
           </div>
-          <div className="relative">
-            <select
-              value={filterDept}
-              onChange={e => setFilterDept(e.target.value)}
-              className="pl-4 pr-8 py-2.5 bg-white border border-slate-200 rounded-xl text-sm
-                         text-slate-700 focus:outline-none focus:ring-2 focus:ring-orange-400
-                         focus:border-transparent transition-colors appearance-none cursor-pointer"
-            >
-              <option value="">Semua Departemen</option>
-              {DEPARTMENT_OPTIONS.map(d => (
-                <option key={d} value={d}>{d}</option>
-              ))}
-            </select>
-            <div className="pointer-events-none absolute inset-y-0 right-2.5 flex items-center">
-              <svg className="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-              </svg>
+          {/* Filter departmen: hanya admin yang perlu, SPV sudah auto-filter dari backend */}
+          {pageMode === "admin" && (
+            <div className="relative">
+              <select value={filterDept} onChange={e => setFilterDept(e.target.value)}
+                className="pl-4 pr-8 py-2.5 bg-white border border-slate-200 rounded-xl text-sm
+                           text-slate-700 focus:outline-none focus:ring-2 focus:ring-orange-400
+                           focus:border-transparent transition-colors appearance-none cursor-pointer">
+                <option value="">Semua Departemen</option>
+                {DEPARTMENT_OPTIONS.map(d => (
+                  <option key={d} value={d}>{d}</option>
+                ))}
+              </select>
+              <div className="pointer-events-none absolute inset-y-0 right-2.5 flex items-center">
+                <svg className="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </div>
             </div>
-          </div>
+          )}
         </div>
 
-        {/* ── TAB: Administrator Departemen ── */}
-        {isAdminTab && (
+        {/* ── Tabel Administrator Departemen ── */}
+        {/* Tampil jika: mode SPV (selalu), atau mode admin dengan tab "admin" */}
+        {(pageMode === "spv" || (pageMode === "admin" && isAdminTab)) && (
           <>
             <p className="text-xs text-slate-400 mb-3">
-              {adminLoading ? "Memuat data…" : `Menampilkan ${filteredAdmin.length} dari ${adminUsers.length} akun`}
+              {adminLoading
+                ? "Memuat data…"
+                : `Menampilkan ${filteredAdmin.length} dari ${adminUsers.length} akun`}
             </p>
             <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
               {adminError ? (
@@ -677,7 +692,11 @@ export default function AdminUsersPage() {
                 <div className="flex flex-col items-center justify-center py-16 text-slate-400">
                   <Users className="w-10 h-10 mb-3 opacity-40" />
                   <p className="text-sm font-medium">Belum ada data administrator</p>
-                  <p className="text-xs mt-1">Klik "Tambah Administrator" untuk membuat akun baru.</p>
+                  <p className="text-xs mt-1">
+                    {pageMode === "spv"
+                      ? `Klik "Tambah Akun" untuk membuat akun baru di departemen ${spvDepartmen ?? "Anda"}.`
+                      : `Klik "Tambah Administrator" untuk membuat akun baru.`}
+                  </p>
                 </div>
               ) : (
                 <div className="overflow-x-auto">
@@ -692,7 +711,6 @@ export default function AdminUsersPage() {
                         <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">No. Telepon</th>
                         <th className="text-center px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Status</th>
                         <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Dibuat Pada</th>
-                        {/* BARU: kolom Aksi */}
                         <th className="text-center px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Aksi</th>
                       </tr>
                     </thead>
@@ -759,19 +777,15 @@ export default function AdminUsersPage() {
                               <span className="text-xs">{formatDate(user.created_at)}</span>
                             </div>
                           </td>
-                          {/* BARU: tombol Hapus */}
                           <td className="px-4 py-4 text-center">
                             <button
                               onClick={() => setDeleteTarget({
-                                id:       user.id,
-                                nama:     user.nama,
-                                username: user.username,
-                                role:     "worker",
+                                id: user.id, nama: user.nama,
+                                username: user.username, role: "worker",
                               })}
                               className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold
                                          text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors
-                                         border border-red-200"
-                            >
+                                         border border-red-200">
                               <Trash2 className="w-3.5 h-3.5" /> Hapus
                             </button>
                           </td>
@@ -785,11 +799,13 @@ export default function AdminUsersPage() {
           </>
         )}
 
-        {/* ── TAB: Approver ── */}
-        {isApproverTab && (
+        {/* ── TAB: Approver — hanya untuk admin ── */}
+        {pageMode === "admin" && isApproverTab && (
           <>
             <p className="text-xs text-slate-400 mb-3">
-              {approverLoading ? "Memuat data…" : `Menampilkan ${filteredApprovers.length} dari ${approverUsers.length} akun`}
+              {approverLoading
+                ? "Memuat data…"
+                : `Menampilkan ${filteredApprovers.length} dari ${approverUsers.length} akun`}
             </p>
             <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
               {approverError ? (
@@ -811,7 +827,7 @@ export default function AdminUsersPage() {
                 <div className="flex flex-col items-center justify-center py-16 text-slate-400">
                   <Users className="w-10 h-10 mb-3 opacity-40" />
                   <p className="text-sm font-medium">Belum ada data approver</p>
-                  <p className="text-xs mt-1">Klik "Tambah Approver" untuk membuat akun baru.</p>
+                  <p className="text-xs mt-1">Klik &quot;Tambah Approver&quot; untuk membuat akun baru.</p>
                 </div>
               ) : (
                 <div className="overflow-x-auto">
@@ -826,7 +842,6 @@ export default function AdminUsersPage() {
                         <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">No. Telepon</th>
                         <th className="text-center px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Status</th>
                         <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Dibuat Pada</th>
-                        {/* BARU: kolom Aksi */}
                         <th className="text-center px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Aksi</th>
                       </tr>
                     </thead>
@@ -892,19 +907,15 @@ export default function AdminUsersPage() {
                               <span className="text-xs">{formatDate(user.created_at)}</span>
                             </div>
                           </td>
-                          {/* BARU: tombol Hapus */}
                           <td className="px-4 py-4 text-center">
                             <button
                               onClick={() => setDeleteTarget({
-                                id:       user.id,
-                                nama:     user.nama,
-                                username: user.username,
-                                role:     user.role,
+                                id: user.id, nama: user.nama,
+                                username: user.username, role: user.role,
                               })}
                               className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold
                                          text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors
-                                         border border-red-200"
-                            >
+                                         border border-red-200">
                               <Trash2 className="w-3.5 h-3.5" /> Hapus
                             </button>
                           </td>
@@ -920,17 +931,14 @@ export default function AdminUsersPage() {
       </main>
 
       {/* ══════════════════════════════════════════════════════════
-          Modal Register (tidak berubah)
+          Modal Register
       ══════════════════════════════════════════════════════════ */}
       {modalOpen && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4"
-          style={{ backgroundColor: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)" }}
-        >
-          <div
-            className="bg-slate-800 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-md
-                       max-h-[90vh] overflow-y-auto"
-          >
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ backgroundColor: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)" }}>
+          <div className="bg-slate-800 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-md
+                         max-h-[90vh] overflow-y-auto">
+
             {/* Modal header */}
             <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b border-slate-700">
               <div className="flex items-center gap-2">
@@ -939,19 +947,21 @@ export default function AdminUsersPage() {
                 </div>
                 <div>
                   <h3 className="text-sm font-bold text-white">
-                    {isAdminTab ? "Tambah Administrator Departemen" : "Tambah Akun Approver"}
+                    {pageMode === "spv"
+                      ? `Tambah Akun Departemen ${spvDepartmen ?? ""}`
+                      : isAdminTab ? "Tambah Administrator Departemen" : "Tambah Akun Approver"}
                   </h3>
                   <p className="text-xs text-slate-400 mt-0.5">
-                    {isAdminTab
-                      ? "Buat akun administrator yang bertugas membuat Form Permit."
-                      : "Buat akun approver untuk proses persetujuan izin kerja."}
+                    {pageMode === "spv"
+                      ? `Akun baru akan otomatis masuk departemen ${spvDepartmen ?? "Anda"}.`
+                      : isAdminTab
+                        ? "Buat akun administrator yang bertugas membuat Form Permit."
+                        : "Buat akun approver untuk proses persetujuan izin kerja."}
                   </p>
                 </div>
               </div>
-              <button
-                onClick={closeModal}
-                className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-colors"
-              >
+              <button onClick={closeModal}
+                className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-colors">
                 <X className="w-4 h-4" />
               </button>
             </div>
@@ -975,8 +985,10 @@ export default function AdminUsersPage() {
                     </div>
                   )}
 
-                  {/* ── FORM: Administrator Departemen ── */}
-                  {isAdminTab && (
+                  {/* ── FORM: Administrator Departemen ──
+                      Tampil: mode SPV (selalu), atau mode admin dengan tab "admin"
+                  ── */}
+                  {(pageMode === "spv" || (pageMode === "admin" && isAdminTab)) && (
                     <form onSubmit={handleAdminSubmit} className="space-y-4">
                       <div>
                         <label className="block text-sm font-medium text-slate-300 mb-1.5">
@@ -1021,28 +1033,42 @@ export default function AdminUsersPage() {
                           onChange={e => handleAdminChange("perusahaan", e.target.value)}
                           placeholder="PT JAI / PT Kontraktor ABC" required className={inputCls} />
                       </div>
-                      <div>
-                        <label className="block text-sm font-medium text-slate-300 mb-1.5">
-                          Departemen <span className="text-red-400">*</span>
-                        </label>
-                        <div className="relative">
-                          <select value={adminForm.departmen}
-                            onChange={e => handleAdminChange("departmen", e.target.value)}
-                            required
-                            className={`${selectCls} ${adminForm.departmen ? "text-white" : "text-slate-500"}`}
-                          >
-                            <option value="" disabled>- Pilih Departemen -</option>
-                            {DEPARTMENT_OPTIONS.map(d => (
-                              <option key={d} value={d} className="text-white bg-slate-700">{d}</option>
-                            ))}
-                          </select>
-                          <div className="pointer-events-none absolute inset-y-0 right-3 flex items-center">
-                            <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                            </svg>
+
+                      {/* Departemen: hanya tampil untuk admin, bukan SPV */}
+                      {pageMode === "admin" && (
+                        <div>
+                          <label className="block text-sm font-medium text-slate-300 mb-1.5">
+                            Departemen <span className="text-red-400">*</span>
+                          </label>
+                          <div className="relative">
+                            <select value={adminForm.departmen}
+                              onChange={e => handleAdminChange("departmen", e.target.value)}
+                              required
+                              className={`${selectCls} ${adminForm.departmen ? "text-white" : "text-slate-500"}`}>
+                              <option value="" disabled>- Pilih Departemen -</option>
+                              {DEPARTMENT_OPTIONS.map(d => (
+                                <option key={d} value={d} className="text-white bg-slate-700">{d}</option>
+                              ))}
+                            </select>
+                            <div className="pointer-events-none absolute inset-y-0 right-3 flex items-center">
+                              <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                              </svg>
+                            </div>
                           </div>
                         </div>
-                      </div>
+                      )}
+
+                      {/* Info departmen untuk SPV */}
+                      {pageMode === "spv" && spvDepartmen && (
+                        <div className="flex items-center gap-2 bg-blue-500/10 border border-blue-500/30 rounded-lg px-3 py-2.5">
+                          <Building2 className="w-4 h-4 text-blue-400 shrink-0" />
+                          <p className="text-blue-300 text-xs">
+                            Akun akan otomatis masuk departemen <span className="font-bold">{spvDepartmen}</span>
+                          </p>
+                        </div>
+                      )}
+
                       <div>
                         <label className="block text-sm font-medium text-slate-300 mb-1.5">Email</label>
                         <input type="email" value={adminForm.email}
@@ -1092,8 +1118,8 @@ export default function AdminUsersPage() {
                     </form>
                   )}
 
-                  {/* ── FORM: Approver ── */}
-                  {isApproverTab && (
+                  {/* ── FORM: Approver — hanya untuk admin ── */}
+                  {pageMode === "admin" && isApproverTab && (
                     <form onSubmit={handleApproverSubmit} className="space-y-4">
                       <div>
                         <label className="block text-sm font-medium text-slate-300 mb-1.5">
@@ -1138,8 +1164,7 @@ export default function AdminUsersPage() {
                           <select value={approverForm.role}
                             onChange={e => handleApproverChange("role", e.target.value)}
                             required
-                            className={`${selectCls} ${approverForm.role ? "text-white" : "text-slate-500"}`}
-                          >
+                            className={`${selectCls} ${approverForm.role ? "text-white" : "text-slate-500"}`}>
                             <option value="" disabled>- Pilih Role -</option>
                             {APPROVER_ROLE_OPTIONS.map(r => (
                               <option key={r.value} value={r.value} className="text-white bg-slate-700">{r.label}</option>
@@ -1161,8 +1186,7 @@ export default function AdminUsersPage() {
                             <select value={approverForm.departmen}
                               onChange={e => handleApproverChange("departmen", e.target.value)}
                               required
-                              className={`${selectCls} ${approverForm.departmen ? "text-white" : "text-slate-500"}`}
-                            >
+                              className={`${selectCls} ${approverForm.departmen ? "text-white" : "text-slate-500"}`}>
                               <option value="" disabled>- Pilih Departemen -</option>
                               {DEPARTMENT_OPTIONS.map(d => (
                                 <option key={d} value={d} className="text-white bg-slate-700">{d}</option>
@@ -1231,10 +1255,7 @@ export default function AdminUsersPage() {
         </div>
       )}
 
-      {/* ══════════════════════════════════════════════════════════
-          BARU: Delete Confirmation Modal
-          z-index [60] agar tampil di atas modal register [50]
-      ══════════════════════════════════════════════════════════ */}
+      {/* Delete Confirmation Modal */}
       {deleteTarget && (
         <DeleteModal
           target={deleteTarget}
@@ -1243,7 +1264,6 @@ export default function AdminUsersPage() {
           loading={deleting}
         />
       )}
-
     </div>
   );
 }
