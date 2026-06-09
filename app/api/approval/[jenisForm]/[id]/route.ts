@@ -1,11 +1,14 @@
 // app/api/approval/[jenisForm]/[id]/route.ts
 // UPDATED: Simpan NIK approver dan timestamp per-role saat melakukan approval.
+// REFACTOR: Role 'pga' diganti menjadi 'smr'.
+//           Kolom DB mr_pga_approved, mr_pga_approved_by, mr_pga_approved_at, mr_pga_nik
+//           TIDAK diubah — tetap digunakan untuk kompatibilitas data lama.
 //
 // WORKFLOW — stage dimulai dari 1:
-//   Hot-work & Workshop INTERNAL:  1=spv → 2=admin_k3 → 3=sfo → 4=pga(mr_pga)
-//   Hot-work & Workshop EKSTERNAL: 1=kontraktor → 2=spv → 3=admin_k3 → 4=sfo → 5=pga(mr_pga)
-//   Height-work INTERNAL:          1=spv → 2=admin_k3 → 3=sfo → 4=pga(mr_pga)
-//   Height-work EKSTERNAL:         1=kontraktor → 2=spv → 3=admin_k3 → 4=sfo → 5=pga(mr_pga)
+//   Hot-work & Workshop INTERNAL:  1=spv → 2=admin_k3 → 3=sfo → 4=smr
+//   Hot-work & Workshop EKSTERNAL: 1=kontraktor → 2=spv → 3=admin_k3 → 4=sfo → 5=smr
+//   Height-work INTERNAL:          1=spv → 2=admin_k3 → 3=sfo → 4=smr
+//   Height-work EKSTERNAL:         1=kontraktor → 2=spv → 3=admin_k3 → 4=sfo → 5=smr
 
 import { NextRequest, NextResponse } from 'next/server';
 import { query, queryOne } from '@/lib/db';
@@ -22,14 +25,14 @@ type FormType = 'hot-work' | 'workshop' | 'height-work';
 const FORM_CONFIG: Record<FormType, {
   table:      string;
   idColumn:   string;
-  pgaApprCol: string;
+  pgaApprCol: string;  // kolom DB tetap mr_pga_* untuk kompatibilitas
   pgaByCol:   string;
 }> = {
   'hot-work': {
     table:      'form_kerja_panas',
     idColumn:   'id_form',
-    pgaApprCol: 'mr_pga_approved',
-    pgaByCol:   'mr_pga_approved_by',
+    pgaApprCol: 'mr_pga_approved',    // kolom DB tidak diubah
+    pgaByCol:   'mr_pga_approved_by', // kolom DB tidak diubah
   },
   'workshop': {
     table:      'form_kerja_workshop',
@@ -57,6 +60,7 @@ const TIPE_EXPR_FW = `CASE
 END`;
 
 // ── Mapping role → kolom DB (approved, approved_by, approved_at, nik) ──
+// CATATAN: role 'smr' (dahulu 'pga') memetakan ke kolom mr_pga_* yang tidak diubah.
 function getRoleApprovalColumns(role: UserRole, formType: FormType, isLastStage: boolean): {
   approvedCol:   string;
   approvedByCol: string;
@@ -65,12 +69,13 @@ function getRoleApprovalColumns(role: UserRole, formType: FormType, isLastStage:
 } | null {
   const config = FORM_CONFIG[formType];
 
+  // Stage terakhir = role 'smr' (dahulu 'pga') → kolom DB mr_pga_* tetap
   if (isLastStage) {
     return {
-      approvedCol:    config.pgaApprCol,
-      approvedByCol:  config.pgaByCol,
-      approvedAtCol:  'mr_pga_approved_at',
-      approvedNikCol: 'mr_pga_nik',
+      approvedCol:    config.pgaApprCol,       // mr_pga_approved
+      approvedByCol:  config.pgaByCol,          // mr_pga_approved_by
+      approvedAtCol:  'mr_pga_approved_at',     // kolom DB tidak diubah
+      approvedNikCol: 'mr_pga_nik',             // kolom DB tidak diubah
     };
   }
 
@@ -104,6 +109,7 @@ function getRoleApprovalColumns(role: UserRole, formType: FormType, isLastStage:
       approvedAtCol:  'sfo_approved_at',
       approvedNikCol: 'sfo_nik',
     },
+    // 'smr' tidak ada di sini karena selalu isLastStage=true saat gilirannya
   };
 
   return map[role] ?? null;

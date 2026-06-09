@@ -1244,3 +1244,92 @@ export async function generatePermitPdf(data: any, formType: FormType): Promise<
   const safe = (data.id_form ?? "permit").replace(/[^a-zA-Z0-9\-_]/g, "_");
   doc.d.save(`Permit_${safe}.pdf`);
 }
+
+export async function generatePermitPdfBlob(data: any, formType: FormType): Promise<Blob> {
+  const { jsPDF } = await import("jspdf");
+ 
+  const jenisPermit = JENIS_LABEL[formType] ?? formType.toUpperCase();
+  const isEksternal = data.tipe_perusahaan === "eksternal";
+  const generatedAt = new Date().toLocaleString("id-ID", {
+    day: "2-digit", month: "short", year: "numeric",
+    hour: "2-digit", minute: "2-digit", second: "2-digit",
+  });
+ 
+  const jd  = new jsPDF({ unit: "mm", format: "a4", compress: true });
+  const doc = new Doc(jd, 0);
+ 
+  // ── Halaman 1: Header ──────────────────────────────────
+  drawWatermark(doc.d);
+  drawHeader(doc, jenisPermit, data.id_form ?? "-", data.status ?? "submitted",
+    data.tanggal ?? null, data.tanggal_pelaksanaan ?? null, data.tipe_perusahaan ?? "internal");
+ 
+  // ── Konten form ────────────────────────────────────────
+  if (formType === "hot-work" || formType === "workshop") {
+    buildHotWorkWorkshop(doc, data, formType);
+  } else {
+    buildHeightWork(doc, data);
+  }
+ 
+  // ── JSA ────────────────────────────────────────────────
+  sec(doc, "Dokumen JSA");
+  await jsaSection(doc, bool(data.perlu_jsa), data.jsa_file_url);
+ 
+  // ── Catatan Reject ─────────────────────────────────────
+  if (data.catatan_reject) {
+    doc.need(14);
+    const ry = doc.y;
+    const d  = doc.d;
+    d.setFillColor(...C.r100);
+    d.setDrawColor(...C.r600);
+    d.setLineWidth(0.3);
+    d.roundedRect(ML, ry, CW, 12, 1, 1, "FD");
+    d.setFont(FF, "bold");
+    d.setFontSize(7);
+    d.setTextColor(...C.r600);
+    d.text("CATATAN PENOLAKAN", ML + 3, ry + 5);
+    d.setFont(FF, "normal");
+    d.setFontSize(7);
+    d.setTextColor(185, 28, 28);
+    const ls = d.splitTextToSize(data.catatan_reject, CW - 6);
+    d.text(ls[0] ?? "-", ML + 3, ry + 9.5);
+    doc.y = ry + 15;
+  }
+ 
+  // ── Approval Grid ──────────────────────────────────────
+  sec(doc, "Persetujuan & Verifikasi QR");
+ 
+  const approvers: Approver[] = [];
+  if (isEksternal) {
+    approvers.push({
+      lbl: "Kontraktor", role: "kontraktor",
+      approved: data.kontraktor_approved, approvedBy: data.kontraktor_approved_by,
+      approvedNik: data.kontraktor_nik, approvedAt: data.kontraktor_approved_at,
+    });
+  }
+  approvers.push(
+    { lbl: "SPV Terkait",  role: "spv",      approved: data.spv_approved,      approvedBy: data.spv_approved_by ?? data.spv_terkait,      approvedNik: data.spv_nik,      approvedAt: data.spv_approved_at },
+    { lbl: "Admin K3",     role: "admin_k3", approved: data.admin_k3_approved,  approvedBy: data.admin_k3_approved_by,                     approvedNik: data.admin_k3_nik, approvedAt: data.admin_k3_approved_at },
+    { lbl: "SFO",          role: "sfo",      approved: data.sfo_approved,       approvedBy: data.sfo_approved_by ?? data.sfo,               approvedNik: data.sfo_nik,      approvedAt: data.sfo_approved_at },
+    { lbl: "MR / PGA Mgr", role: "mr_pga",   approved: data.mr_pga_approved,    approvedBy: data.mr_pga_approved_by ?? data.mr_pga_mgr,     approvedNik: data.mr_pga_nik,   approvedAt: data.mr_pga_approved_at },
+  );
+ 
+  await approvalGrid(doc, approvers, data.id_form ?? "", formType);
+ 
+  // ── Lampiran Lisensi HEW (halaman 2+) ───────────────────
+  if (formType === "height-work") {
+    await buildLisensiPage(doc, data);
+  }
+ 
+  // ── Watermark semua halaman ────────────────────────────
+  const total = (doc.d.internal as any).getNumberOfPages();
+  for (let p = 1; p <= total; p++) {
+    doc.d.setPage(p);
+    drawWatermark(doc.d);
+  }
+ 
+  // ── Footer semua halaman ───────────────────────────────
+  drawFooters(doc.d, total, generatedAt);
+ 
+  // ── Kembalikan sebagai Blob (TIDAK download) ───────────
+  return doc.d.output("blob");
+}

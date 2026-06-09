@@ -307,7 +307,7 @@ export async function GET(req: NextRequest) {
     //   - hot-work/workshop EKSTERNAL stage 5
     //   - height-work internal stage 4
     //   - height-work eksternal stage 5
-    if (userRole === 'pga') {
+    if (userRole === 'smr') {
       if (countOnly) {
         const [subm, appr, rej] = await Promise.all([
           Promise.all([

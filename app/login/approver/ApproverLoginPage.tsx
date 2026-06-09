@@ -38,7 +38,7 @@ export default function ApproverLoginPage() {
         return;
       }
 
-      const allowedRoles = ["spv", "admin", "kontraktor", "sfo", "pga", "firewatch", "admin_k3"];
+      const allowedRoles = ["spv", "admin", "kontraktor", "sfo", "smr", "firewatch", "admin_k3"];
       if (!allowedRoles.includes(data.user.role)) {
         await fetch("/form-permit/api/auth/logout", { method: "POST", credentials: "include" });
         sessionStorage.clear();

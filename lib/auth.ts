@@ -4,11 +4,15 @@
 // bukan sebagai approver. Role 'firewatch' tetap ada untuk keperluan login,
 // tapi tidak punya stage approval.
 //
+// REFACTOR: Role 'pga' diganti menjadi 'smr'.
+// Kolom DB mr_pga_approved, mr_pga_approved_by, mr_pga_approved_at, mr_pga_nik
+// TIDAK diubah untuk kompatibilitas data lama.
+//
 // WORKFLOW BARU:
-//   Hot-work & Workshop INTERNAL:  spv(1) → admin_k3(2) → sfo(3) → mr_pga(4)
-//   Hot-work & Workshop EKSTERNAL: kontraktor(1) → spv(2) → admin_k3(3) → sfo(4) → mr_pga(5)
-//   Height-work INTERNAL:          spv(1) → admin_k3(2) → sfo(3) → mr_pga(4)
-//   Height-work EKSTERNAL:         kontraktor(1) → spv(2) → admin_k3(3) → sfo(4) → mr_pga(5)
+//   Hot-work & Workshop INTERNAL:  spv(1) → admin_k3(2) → sfo(3) → smr(4)
+//   Hot-work & Workshop EKSTERNAL: kontraktor(1) → spv(2) → admin_k3(3) → sfo(4) → smr(5)
+//   Height-work INTERNAL:          spv(1) → admin_k3(2) → sfo(3) → smr(4)
+//   Height-work EKSTERNAL:         kontraktor(1) → spv(2) → admin_k3(3) → sfo(4) → smr(5)
 
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
@@ -24,7 +28,7 @@ export type UserRole =
   | 'kontraktor'
   | 'admin_k3'
   | 'sfo'
-  | 'pga'
+  | 'smr'         // sebelumnya: 'pga'
   | 'admin';
 
 // ROLE_ORDER: dipakai untuk perbandingan hierarki role (bukan stage approval).
@@ -36,19 +40,19 @@ export const ROLE_ORDER: Record<UserRole, number> = {
   kontraktor: 2,
   admin_k3:   3,
   sfo:        4,
-  pga:        5,
+  smr:        5,  // sebelumnya: pga: 5
   admin:      99,
 };
 
 // ── Stage maps HOT-WORK & WORKSHOP ───────────────────────────
 // Stage dimulai dari 1 (tidak ada stage 0 untuk firewatch lagi).
-// Internal:  1=spv, 2=admin_k3, 3=sfo, 4=pga
-// Eksternal: 1=kontraktor, 2=spv, 3=admin_k3, 4=sfo, 5=pga
+// Internal:  1=spv, 2=admin_k3, 3=sfo, 4=smr
+// Eksternal: 1=kontraktor, 2=spv, 3=admin_k3, 4=sfo, 5=smr
 export const STAGE_TO_ROLE_FW_INTERNAL: Record<number, UserRole> = {
   1: 'spv',
   2: 'admin_k3',
   3: 'sfo',
-  4: 'pga',
+  4: 'smr',       // sebelumnya: 'pga'
 };
 
 export const STAGE_TO_ROLE_FW_EKSTERNAL: Record<number, UserRole> = {
@@ -56,17 +60,17 @@ export const STAGE_TO_ROLE_FW_EKSTERNAL: Record<number, UserRole> = {
   2: 'spv',
   3: 'admin_k3',
   4: 'sfo',
-  5: 'pga',
+  5: 'smr',       // sebelumnya: 'pga'
 };
 
 // ── Stage maps HEIGHT-WORK ────────────────────────────────────
-// Internal:  1=spv, 2=admin_k3, 3=sfo, 4=pga
-// Eksternal: 1=kontraktor, 2=spv, 3=admin_k3, 4=sfo, 5=pga
+// Internal:  1=spv, 2=admin_k3, 3=sfo, 4=smr
+// Eksternal: 1=kontraktor, 2=spv, 3=admin_k3, 4=sfo, 5=smr
 export const STAGE_TO_ROLE_HW_INTERNAL: Record<number, UserRole> = {
   1: 'spv',
   2: 'admin_k3',
   3: 'sfo',
-  4: 'pga',
+  4: 'smr',       // sebelumnya: 'pga'
 };
 
 export const STAGE_TO_ROLE_HW_EKSTERNAL: Record<number, UserRole> = {
@@ -74,7 +78,7 @@ export const STAGE_TO_ROLE_HW_EKSTERNAL: Record<number, UserRole> = {
   2: 'spv',
   3: 'admin_k3',
   4: 'sfo',
-  5: 'pga',
+  5: 'smr',       // sebelumnya: 'pga'
 };
 
 // ── STAGE_TO_ROLE default (backward-compat, dipakai getStageToRoleMap) ───
@@ -92,7 +96,7 @@ export const ROLE_TO_STAGE: Record<UserRole, number> = {
   kontraktor:  1,  // stage 1 di alur eksternal
   admin_k3:    2,
   sfo:         3,
-  pga:         4,
+  smr:         4,  // sebelumnya: pga: 4
   admin:       99,
 };
 
@@ -177,7 +181,7 @@ export function canUserApproveAtStage(
   // firewatch tidak punya hak approve sama sekali
   if (userRole === 'firewatch' || userRole === 'worker') return false;
 
-  const stageMap   = getStageToRoleMap(formType || '', tipePerusahaan);
+  const stageMap     = getStageToRoleMap(formType || '', tipePerusahaan);
   const requiredRole = stageMap[currentStage];
   return userRole === requiredRole;
 }
@@ -197,13 +201,13 @@ export function getStageConfig(
       return {
         totalStages: 5,
         startStage:  1,
-        stages: ['kontraktor', 'spv', 'admin_k3', 'sfo', 'mr_pga'],
+        stages: ['kontraktor', 'spv', 'admin_k3', 'sfo', 'smr'], // sebelumnya: 'mr_pga'
       };
     }
     return {
       totalStages: 4,
       startStage:  1,
-      stages: ['spv', 'admin_k3', 'sfo', 'mr_pga'],
+      stages: ['spv', 'admin_k3', 'sfo', 'smr'], // sebelumnya: 'mr_pga'
     };
   }
   // hot-work & workshop
@@ -211,13 +215,13 @@ export function getStageConfig(
     return {
       totalStages: 5,
       startStage:  1,
-      stages: ['kontraktor', 'spv', 'admin_k3', 'sfo', 'mr_pga'],
+      stages: ['kontraktor', 'spv', 'admin_k3', 'sfo', 'smr'], // sebelumnya: 'mr_pga'
     };
   }
   return {
     totalStages: 4,
     startStage:  1,
-    stages: ['spv', 'admin_k3', 'sfo', 'mr_pga'],
+    stages: ['spv', 'admin_k3', 'sfo', 'smr'], // sebelumnya: 'mr_pga'
   };
 }
 

@@ -44,8 +44,9 @@ export async function GET(req: NextRequest) {
          is_active,
          created_at
        FROM users
-       WHERE role IN ('spv', 'kontraktor', 'admin_k3', 'sfo', 'pga', 'admin')
+       WHERE role IN ('spv', 'kontraktor', 'admin_k3', 'sfo', 'smr', 'admin')
        ORDER BY role ASC, created_at DESC`,
+      // ↑ 'pga' diganti 'smr' sesuai nilai baru di kolom role tabel users
       []
     );
 

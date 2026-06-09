@@ -52,7 +52,7 @@ export default function LoginPage() {
 
       // FIX: Validasi role approver sebelum redirect
       // Worker tidak boleh masuk lewat halaman approver
-      const approverRoles = ['spv', 'admin', 'kontraktor', 'sfo', 'pga', 'firewatch', 'admin_k3'];
+      const approverRoles = ['spv', 'admin', 'kontraktor', 'sfo', 'smr', 'firewatch', 'admin_k3'];
       if (!approverRoles.includes(data.user.role)) {
         await fetch("/form-permit/api/auth/logout", {
           method: "POST",

@@ -214,6 +214,10 @@ export default function WorkshopPermitForm() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
+      <style>{`
+        input[type="time"]::-webkit-datetime-edit-ampm-field { display: none; }
+        input[type="time"] { -webkit-appearance: textfield; }
+      `}</style>
       <div className="bg-white shadow-sm border-b border-slate-200 sticky top-0 z-50">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-5 flex items-center justify-between">
           <div className="flex items-center gap-4">
@@ -310,7 +314,7 @@ export default function WorkshopPermitForm() {
 
             <div>
               <label className="block text-sm font-semibold text-slate-700 mb-2">Waktu (Pukul)</label>
-              <input type="time" value={formData.waktuPukul} onChange={e => setFormData(p => ({ ...p, waktuPukul: e.target.value }))} className={inputCls} />
+              <input type="time" step="60" value={formData.waktuPukul} onChange={e => setFormData(p => ({ ...p, waktuPukul: e.target.value }))} className={inputCls} />
             </div>
 
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
@@ -400,8 +404,8 @@ export default function WorkshopPermitForm() {
                       <p className="text-sm font-semibold text-slate-900 mb-3 capitalize">{key}</p>
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                         <div className="md:col-span-1"> <label className="block text-xs font-medium text-slate-600 mb-1">Detail</label> <input type="text" value={item.detail} onChange={e => setWork(key, "detail", e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm text-black" /> </div>
-                        <div> <label className="block text-xs font-medium text-slate-600 mb-1">Mulai</label> <input type="time" value={item.mulai} onChange={e => setWork(key, "mulai", e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm text-black" /> </div>
-                        <div> <label className="block text-xs font-medium text-slate-600 mb-1">Selesai</label> <input type="time" value={item.selesai} onChange={e => setWork(key, "selesai", e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm text-black" /> </div>
+                        <div> <label className="block text-xs font-medium text-slate-600 mb-1">Mulai</label> <input type="time" step="60" value={item.mulai} onChange={e => setWork(key, "mulai", e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm text-black" /> </div>
+                        <div> <label className="block text-xs font-medium text-slate-600 mb-1">Selesai</label> <input type="time" step="60" value={item.selesai} onChange={e => setWork(key, "selesai", e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm text-black" /> </div>
                       </div>
                       {key === "painting" && (
                         <div className="grid grid-cols-2 gap-4 mt-4 pt-4 border-t border-slate-300">

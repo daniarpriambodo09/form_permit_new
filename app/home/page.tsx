@@ -16,11 +16,11 @@ type UserRole =
   | "kontraktor"
   | "admin_k3"
   | "sfo"
-  | "pga"
+  | "smr"
   | "admin";
 
 const APPROVER_ROLES: UserRole[] = [
-  "firewatch", "spv", "kontraktor", "admin_k3", "sfo", "pga",
+  "firewatch", "spv", "kontraktor", "admin_k3", "sfo", "smr",
 ];
 
 interface QuickAccessCard {
@@ -46,16 +46,16 @@ function getQuickAccessCards(role: UserRole): QuickAccessCard[] {
         icon: ClipboardList,
       },
       {
-        title: "Kelola Administrator Departemen",
-        description: "Daftarkan dan kelola akun administrator departemen",
+        title: "Kelola Akun Users",
+        description: "Kelola seluruh akun user dan approver dalam satu halaman.",
         href: "/admin-users",
         icon: Users,
       },
       {
-        title: "Kelola Akun Approver",
-        description: "Kelola akun SPV, Kontraktor, Admin K3, SFO, dan PGA.",
-        href: "/admin-users?tab=approver",
-        icon: Users,
+        title: "Daftar File Form",
+        description: "Lihat dan buka file PDF form tanpa perlu mengunduh terlebih dahulu.",
+        href: "/form-files",
+        icon: FileText,
       },
     ];
   }

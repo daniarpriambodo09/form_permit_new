@@ -1,4 +1,5 @@
 // app/profile/page.tsx
+// REFACTOR: Role 'pga' diganti 'smr' di ROLE_LABELS.
 "use client";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -22,15 +23,16 @@ interface UserProfile {
   perusahaan?: string | null;
 }
 
+// REFACTOR: 'pga' → 'smr', label 'PGA / MR' → 'SMR'
 const ROLE_LABELS: Record<string, string> = {
-  worker:    "Worker",
-  firewatch: "Fire Watch",
-  spv:       "Supervisor",
-  kontraktor:"Kontraktor",
-  admin_k3:  "Admin K3",
-  sfo:       "SFO",
-  pga:       "PGA / MR",
-  admin:     "Administrator",
+  worker:     "Worker",
+  firewatch:  "Fire Watch",
+  spv:        "Supervisor",
+  kontraktor: "Kontraktor",
+  admin_k3:   "Admin K3",
+  sfo:        "SFO",
+  smr:        "SMR",          // sebelumnya: pga: "PGA / MR"
+  admin:      "Administrator",
 };
 
 type ActiveTab = "info" | "username" | "password";
@@ -80,19 +82,19 @@ export default function ProfilePage() {
   const [toast, setToast]         = useState<Toast | null>(null);
 
   // Username form
-  const [newUsername, setNewUsername]   = useState("");
-  const [usernameErr, setUsernameErr]   = useState("");
-  const [savingUser, setSavingUser]     = useState(false);
+  const [newUsername, setNewUsername] = useState("");
+  const [usernameErr, setUsernameErr] = useState("");
+  const [savingUser, setSavingUser]   = useState(false);
 
   // Password form
-  const [oldPw, setOldPw]               = useState("");
-  const [newPw, setNewPw]               = useState("");
-  const [confirmPw, setConfirmPw]       = useState("");
-  const [pwErr, setPwErr]               = useState("");
-  const [savingPw, setSavingPw]         = useState(false);
-  const [showOld, setShowOld]           = useState(false);
-  const [showNew, setShowNew]           = useState(false);
-  const [showConfirm, setShowConfirm]   = useState(false);
+  const [oldPw, setOldPw]             = useState("");
+  const [newPw, setNewPw]             = useState("");
+  const [confirmPw, setConfirmPw]     = useState("");
+  const [pwErr, setPwErr]             = useState("");
+  const [savingPw, setSavingPw]       = useState(false);
+  const [showOld, setShowOld]         = useState(false);
+  const [showNew, setShowNew]         = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
 
   useEffect(() => {
     fetch("/form-permit/api/auth/me", { credentials: "include" })
@@ -112,9 +114,9 @@ export default function ProfilePage() {
   const handleChangeUsername = async () => {
     setUsernameErr("");
     const trimmed = newUsername.trim();
-    if (!trimmed) { setUsernameErr("Username tidak boleh kosong."); return; }
-    if (trimmed === profile?.username) { setUsernameErr("Username baru sama dengan username saat ini."); return; }
-    if (trimmed.length < 4) { setUsernameErr("Username minimal 4 karakter."); return; }
+    if (!trimmed)                          { setUsernameErr("Username tidak boleh kosong."); return; }
+    if (trimmed === profile?.username)     { setUsernameErr("Username baru sama dengan username saat ini."); return; }
+    if (trimmed.length < 4)               { setUsernameErr("Username minimal 4 karakter."); return; }
     if (!/^[a-zA-Z0-9_]+$/.test(trimmed)) { setUsernameErr("Username hanya boleh berisi huruf, angka, dan underscore."); return; }
 
     setSavingUser(true);
@@ -140,8 +142,8 @@ export default function ProfilePage() {
   // ── Ubah Password ────────────────────────────────────────────
   const handleChangePassword = async () => {
     setPwErr("");
-    if (!oldPw) { setPwErr("Masukkan password lama."); return; }
-    if (newPw.length < 6) { setPwErr("Password baru minimal 6 karakter."); return; }
+    if (!oldPw)              { setPwErr("Masukkan password lama."); return; }
+    if (newPw.length < 6)    { setPwErr("Password baru minimal 6 karakter."); return; }
     if (newPw !== confirmPw) { setPwErr("Konfirmasi password tidak cocok."); return; }
 
     setSavingPw(true);
@@ -224,7 +226,7 @@ export default function ProfilePage() {
               {tab === "info"     && <BadgeInfo className="w-4 h-4" />}
               {tab === "username" && <User className="w-4 h-4" />}
               {tab === "password" && <Lock className="w-4 h-4" />}
-              {tab === "info"     ? "Informasi" : tab === "username" ? "Username" : "Password"}
+              {tab === "info" ? "Informasi" : tab === "username" ? "Username" : "Password"}
             </button>
           ))}
         </div>
@@ -297,9 +299,9 @@ export default function ProfilePage() {
 
             <div className="space-y-4">
               {[
-                { label: "Password Lama",             val: oldPw,     setVal: setOldPw,     show: showOld,    setShow: setShowOld },
-                { label: "Password Baru",             val: newPw,     setVal: setNewPw,     show: showNew,    setShow: setShowNew },
-                { label: "Konfirmasi Password Baru",  val: confirmPw, setVal: setConfirmPw, show: showConfirm,setShow: setShowConfirm },
+                { label: "Password Lama",            val: oldPw,     setVal: setOldPw,     show: showOld,     setShow: setShowOld     },
+                { label: "Password Baru",            val: newPw,     setVal: setNewPw,     show: showNew,     setShow: setShowNew     },
+                { label: "Konfirmasi Password Baru", val: confirmPw, setVal: setConfirmPw, show: showConfirm, setShow: setShowConfirm },
               ].map(({ label, val, setVal, show, setShow }) => (
                 <div key={label}>
                   <label className="block text-sm font-semibold text-slate-700 mb-1.5">{label}</label>

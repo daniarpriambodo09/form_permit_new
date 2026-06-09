@@ -369,6 +369,10 @@ export default function HeightWorkFormPage() {
 
   return (
     <div className="min-h-screen bg-slate-50">
+      <style>{`
+        input[type="time"]::-webkit-datetime-edit-ampm-field { display: none; }
+        input[type="time"] { -webkit-appearance: textfield; }
+      `}</style>
       <header className="bg-white border-b border-slate-200 sticky top-0 z-40">
         <div className="max-w-3xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -443,19 +447,20 @@ export default function HeightWorkFormPage() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-semibold text-slate-700 mb-2">Waktu Mulai</label>
-                  <input type="time" value={waktuMulai} onChange={(e) => setWaktuMulai(e.target.value)} className={inputCls} />
+                  <input type="time" step="60" value={waktuMulai} onChange={(e) => setWaktuMulai(e.target.value)} className={inputCls} />
+...
                 </div>
                 <div>
                   <label className="block text-sm font-semibold text-slate-700 mb-2">Waktu Selesai</label>
-                  <input type="time" value={waktuSelesai} onChange={(e) => setWaktuSelesai(e.target.value)} className={inputCls} />
+                  <input type="time" step="60" value={waktuSelesai} onChange={(e) => setWaktuSelesai(e.target.value)} className={inputCls} />
                 </div>
               </div>
-
               <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2">Nama Pengawas Kontraktor <span className="text-red-500">*</span></label>
-                <input type="text" value={namaPengawasKontraktor} onChange={(e) => setNamaPengawasKontraktor(e.target.value)} placeholder="Nama pengawas kontraktor" required className={inputCls} />
+                <label className="block text-sm font-semibold text-slate-700 mb-2">
+                  {tipePerusahaan === "eksternal" ? "Nama Pengawas Kontraktor" : "Nama Pengawas"} <span className="text-red-500">*</span>
+                </label>
+                <input type="text" value={namaPengawasKontraktor} onChange={(e) => setNamaPengawasKontraktor(e.target.value)} placeholder={tipePerusahaan === "eksternal" ? "Nama pengawas kontraktor" : "Nama pengawas"} required className={inputCls} />
               </div>
-
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-2">Nama Departemen <span className="text-red-500">*</span></label>
                 <select value={namaDepartemen} onChange={(e) => { setNamaDepartemen(e.target.value); setNamaPengawasDepartemen(""); }} required className={`${inputCls} ${!namaDepartemen ? "text-slate-400" : "text-slate-800"}`}>

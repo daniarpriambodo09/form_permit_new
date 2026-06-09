@@ -47,7 +47,7 @@ type ActiveTab = "admin" | "approver";
 
 const DEPARTMENT_OPTIONS = [
   "QA", "ENG", "MTC", "PRODUKSI",
-  "NYS", "FATP-Exim", "MPC-WHS", "PGA",
+  "NYS", "FATP-Exim", "MPC-WHS", "SMR",
 ] as const;
 
 const APPROVER_ROLE_OPTIONS = [
@@ -55,7 +55,7 @@ const APPROVER_ROLE_OPTIONS = [
   { value: "kontraktor", label: "Kontraktor" },
   { value: "admin_k3",   label: "Admin K3" },
   { value: "sfo",        label: "SFO" },
-  { value: "pga",        label: "PGA" },
+  { value: "smr",        label: "SMR" },
   { value: "admin",      label: "Admin" },
 ] as const;
 
@@ -64,7 +64,7 @@ const ROLE_LABEL: Record<string, string> = {
   kontraktor: "Kontraktor",
   admin_k3:   "Admin K3",
   sfo:        "SFO",
-  pga:        "PGA",
+  smr:        "SMR",
   admin:      "Admin",
   worker:     "Worker",
   firewatch:  "Fire Watch",
@@ -75,7 +75,7 @@ const ROLE_COLOR: Record<string, string> = {
   kontraktor: "bg-purple-50 text-purple-700 border-purple-200",
   admin_k3:   "bg-orange-50 text-orange-700 border-orange-200",
   sfo:        "bg-teal-50 text-teal-700 border-teal-200",
-  pga:        "bg-rose-50 text-rose-700 border-rose-200",
+  smr:        "bg-rose-50 text-rose-700 border-rose-200",
   admin:      "bg-slate-50 text-slate-700 border-slate-300",
 };
 

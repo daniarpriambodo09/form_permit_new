@@ -1,8 +1,6 @@
 // app/approval/page.tsx
-// FIX: getApprovalStages dan getStageLabelForForm sekarang aware tipe_perusahaan
-// untuk hot-work & workshop:
-//   Internal:  fw(0) → spv(1) → admin_k3(2) → sfo(3) → mr_pga(4)
-//   Eksternal: kontraktor(0) → fw(1) → spv(2) → admin_k3(3) → sfo(4) → mr_pga(5)
+// REFACTOR: Role 'pga' diganti 'smr' di seluruh label, mapping stage, dan roleLabelMap.
+//           Kolom DB mr_pga_approved tetap digunakan (tidak diubah).
 "use client";
 import { useState, useEffect } from "react";
 import Link from "next/link";
@@ -29,14 +27,12 @@ interface FormItem {
   current_stage?: number;
   // tipe_perusahaan berlaku untuk semua jenis form
   tipe_perusahaan?: string;
-  // approval columns hot-work & workshop
-  fw_approved?: boolean;
+  // approval columns — kolom DB mr_pga_* tetap tidak diubah
   spv_approved?: boolean;
   kontraktor_approved?: boolean;
   admin_k3_approved?: boolean;
   sfo_approved?: boolean;
-  pga_approved?: boolean;
-  mr_pga_approved?: boolean;
+  mr_pga_approved?: boolean; // kolom DB tetap, bukan pga_approved
 }
 
 interface FormCounts {
@@ -63,18 +59,18 @@ const jenisBadge: Record<string, string> = {
   "height-work": "bg-orange-100 text-orange-700",
 };
 
+// REFACTOR: 'pga' → 'smr', label 'PGA / MR' → 'SMR'
 const roleLabelMap: Record<string, string> = {
   firewatch:  "Fire Watch",
   spv:        "SPV",
   kontraktor: "Kontraktor",
   admin_k3:   "Admin K3",
   sfo:        "SFO",
-  pga:        "PGA / MR",
+  smr:        "SMR",   // sebelumnya: pga: "PGA / MR"
   admin:      "Admin",
 };
 
 // ── Helper: label stage sesuai jenis form & tipe_perusahaan ──
-// Dipakai untuk badge "Tahap X: ..." di card list
 function getStageLabelForForm(form: FormItem): string {
   const stage = form.current_stage ?? 0;
   const isHw  = form.jenis_form === "height-work";
@@ -87,23 +83,20 @@ function getStageLabelForForm(form: FormItem): string {
       };
       return map[stage] ?? `Tahap ${stage}`;
     }
-    // height-work internal
     const map: Record<number, string> = {
       1: "SPV", 2: "Admin K3", 3: "SFO", 4: "SMR",
     };
     return map[stage] ?? `Tahap ${stage}`;
   }
 
-  // hot-work & workshop — aware tipe_perusahaan
+  // hot-work & workshop
   if (isEksternal) {
-    // Eksternal: stage 0=Kontraktor, 1=FireWatch, 2=SPV, 3=AdminK3, 4=SFO, 5=SMR
     const map: Record<number, string> = {
       1: "Kontraktor", 2: "SPV", 3: "Admin K3", 4: "SFO", 5: "SMR",
     };
     return map[stage] ?? `Tahap ${stage}`;
   }
 
-  // Internal: stage 0=FireWatch, 1=SPV, 2=AdminK3, 3=SFO, 4=SMR
   const map: Record<number, string> = {
     1: "SPV", 2: "Admin K3", 3: "SFO", 4: "SMR",
   };
@@ -111,6 +104,7 @@ function getStageLabelForForm(form: FormItem): string {
 }
 
 // ── Helper: stages badge untuk approval progress ──
+// key menggunakan nama kolom DB yang sebenarnya (mr_pga_approved, bukan smr_approved)
 function getApprovalStages(form: FormItem): { key: keyof FormItem; label: string }[] {
   const isEksternal = form.tipe_perusahaan === "eksternal";
 
@@ -121,34 +115,33 @@ function getApprovalStages(form: FormItem): { key: keyof FormItem; label: string
         { key: "spv_approved",        label: "SPV" },
         { key: "admin_k3_approved",   label: "Admin K3" },
         { key: "sfo_approved",        label: "SFO" },
-        { key: "mr_pga_approved",     label: "SMR" },
+        { key: "mr_pga_approved",     label: "SMR" }, // key kolom DB tetap, label diubah
       ];
     }
     return [
       { key: "spv_approved",      label: "SPV" },
       { key: "admin_k3_approved", label: "Admin K3" },
       { key: "sfo_approved",      label: "SFO" },
-      { key: "mr_pga_approved",   label: "SMR" },
+      { key: "mr_pga_approved",   label: "SMR" }, // key kolom DB tetap, label diubah
     ];
   }
 
-  // hot-work & workshop — aware tipe_perusahaan
+  // hot-work & workshop
   if (isEksternal) {
     return [
       { key: "kontraktor_approved", label: "Kontraktor" },
-      { key: "spv_approved", label: "SPV" },
-      { key: "admin_k3_approved", label: "Admin K3" },
-      { key: "sfo_approved", label: "SFO" },
-      { key: "mr_pga_approved", label: "SMR" },
+      { key: "spv_approved",        label: "SPV" },
+      { key: "admin_k3_approved",   label: "Admin K3" },
+      { key: "sfo_approved",        label: "SFO" },
+      { key: "mr_pga_approved",     label: "SMR" }, // key kolom DB tetap, label diubah
     ];
   }
 
-  // Internal
   return [
-    { key: "spv_approved", label: "SPV" },
+    { key: "spv_approved",      label: "SPV" },
     { key: "admin_k3_approved", label: "Admin K3" },
-    { key: "sfo_approved", label: "SFO" },
-    { key: "mr_pga_approved", label: "SMR" },
+    { key: "sfo_approved",      label: "SFO" },
+    { key: "mr_pga_approved",   label: "SMR" }, // key kolom DB tetap, label diubah
   ];
 }
 

@@ -1,8 +1,9 @@
 // app/approval/[jenisForm]/[id]/page.tsx
-// REFACTOR: Hapus Fire Watch dari approval chain visual dan dari logic approval.
-// ADD: Tampilkan section Dokumen JSA untuk semua jenis form.
+// REFACTOR: Role 'pga' diganti 'smr' di seluruh label, roleLabel map,
+//           getApproveButtonLabel, dan renderApprovalChain.
+//           Kolom DB mr_pga_approved, mr_pga_approved_by tetap digunakan.
 //
-// WORKFLOW BARU:
+// WORKFLOW:
 //   Hot-work & Workshop INTERNAL:  SPV(1) → Admin K3(2) → SFO(3) → SMR(4)
 //   Hot-work & Workshop EKSTERNAL: Kontraktor(1) → SPV(2) → Admin K3(3) → SFO(4) → SMR(5)
 //   Height-work INTERNAL:          SPV(1) → Admin K3(2) → SFO(3) → SMR(4)
@@ -26,8 +27,8 @@ const formatTime = (t?: string) => (!t ? "-" : String(t).slice(0, 5));
 const isTruthy = (v: any) => v === true || v === "t" || v === "true";
 
 const jenisLabel: Record<string, string> = {
-  "hot-work": "Hot Work Permit",
-  "workshop": "Workshop Permit",
+  "hot-work":    "Hot Work Permit",
+  "workshop":    "Workshop Permit",
   "height-work": "Kerja Ketinggian",
 };
 
@@ -112,6 +113,9 @@ const JsaDisplay = ({ perluJsa, jsaFileUrl }: { perluJsa: boolean; jsaFileUrl?: 
 };
 
 // ── Approval chain ────────────────────────────────────────────
+// REFACTOR: key 'mr_pga' (nama kolom DB tanpa suffix _approved) tetap digunakan
+// agar form[`${stage.key}_approved`] → mr_pga_approved tetap cocok dengan kolom DB.
+// Label berubah dari "PGA / MR" / "MR PGA" menjadi "SMR".
 const renderApprovalChain = (form: any, jenisForm: string) => {
   const isEksternal = form.tipe_perusahaan === "eksternal" || form.petugas_ketinggian === "eksternal";
 
@@ -121,34 +125,35 @@ const renderApprovalChain = (form: any, jenisForm: string) => {
     if (isEksternal) {
       stages = [
         { label: "Kontraktor", key: "kontraktor", icon: "🏢", dbStage: 1 },
-        { label: "SPV", key: "spv", icon: "", dbStage: 2 },
-        { label: "Admin K3", key: "admin_k3", icon: "🛡️", dbStage: 3 },
-        { label: "SFO", key: "sfo", icon: "", dbStage: 4 },
-        { label: "SMR", key: "mr_pga", icon: "✅", dbStage: 5 },
+        { label: "SPV",        key: "spv",        icon: "👷", dbStage: 2 },
+        { label: "Admin K3",   key: "admin_k3",   icon: "🛡️", dbStage: 3 },
+        { label: "SFO",        key: "sfo",        icon: "🔒", dbStage: 4 },
+        { label: "SMR",        key: "mr_pga",     icon: "✅", dbStage: 5 }, // label diubah, key kolom DB tetap
       ];
     } else {
       stages = [
-        { label: "SPV", key: "spv", icon: "👷", dbStage: 1 },
+        { label: "SPV",      key: "spv",      icon: "👷", dbStage: 1 },
         { label: "Admin K3", key: "admin_k3", icon: "🛡️", dbStage: 2 },
-        { label: "SFO", key: "sfo", icon: "🔒", dbStage: 3 },
-        { label: "SMR", key: "mr_pga", icon: "✅", dbStage: 4 },
+        { label: "SFO",      key: "sfo",      icon: "🔒", dbStage: 3 },
+        { label: "SMR",      key: "mr_pga",   icon: "✅", dbStage: 4 }, // label diubah, key kolom DB tetap
       ];
     }
   } else {
+    // hot-work & workshop
     if (isEksternal) {
       stages = [
         { label: "Kontraktor", key: "kontraktor", icon: "🏢", dbStage: 1 },
-        { label: "SPV", key: "spv", icon: "", dbStage: 2 },
-        { label: "Admin K3", key: "admin_k3", icon: "🛡️", dbStage: 3 },
-        { label: "SFO", key: "sfo", icon: "🔒", dbStage: 4 },
-        { label: "SMR", key: "mr_pga", icon: "✅", dbStage: 5 },
+        { label: "SPV",        key: "spv",        icon: "👷", dbStage: 2 },
+        { label: "Admin K3",   key: "admin_k3",   icon: "🛡️", dbStage: 3 },
+        { label: "SFO",        key: "sfo",        icon: "🔒", dbStage: 4 },
+        { label: "SMR",        key: "mr_pga",     icon: "✅", dbStage: 5 }, // label diubah, key kolom DB tetap
       ];
     } else {
       stages = [
-        { label: "SPV", key: "spv", icon: "👷", dbStage: 1 },
+        { label: "SPV",      key: "spv",      icon: "👷", dbStage: 1 },
         { label: "Admin K3", key: "admin_k3", icon: "🛡️", dbStage: 2 },
-        { label: "SFO", key: "sfo", icon: "🔒", dbStage: 3 },
-        { label: "SMR", key: "mr_pga", icon: "✅", dbStage: 4 },
+        { label: "SFO",      key: "sfo",      icon: "🔒", dbStage: 3 },
+        { label: "SMR",      key: "mr_pga",   icon: "✅", dbStage: 4 }, // label diubah, key kolom DB tetap
       ];
     }
   }
@@ -160,12 +165,12 @@ const renderApprovalChain = (form: any, jenisForm: string) => {
       <h4 className="font-semibold text-slate-800 text-sm mb-4">Status Approval</h4>
       <div className="flex items-center justify-between gap-1">
         {stages.map((stage, idx) => {
-          const approvedKey = `${stage.key}_approved`;
-          const approvedByKey = `${stage.key}_approved_by`;
-          const isApproved = isTruthy(form[approvedKey]);
-          const approvedBy = form[approvedByKey];
-          const isCurrent = currentDbStage === stage.dbStage && form.status === "submitted";
-          const isRejected = form.status === "rejected";
+          const approvedKey  = `${stage.key}_approved`;   // → mr_pga_approved (kolom DB)
+          const approvedByKey = `${stage.key}_approved_by`; // → mr_pga_approved_by (kolom DB)
+          const isApproved   = isTruthy(form[approvedKey]);
+          const approvedBy   = form[approvedByKey];
+          const isCurrent    = currentDbStage === stage.dbStage && form.status === "submitted";
+          const isRejected   = form.status === "rejected";
 
           return (
             <React.Fragment key={stage.key}>
@@ -214,17 +219,17 @@ export default function ApprovalDetailPage({
   const { jenisForm, id } = use(params);
   const router = useRouter();
 
-  const [form, setForm] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
+  const [form, setForm]         = useState<any>(null);
+  const [loading, setLoading]   = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [showReject, setShowReject] = useState(false);
-  const [catatan, setCatatan] = useState("");
-  const [done, setDone] = useState<"approved" | "rejected" | null>(null);
-  const [error, setError] = useState("");
+  const [catatan, setCatatan]   = useState("");
+  const [done, setDone]         = useState<"approved" | "rejected" | null>(null);
+  const [error, setError]       = useState("");
 
-  const [userNama, setUserNama] = useState("");
-  const [userNik, setUserNik] = useState("");
-  const [userRole, setUserRole] = useState("");
+  const [userNama, setUserNama]     = useState("");
+  const [userNik, setUserNik]       = useState("");
+  const [userRole, setUserRole]     = useState("");
   const [userJabatan, setUserJabatan] = useState("");
 
   const isHotOrWorkshop = jenisForm !== "height-work";
@@ -237,9 +242,9 @@ export default function ApprovalDetailPage({
     fetch("/form-permit/api/auth/me")
       .then(r => r.json())
       .then(data => {
-        if (data.user?.nik) setUserNik(data.user.nik);
-        if (data.user?.nama) setUserNama(data.user.nama);
-        if (data.user?.role) setUserRole(data.user.role);
+        if (data.user?.nik)     setUserNik(data.user.nik);
+        if (data.user?.nama)    setUserNama(data.user.nama);
+        if (data.user?.role)    setUserRole(data.user.role);
         if (data.user?.jabatan) setUserJabatan(data.user.jabatan);
       })
       .catch(() => {});
@@ -338,23 +343,25 @@ export default function ApprovalDetailPage({
     );
   }
 
+  // REFACTOR: 'pga' → 'smr', label 'PGA / MR' → 'SMR'
   const roleLabel: Record<string, string> = {
-    spv: "SPV / Pemberi Izin",
+    spv:        "SPV / Pemberi Izin",
     kontraktor: "Kontraktor",
-    admin_k3: "Admin K3",
-    sfo: "SFO",
-    pga: "SMR",
-    admin: "Admin",
-    firewatch: "Fire Watch (Tidak bisa approve)",
-    worker: "Worker",
+    admin_k3:   "Admin K3",
+    sfo:        "SFO",
+    smr:        "SMR",            // sebelumnya: pga: "SMR" / "PGA / MR"
+    admin:      "Admin",
+    firewatch:  "Fire Watch (Tidak bisa approve)",
+    worker:     "Worker",
   };
 
+  // REFACTOR: case 'pga' → 'smr'
   const getApproveButtonLabel = () => {
     if (userRole === "kontraktor") return "Setujui (Kontraktor)";
-    if (userRole === "spv") return "Setujui (SPV)";
-    if (userRole === "admin_k3") return "Setujui (Admin K3)";
-    if (userRole === "sfo") return "Setujui (SFO)";
-    if (userRole === "pga") return "Setujui (SMR)";
+    if (userRole === "spv")        return "Setujui (SPV)";
+    if (userRole === "admin_k3")   return "Setujui (Admin K3)";
+    if (userRole === "sfo")        return "Setujui (SFO)";
+    if (userRole === "smr")        return "Setujui (SMR)"; // sebelumnya: "pga" → "Setujui (SMR)"
     return "Setujui Form";
   };
 
@@ -422,7 +429,7 @@ export default function ApprovalDetailPage({
           </div>
         )}
 
-        {/* Info alur approval baru */}
+        {/* Info alur approval */}
         {isHotOrWorkshop && form.tipe_perusahaan && (
           <div className={`rounded-xl p-4 flex items-start gap-3 border ${
             isEksternal ? "bg-purple-50 border-purple-200" : "bg-blue-50 border-blue-200"
@@ -433,7 +440,7 @@ export default function ApprovalDetailPage({
                 Tipe Pekerja: {getTipeLabel(form.tipe_perusahaan)}
               </p>
               <p className={`text-xs mt-0.5 ${isEksternal ? "text-purple-700" : "text-blue-700"}`}>
-                Alur approval: {" "}
+                Alur approval:{" "}
                 {isEksternal
                   ? "Kontraktor → SPV → Admin K3 → SFO → SMR"
                   : "SPV → Admin K3 → SFO → SMR"
@@ -459,12 +466,12 @@ export default function ApprovalDetailPage({
           <>
             <Sec title="Bagian 1: Identitas & Registrasi">
               <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-4">
-                <F label="No. Registrasi" value={form.no_registrasi} />
-                <F label="Nama Kontraktor / NIK" value={form.nama_kontraktor_nik} />
-                <F label="Nama Pekerja / NIK" value={form.nama_pekerja_nik} />
-                <F label="Lokasi Pekerjaan" value={form.lokasi_pekerjaan} />
-                <F label="Tanggal Pelaksanaan" value={formatDate(form.tanggal_pelaksanaan)} />
-                <F label="Waktu Pukul" value={formatTime(form.waktu_pukul)} />
+                <F label="No. Registrasi"        value={form.no_registrasi} />
+                <F label="Nama Kontraktor / NIK"  value={form.nama_kontraktor_nik} />
+                <F label="Nama Pekerja / NIK"     value={form.nama_pekerja_nik} />
+                <F label="Lokasi Pekerjaan"       value={form.lokasi_pekerjaan} />
+                <F label="Tanggal Pelaksanaan"    value={formatDate(form.tanggal_pelaksanaan)} />
+                <F label="Waktu Pukul"            value={formatTime(form.waktu_pukul)} />
               </div>
 
               <div className="grid grid-cols-2 gap-4">
@@ -477,7 +484,7 @@ export default function ApprovalDetailPage({
                     </span>
                   </div>
                   <F label="Nama" value={form.nama_fire_watch || "Belum diisi"} />
-                  <F label="NIK" value={form.nik_fire_watch || "Belum diisi"} />
+                  <F label="NIK"  value={form.nik_fire_watch  || "Belum diisi"} />
                 </div>
                 <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
                   <div className="flex items-center gap-2 mb-2">
@@ -489,7 +496,7 @@ export default function ApprovalDetailPage({
                     )}
                   </div>
                   <F label="Jabatan" value={form.jabatan_pemberi_izin || "Belum diisi"} />
-                  <F label="NIK" value={form.nik_pemberi_ijin || "Belum diisi"} />
+                  <F label="NIK"     value={form.nik_pemberi_ijin     || "Belum diisi"} />
                 </div>
               </div>
             </Sec>
@@ -497,13 +504,13 @@ export default function ApprovalDetailPage({
             <Sec title="Bagian 2: Jenis Pekerjaan & Area Berisiko">
               <div className="mb-3 flex flex-wrap gap-2">
                 {isTruthy(form.preventive_genset_pump_room) && <span className="px-2 py-1 bg-slate-100 rounded text-xs">✓ Preventive Genset</span>}
-                {isTruthy(form.tangki_solar) && <span className="px-2 py-1 bg-slate-100 rounded text-xs">✓ Tangki Solar</span>}
-                {isTruthy(form.panel_listrik) && <span className="px-2 py-1 bg-slate-100 rounded text-xs">✓ Panel Listrik</span>}
+                {isTruthy(form.tangki_solar)                && <span className="px-2 py-1 bg-slate-100 rounded text-xs">✓ Tangki Solar</span>}
+                {isTruthy(form.panel_listrik)               && <span className="px-2 py-1 bg-slate-100 rounded text-xs">✓ Panel Listrik</span>}
               </div>
               {[
-                { l: "Cutting", d: form.detail_cutting, m: form.t_mulai_cutting, s: form.t_selesai_cutting },
+                { l: "Cutting",  d: form.detail_cutting,  m: form.t_mulai_cutting,  s: form.t_selesai_cutting  },
                 { l: "Grinding", d: form.detail_grinding, m: form.t_mulai_grinding, s: form.t_selesai_grinding },
-                { l: "Welding", d: form.detail_welding, m: form.t_mulai_welding, s: form.t_selesai_welding },
+                { l: "Welding",  d: form.detail_welding,  m: form.t_mulai_welding,  s: form.t_selesai_welding  },
                 { l: "Painting", d: form.detail_painting, m: form.t_mulai_painting, s: form.t_selesai_painting },
               ].filter(x => x.d || x.m).map(x => (
                 <div key={x.l} className="flex gap-2 py-1.5 border-b border-slate-100 text-sm last:border-0">
@@ -513,35 +520,35 @@ export default function ApprovalDetailPage({
                 </div>
               ))}
               <div className="mt-3 flex flex-wrap gap-1.5">
-                {isTruthy(form.ruang_tertutup) && <span className="px-2 py-0.5 bg-red-50 text-red-600 text-xs rounded-full border border-red-200">Ruang Tertutup</span>}
-                {isTruthy(form.bahan_mudah_terbakar) && <span className="px-2 py-0.5 bg-red-50 text-red-600 text-xs rounded-full border border-red-200">Bahan Mudah Terbakar</span>}
-                {isTruthy(form.gas_bejana_tangki) && <span className="px-2 py-0.5 bg-red-50 text-red-600 text-xs rounded-full border border-red-200">Gas/Bejana/Tangki</span>}
-                {isTruthy(form.height_work) && <span className="px-2 py-0.5 bg-red-50 text-red-600 text-xs rounded-full border border-red-200">Ketinggian</span>}
-                {isTruthy(form.cairan_hydrocarbon) && <span className="px-2 py-0.5 bg-red-50 text-red-600 text-xs rounded-full border border-red-200">Hydrocarbon</span>}
+                {isTruthy(form.ruang_tertutup)         && <span className="px-2 py-0.5 bg-red-50 text-red-600 text-xs rounded-full border border-red-200">Ruang Tertutup</span>}
+                {isTruthy(form.bahan_mudah_terbakar)   && <span className="px-2 py-0.5 bg-red-50 text-red-600 text-xs rounded-full border border-red-200">Bahan Mudah Terbakar</span>}
+                {isTruthy(form.gas_bejana_tangki)      && <span className="px-2 py-0.5 bg-red-50 text-red-600 text-xs rounded-full border border-red-200">Gas/Bejana/Tangki</span>}
+                {isTruthy(form.height_work)            && <span className="px-2 py-0.5 bg-red-50 text-red-600 text-xs rounded-full border border-red-200">Ketinggian</span>}
+                {isTruthy(form.cairan_hydrocarbon)     && <span className="px-2 py-0.5 bg-red-50 text-red-600 text-xs rounded-full border border-red-200">Hydrocarbon</span>}
               </div>
             </Sec>
 
             <Sec title="Bagian 3: Upaya Pencegahan">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8">
                 <div>
-                  <BF label="Equipment / Tools kondisi baik" value={form.kondisi_tools_baik} />
-                  <BF label="APAR / Hydrant tersedia" value={form.tersedia_apar_hydrant} />
-                  <BF label="Sensor Smoke Detector non-aktif" value={form.sensor_smoke_detector_non_aktif} />
-                  <BF label="APD lengkap dipakai" value={form.apd_lengkap} />
-                  <BF label="Tidak ada cairan mudah terbakar" value={form.tidak_ada_cairan_mudah_terbakar} />
-                  <BF label="Lantai bersih" value={form.lantai_bersih} />
-                  <BF label="Lantai dibasahi" value={form.lantai_sudah_dibasahi} />
-                  <BF label="Cairan mudah terbakar tertutup" value={form.cairan_mudah_tebakar_tertutup} />
+                  <BF label="Equipment / Tools kondisi baik"      value={form.kondisi_tools_baik} />
+                  <BF label="APAR / Hydrant tersedia"             value={form.tersedia_apar_hydrant} />
+                  <BF label="Sensor Smoke Detector non-aktif"     value={form.sensor_smoke_detector_non_aktif} />
+                  <BF label="APD lengkap dipakai"                 value={form.apd_lengkap} />
+                  <BF label="Tidak ada cairan mudah terbakar"     value={form.tidak_ada_cairan_mudah_terbakar} />
+                  <BF label="Lantai bersih"                       value={form.lantai_bersih} />
+                  <BF label="Lantai dibasahi"                     value={form.lantai_sudah_dibasahi} />
+                  <BF label="Cairan mudah terbakar tertutup"      value={form.cairan_mudah_tebakar_tertutup} />
                 </div>
                 <div>
-                  <BF label="Lembaran di bawah pekerjaan" value={form.lembaran_dibawah_pekerjaan} />
-                  <BF label="Lindungi conveyor, kabel" value={form.lindungi_conveyor_dll} />
-                  <BF label="Alat dibersihkan" value={form.alat_telah_bersih} />
-                  <BF label="Uap menyala dibuang" value={form.uap_menyala_telah_dibuang} />
-                  <BF label="Konstruksi tidak mudah terbakar" value={form.kerja_pada_dinding_lagit} />
-                  <BF label="Bahan mudah terbakar dipindahkan" value={form.bahan_mudah_terbakar_dipindahkan_dari_dinding} />
-                  <BF label="Fire watch memastikan area aman" value={form.fire_watch_memastikan_area_aman} />
-                  <BF label="Fire watch terlatih pakai APAR" value={form.firwatch_terlatih} />
+                  <BF label="Lembaran di bawah pekerjaan"         value={form.lembaran_dibawah_pekerjaan} />
+                  <BF label="Lindungi conveyor, kabel"            value={form.lindungi_conveyor_dll} />
+                  <BF label="Alat dibersihkan"                    value={form.alat_telah_bersih} />
+                  <BF label="Uap menyala dibuang"                 value={form.uap_menyala_telah_dibuang} />
+                  <BF label="Konstruksi tidak mudah terbakar"     value={form.kerja_pada_dinding_lagit} />
+                  <BF label="Bahan mudah terbakar dipindahkan"    value={form.bahan_mudah_terbakar_dipindahkan_dari_dinding} />
+                  <BF label="Fire watch memastikan area aman"     value={form.fire_watch_memastikan_area_aman} />
+                  <BF label="Fire watch terlatih pakai APAR"      value={form.firwatch_terlatih} />
                 </div>
               </div>
               {form.permintaan_tambahan && (
@@ -556,33 +563,33 @@ export default function ApprovalDetailPage({
           <>
             <Sec title="Informasi Pekerjaan di Ketinggian">
               <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                <F label="Tipe Petugas" value={getTipeLabel(form.tipe_perusahaan || form.petugas_ketinggian)} />
-                <F label="Deskripsi Pekerjaan" value={form.deskripsi_pekerjaan} />
-                <F label="Lokasi" value={form.lokasi} />
-                <F label="Tanggal Pelaksanaan" value={formatDate(form.tanggal_pelaksanaan)} />
-                <F label="Waktu Mulai" value={formatTime(form.waktu_mulai)} />
-                <F label="Waktu Selesai" value={formatTime(form.waktu_selesai)} />
-                <F label="Pengawas Kontraktor" value={form.nama_pengawas_kontraktor} />
-                <F label="Pengawas Departemen" value={form.nama_pengawas_departemen} />
-                <F label="Departemen" value={form.nama_departemen} />
+                <F label="Tipe Petugas"           value={getTipeLabel(form.tipe_perusahaan || form.petugas_ketinggian)} />
+                <F label="Deskripsi Pekerjaan"    value={form.deskripsi_pekerjaan} />
+                <F label="Lokasi"                 value={form.lokasi} />
+                <F label="Tanggal Pelaksanaan"    value={formatDate(form.tanggal_pelaksanaan)} />
+                <F label="Waktu Mulai"            value={formatTime(form.waktu_mulai)} />
+                <F label="Waktu Selesai"          value={formatTime(form.waktu_selesai)} />
+                <F label="Pengawas Kontraktor"    value={form.nama_pengawas_kontraktor} />
+                <F label="Pengawas Departemen"    value={form.nama_pengawas_departemen} />
+                <F label="Departemen"             value={form.nama_departemen} />
               </div>
             </Sec>
 
             <Sec title="Pengecekan Keselamatan">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8">
                 <div>
-                  <BF label="Area kerja aman" value={form.area_diperiksa_aman} />
-                  <BF label="Paham prosedur kebakaran" value={form.paham_cara_menggunakan_alat_pemadam_kebakaran} />
-                  <BF label="Ada pekerjaan listrik" value={form.ada_kerja_listrik} />
-                  <BF label="Prosedur LOTO" value={form.prosedur_loto} />
-                  <BF label="Safety line baik" value={form.safetyline_tersedia} />
+                  <BF label="Area kerja aman"                  value={form.area_diperiksa_aman} />
+                  <BF label="Paham prosedur kebakaran"         value={form.paham_cara_menggunakan_alat_pemadam_kebakaran} />
+                  <BF label="Ada pekerjaan listrik"            value={form.ada_kerja_listrik} />
+                  <BF label="Prosedur LOTO"                    value={form.prosedur_loto} />
+                  <BF label="Safety line baik"                 value={form.safetyline_tersedia} />
                 </div>
                 <div>
-                  <BF label="Webbing harness baik" value={form.webbing_kondisi_baik} />
-                  <BF label="D-Ring baik" value={form.dring_kondisi_baik} />
-                  <BF label="Snap Hook baik" value={form.snap_hook_kondisi_baik} />
-                  <BF label="Helm sesuai standar" value={form.helm_sesuai_sop} />
-                  <BF label="Rambu safety tersedia" value={form.rambu2_tersedia} />
+                  <BF label="Webbing harness baik"             value={form.webbing_kondisi_baik} />
+                  <BF label="D-Ring baik"                      value={form.dring_kondisi_baik} />
+                  <BF label="Snap Hook baik"                   value={form.snap_hook_kondisi_baik} />
+                  <BF label="Helm sesuai standar"              value={form.helm_sesuai_sop} />
+                  <BF label="Rambu safety tersedia"            value={form.rambu2_tersedia} />
                 </div>
               </div>
             </Sec>
@@ -614,7 +621,7 @@ export default function ApprovalDetailPage({
                 <div>
                   <h3 className="font-bold text-amber-700 text-base">Fire Watch — Tidak Dapat Approve</h3>
                   <p className="text-sm text-amber-600 mt-0.5">
-                    Role Fire Watch tidak lagi termasuk dalam rantai approval. Form ini menunggu persetujuan dari {" "}
+                    Role Fire Watch tidak lagi termasuk dalam rantai approval. Form ini menunggu persetujuan dari{" "}
                     <strong>{isEksternal ? "Kontraktor" : "SPV"}</strong>.
                   </p>
                 </div>
@@ -626,7 +633,7 @@ export default function ApprovalDetailPage({
               <p className="text-xs text-slate-500 mb-5">
                 Anda login sebagai: <strong>{roleLabel[userRole] || userRole}</strong>
                 {userNama && <> — {userNama}</>}
-                {userNik && <> (NIK: <span className="font-mono">{userNik}</span>)</>}
+                {userNik  && <> (NIK: <span className="font-mono">{userNik}</span>)</>}
               </p>
 
               <div className="flex items-start gap-2 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2.5 mb-5">
