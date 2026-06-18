@@ -458,7 +458,7 @@ export default function HeightWorkFormPage() {
               </div>
 
               {/* ── Field Waktu - Layout Rapi (sama seperti hot-work & workshop) ── */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-md">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-semibold text-slate-700 mb-2">Waktu Mulai <span className="text-[10px] font-normal text-slate-400">(24 jam)</span></label>
                   <TimeInput24 value={waktuMulai} onChange={setWaktuMulai} />
