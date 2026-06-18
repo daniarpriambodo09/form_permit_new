@@ -1,4 +1,10 @@
 // app/form/height-work/page.tsx
+// UPDATED: Standardisasi seluruh input waktu menjadi format 24 jam (HH:mm),
+// menggunakan komponen Time24Input (dropdown jam/menit) sehingga AM/PM
+// tidak akan pernah muncul di browser/device manapun.
+// Data waktu lama (jika ada yang tersimpan dengan AM/PM) tetap bisa dibaca
+// melalui normalizeTo24h(), dan saat form disimpan ulang akan otomatis
+// tersimpan dalam format 24 jam ("HH:mm").
 "use client";
 import { useState, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
@@ -11,6 +17,7 @@ import JsaUploadSection, {
   type JsaFileInfo,
   type JsaUploadStatus as JsaStatus,
 } from "@/components/JsaUploadSection";
+import Time24Input, { normalizeTo24h } from "@/components/Time24Input";
 
 type UploadStatus = "idle" | "uploading" | "success" | "error";
 
@@ -240,14 +247,20 @@ export default function HeightWorkFormPage() {
   const lisensiMissing = petugasAktif.filter(({ idx }) => !fotoLisensi[idx]);
   const lisensiUploading = uploadStatus.some((s) => s === "uploading");
 
+  // ── Validasi format waktu 24 jam (HH:mm), jam 00-23, menit 00-59 ──
+  const TIME_24H_PATTERN = /^([01]\d|2[0-3]):([0-5]\d)$/;
+  const isValidTime24 = (val: string) => val === "" || TIME_24H_PATTERN.test(val);
+
   const buildBody = (isSubmit: boolean) => ({
     isSubmit,
     tipePerusahaan,
     deskripsiPekerjaan,
     lokasi,
     tanggalPelaksanaan,
-    waktuMulai,
-    waktuSelesai,
+    // Selalu normalisasi ke "HH:mm" 24-jam sebelum dikirim ke server,
+    // termasuk jika value berasal dari data lama berformat AM/PM.
+    waktuMulai: normalizeTo24h(waktuMulai),
+    waktuSelesai: normalizeTo24h(waktuSelesai),
     namaPengawasKontraktor,
     namaPengawasDepartemen,
     namaDepartemen,
@@ -315,6 +328,12 @@ export default function HeightWorkFormPage() {
       return;
     }
 
+    // ── Validasi format waktu 24 jam sebelum submit ──
+    if (!isValidTime24(waktuMulai) || !isValidTime24(waktuSelesai)) {
+      setError("Format waktu tidak valid. Gunakan format 24 jam HH:mm (00:00 - 23:59).");
+      return;
+    }
+
     // ── Validasi JSA ──────────────────────────────────────────
     if (perluJsa && (!jsaFile || jsaUploadStatus !== "success")) {
       setError("File JSA wajib diupload sebelum mengajukan form");
@@ -369,10 +388,6 @@ export default function HeightWorkFormPage() {
 
   return (
     <div className="min-h-screen bg-slate-50">
-      <style>{`
-        input[type="time"]::-webkit-datetime-edit-ampm-field { display: none; }
-        input[type="time"] { -webkit-appearance: textfield; }
-      `}</style>
       <header className="bg-white border-b border-slate-200 sticky top-0 z-40">
         <div className="max-w-3xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -446,12 +461,12 @@ export default function HeightWorkFormPage() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-2">Waktu Mulai</label>
-                  <input type="time" step="60" value={waktuMulai} onChange={(e) => setWaktuMulai(e.target.value)} className={inputCls} />
+                  <label className="block text-sm font-semibold text-slate-700 mb-2">Waktu Mulai <span className="text-[10px] font-normal text-slate-400">(24 jam)</span></label>
+                  <Time24Input value={waktuMulai} onChange={setWaktuMulai} />
                 </div>
                 <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-2">Waktu Selesai</label>
-                  <input type="time" step="60" value={waktuSelesai} onChange={(e) => setWaktuSelesai(e.target.value)} className={inputCls} />
+                  <label className="block text-sm font-semibold text-slate-700 mb-2">Waktu Selesai <span className="text-[10px] font-normal text-slate-400">(24 jam)</span></label>
+                  <Time24Input value={waktuSelesai} onChange={setWaktuSelesai} />
                 </div>
               </div>
               <div>

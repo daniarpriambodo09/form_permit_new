@@ -484,10 +484,9 @@ export default function AdminUsersPage() {
     if (pageMode === "admin" && !adminForm.departmen) {
       setFormError("Departemen wajib dipilih"); return;
     }
-    if (adminForm.email) {
-      const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!emailRe.test(adminForm.email)) { setFormError("Format email tidak valid"); return; }
-    }
+    if (!adminForm.email.trim())        { setFormError("Email wajib diisi"); return; }
+    const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRe.test(adminForm.email)) { setFormError("Format email tidak valid"); return; }
     if (adminForm.password !== adminForm.password2) { setFormError("Password dan konfirmasi password tidak cocok"); return; }
     if (adminForm.password.length < 6)  { setFormError("Password minimal 6 karakter"); return; }
 
@@ -536,10 +535,9 @@ export default function AdminUsersPage() {
     if (!approverForm.role)               { setFormError("Role Approver wajib dipilih"); return; }
     if (approverForm.role === "spv" && !approverForm.departmen) {
                                             setFormError("Departemen wajib dipilih untuk SPV"); return; }
-    if (approverForm.email) {
-      const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!emailRe.test(approverForm.email)) { setFormError("Format email tidak valid"); return; }
-    }
+    if (!approverForm.email.trim())       { setFormError("Email wajib diisi"); return; }
+    const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRe.test(approverForm.email)) { setFormError("Format email tidak valid"); return; }
     if (approverForm.password !== approverForm.password2) { setFormError("Password dan konfirmasi password tidak cocok"); return; }
     if (approverForm.password.length < 6) { setFormError("Password minimal 6 karakter"); return; }
 
@@ -1215,10 +1213,12 @@ export default function AdminUsersPage() {
                       )}
 
                       <div>
-                        <label className="block text-sm font-medium text-slate-300 mb-1.5">Email</label>
+                        <label className="block text-sm font-medium text-slate-300 mb-1.5">
+                          Email <span className="text-red-400">*</span>
+                        </label>
                         <input type="email" value={adminForm.email}
                           onChange={e => handleAdminChange("email", e.target.value)}
-                          placeholder="user@company.com (opsional)" className={inputCls} />
+                          placeholder="user@company.com" required className={inputCls} />
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-slate-300 mb-1.5">No. Telepon</label>
@@ -1346,10 +1346,12 @@ export default function AdminUsersPage() {
                         </div>
                       )}
                       <div>
-                        <label className="block text-sm font-medium text-slate-300 mb-1.5">Email</label>
+                        <label className="block text-sm font-medium text-slate-300 mb-1.5">
+                          Email <span className="text-red-400">*</span>
+                        </label>
                         <input type="email" value={approverForm.email}
                           onChange={e => handleApproverChange("email", e.target.value)}
-                          placeholder="user@company.com (opsional)" className={inputCls} />
+                          placeholder="user@company.com" required className={inputCls} />
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-slate-300 mb-1.5">No. Telepon</label>

@@ -8,7 +8,8 @@ import Link from "next/link";
 export default function ApproverLoginPage() {
   const router       = useRouter();
   const searchParams = useSearchParams();
-  const expired      = searchParams.get("expired") === "1";
+  const expired      = searchParams.get("expired")  === "1";
+  const redirectTo   = searchParams.get("redirect") ?? "";   // ← path tujuan dari link email
 
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -50,7 +51,18 @@ export default function ApproverLoginPage() {
       sessionStorage.setItem("user_jabatan", data.user.jabatan);
       sessionStorage.setItem("user_role",    data.user.role);
 
-      // UBAH: semua role (termasuk admin) redirect ke /home
+      // Redirect setelah login berhasil:
+      // Jika ada ?redirect=... (dari link email approval), arahkan ke sana.
+      // Validasi diawali "/" agar tidak bisa dipakai sebagai open redirect.
+      if (redirectTo) {
+        const decoded = decodeURIComponent(redirectTo);
+        if (decoded.startsWith("/")) {
+          router.replace(decoded);
+          return;
+        }
+      }
+
+      // Default: ke /home
       router.replace("/home");
 
     } catch {
@@ -87,6 +99,15 @@ export default function ApproverLoginPage() {
             <p className="text-slate-400 text-xs mt-2">
               Halaman ini khusus untuk Safety Officer, Supervisor, PGA, dan Manager.
             </p>
+            {/* Banner kontekstual jika datang dari redirect link email */}
+            {redirectTo && !expired && (
+              <div className="mt-3 flex items-start gap-2 bg-orange-500/10 border border-orange-500/30 rounded-lg px-3 py-2">
+                <Lock className="w-3.5 h-3.5 text-orange-400 shrink-0 mt-0.5" />
+                <p className="text-orange-300 text-xs">
+                  Silakan login untuk melanjutkan ke halaman approval yang dituju.
+                </p>
+              </div>
+            )}
           </div>
 
           {error && (

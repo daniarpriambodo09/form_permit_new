@@ -3,30 +3,37 @@
 // REFACTOR: current_stage dimulai dari 1 (bukan 0).
 // Stage 0 (firewatch) dihapus. Form yang baru dibuat langsung
 // menunggu approval SPV (internal, stage 1) atau Kontraktor (eksternal, stage 1).
+// ADDED: Email notification ke approver pertama saat form di-submit.
 
 import { NextRequest, NextResponse } from 'next/server';
 import { query, queryOne } from '@/lib/db';
 import { generateEditToken, verifyToken, COOKIE_NAME } from '@/lib/auth';
+import { notifyFirstApprover } from '@/lib/approval-email';
 
 async function generateId(): Promise<string> {
   const row = await queryOne<{ id_form: string }>(
     `SELECT id_form FROM form_kerja_panas ORDER BY id_form DESC LIMIT 1`
   );
-  let next = 1000;
+  let next = 1;
   if (row) {
-    const num = parseInt(row.id_form.replace('HOW-', ''), 10);
+    const num = parseInt(row.id_form.replace('HW-', ''), 10);
     if (!isNaN(num)) next = num + 1;
   }
-  return `HOW-${next}`;
+  return `HW-${String(next).padStart(4, '0')}`;
 }
 
-function getUserId(req: NextRequest): string | null {
+function getUserFromReq(req: NextRequest): { userId: string | null; nama: string | null } {
   const token = req.cookies.get(COOKIE_NAME)?.value;
-  if (!token) return null;
+  if (!token) return { userId: null, nama: null };
   try {
     const user = verifyToken(token);
-    return user?.userId ? String(user.userId) : null;
-  } catch { return null; }
+    return {
+      userId: user?.userId ? String(user.userId) : null,
+      nama:   user?.nama   ?? null,
+    };
+  } catch {
+    return { userId: null, nama: null };
+  }
 }
 
 // ── GET: list forms ──────────────────────────────────────────
@@ -68,7 +75,7 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { isSubmit, ...f } = body;
 
-    const userId    = getUserId(req);
+    const { userId, nama: namaFromToken } = getUserFromReq(req);
     const idForm    = await generateId();
     const editToken = generateEditToken();
     const now       = new Date().toISOString();
@@ -126,86 +133,72 @@ export async function POST(req: NextRequest) {
         $66,$67
       )`,
       [
-        idForm,                                                                       // $1
-        now,                                                                          // $2
-        f.tanggalPelaksanaan ? new Date(f.tanggalPelaksanaan).toISOString() : null,  // $3
-        status,                                                                       // $4
-        tipePerusahaan,                                                               // $5
-        startStage,                                                                   // $6
-
-        f.noRegistrasi   || null,                                                     // $7
-        f.namaKontraktor || null,                                                     // $8
-        f.namaPekerjaNIK || null,                                                     // $9
-        f.lokasi         || null,                                                     // $10
-        f.waktuPukul     || null,                                                     // $11
-
-        f.namaFireWatch  || null,                                                     // $12
-        f.nikFireWatch   || null,                                                     // $13
-        '',                                                                           // $14 tanda_tangan_fw (legacy)
-        null,                                                                         // $15 jabatan_pemberi_izin
-        null,                                                                         // $16 nik_pemberi_ijin
-
-        f.jenisPekerjaan?.preventive ?? false,                                        // $17
-        f.jenisPekerjaan?.tangki     ?? false,                                        // $18
-        f.jenisPekerjaan?.panel      ?? false,                                        // $19
-
-        f.jenisPekerjaan?.cutting?.detail   || null,                                  // $20
-        f.jenisPekerjaan?.cutting?.mulai    || null,                                  // $21
-        f.jenisPekerjaan?.cutting?.selesai  || null,                                  // $22
-        f.jenisPekerjaan?.grinding?.detail  || null,                                  // $23
-        f.jenisPekerjaan?.grinding?.mulai   || null,                                  // $24
-        f.jenisPekerjaan?.grinding?.selesai || null,                                  // $25
-        f.jenisPekerjaan?.welding?.detail   || null,                                  // $26
-        f.jenisPekerjaan?.welding?.mulai    || null,                                  // $27
-        f.jenisPekerjaan?.welding?.selesai  || null,                                  // $28
-        f.jenisPekerjaan?.painting?.detail  || null,                                  // $29
-        f.jenisPekerjaan?.painting?.mulai   || null,                                  // $30
-        f.jenisPekerjaan?.painting?.selesai || null,                                  // $31
-
-        f.jenisPekerjaan?.lainnya            ?? false,                                // $32
-        f.jenisPekerjaan?.lainnyaKeterangan || null,                                  // $33
-
-        f.areaBerisiko?.ruangTertutup ?? false,                                       // $34
-        f.areaBerisiko?.bahanMudah    ?? false,                                       // $35
-        f.areaBerisiko?.gas           ?? false,                                       // $36
-        f.areaBerisiko?.ketinggian    ?? false,                                       // $37
-        f.areaBerisiko?.cairan        ?? false,                                       // $38
-        f.areaBerisiko?.hydrocarbon   ?? false,                                       // $39
-        f.areaBerisiko?.lain          || null,                                        // $40
-
-        f.pencegahan?.equipment                  === 'ya',                            // $41
-        f.pencegahan?.apar                       === 'ya',                            // $42
-        f.pencegahan?.sensor                     === 'ya',                            // $43
-        f.pencegahan?.apd                        === 'ya',                            // $44
-        f.pencegahan?.meter11_cairan             === 'ya',                            // $45
-        f.pencegahan?.lantai                     === 'ya',                            // $46
-        f.pencegahan?.lantaiBasah                === 'ya',                            // $47
-        f.pencegahan?.cairan_diproteksi          === 'ya',                            // $48
-        f.pencegahan?.lembaran                   === 'ya',                            // $49
-        f.pencegahan?.lindungi_conveyor          === 'ya',                            // $50
-        f.pencegahan?.ruang_tertutup_dibersihkan === 'ya',                            // $51
-        f.pencegahan?.uap_dibuang                === 'ya',                            // $52
-        f.pencegahan?.dinding_konstruksi         === 'ya',                            // $53
-        f.pencegahan?.bahan_dipindahkan          === 'ya',                            // $54
-        f.pencegahan?.firewatch_ada              === 'ya',                            // $55
-        f.pencegahan?.firewatch_pelatihan        === 'ya',                            // $56
-
-        f.pencegahan?.fireblank === 'layak',                                          // $57
-        f.pencegahan?.fireblank_jumlah ? parseInt(f.pencegahan.fireblank_jumlah) : null, // $58
-        f.pencegahan?.permintaan_tambahan || null,                                    // $59
-
-        null,                                                                         // $60 spv_terkait
-        null,                                                                         // $61 kontraktor
-        null,                                                                         // $62 sfo
-        null,                                                                         // $63 pga
-
-        perluJsa,                                                                     // $64 perlu_jsa   ← BARU
-        jsaFileUrl,                                                                   // $65 jsa_file_url ← BARU
-
-        editToken,                                                                    // $66
-        userId ?? null,                                                               // $67
+        idForm, now,
+        f.tanggalPelaksanaan ? new Date(f.tanggalPelaksanaan).toISOString() : null,
+        status, tipePerusahaan, startStage,
+        f.noRegistrasi   || null, f.namaKontraktor || null, f.namaPekerjaNIK || null,
+        f.lokasi         || null, f.waktuPukul     || null,
+        f.namaFireWatch  || null, f.nikFireWatch   || null, '',
+        null, null,
+        f.jenisPekerjaan?.preventive ?? false,
+        f.jenisPekerjaan?.tangki     ?? false,
+        f.jenisPekerjaan?.panel      ?? false,
+        f.jenisPekerjaan?.cutting?.detail   || null,
+        f.jenisPekerjaan?.cutting?.mulai    || null,
+        f.jenisPekerjaan?.cutting?.selesai  || null,
+        f.jenisPekerjaan?.grinding?.detail  || null,
+        f.jenisPekerjaan?.grinding?.mulai   || null,
+        f.jenisPekerjaan?.grinding?.selesai || null,
+        f.jenisPekerjaan?.welding?.detail   || null,
+        f.jenisPekerjaan?.welding?.mulai    || null,
+        f.jenisPekerjaan?.welding?.selesai  || null,
+        f.jenisPekerjaan?.painting?.detail  || null,
+        f.jenisPekerjaan?.painting?.mulai   || null,
+        f.jenisPekerjaan?.painting?.selesai || null,
+        f.jenisPekerjaan?.lainnya            ?? false,
+        f.jenisPekerjaan?.lainnyaKeterangan || null,
+        f.areaBerisiko?.ruangTertutup ?? false, f.areaBerisiko?.bahanMudah ?? false,
+        f.areaBerisiko?.gas           ?? false, f.areaBerisiko?.ketinggian ?? false,
+        f.areaBerisiko?.cairan        ?? false, f.areaBerisiko?.hydrocarbon ?? false,
+        f.areaBerisiko?.lain          || null,
+        f.pencegahan?.equipment                  === 'ya',
+        f.pencegahan?.apar                       === 'ya',
+        f.pencegahan?.sensor                     === 'ya',
+        f.pencegahan?.apd                        === 'ya',
+        f.pencegahan?.meter11_cairan             === 'ya',
+        f.pencegahan?.lantai                     === 'ya',
+        f.pencegahan?.lantaiBasah                === 'ya',
+        f.pencegahan?.cairan_diproteksi          === 'ya',
+        f.pencegahan?.lembaran                   === 'ya',
+        f.pencegahan?.lindungi_conveyor          === 'ya',
+        f.pencegahan?.ruang_tertutup_dibersihkan === 'ya',
+        f.pencegahan?.uap_dibuang                === 'ya',
+        f.pencegahan?.dinding_konstruksi         === 'ya',
+        f.pencegahan?.bahan_dipindahkan          === 'ya',
+        f.pencegahan?.firewatch_ada              === 'ya',
+        f.pencegahan?.firewatch_pelatihan        === 'ya',
+        f.pencegahan?.fireblank === 'layak',
+        f.pencegahan?.fireblank_jumlah ? parseInt(f.pencegahan.fireblank_jumlah) : null,
+        f.pencegahan?.permintaan_tambahan || null,
+        null, null, null, null,
+        perluJsa, jsaFileUrl,
+        editToken, userId ?? null,
       ]
     );
+
+    // ── Email: kirim ke approver pertama jika status submitted (fire-and-forget) ──
+    if (status === 'submitted' && userId) {
+      notifyFirstApprover({
+        formType:       'hot-work',
+        idForm,
+        tipePerusahaan,
+        userId:         parseInt(userId),
+        namaPemohon:    namaFromToken ?? f.namaKontraktor ?? '-',
+        tanggal:        now,
+      }).catch((err) => {
+        console.error(`[EMAIL] Background first-approver email error for ${idForm}:`, err);
+      });
+    }
 
     return NextResponse.json({ success: true, id_form: idForm, status, edit_token: editToken }, { status: 201 });
   } catch (err: any) {

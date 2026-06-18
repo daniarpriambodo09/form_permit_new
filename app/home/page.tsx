@@ -1,13 +1,14 @@
 // app/home/page.tsx
 // PATCH: nama user di header menjadi link ke /profile
 // PATCH: SPV mendapat quick access card "Kelola Akun Departemen" → /admin-users
+// PATCH: Admin mendapat card baru "Pengaturan SMTP" → /smtp-settings
 "use client";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   FileText, Flame, Shield, AlertTriangle,
-  History, BarChart3, ClipboardList, LogOut, User, Users,
+  History, BarChart3, ClipboardList, LogOut, User, Users, Mail,
 } from "lucide-react";
 
 type UserRole =
@@ -58,6 +59,13 @@ function getQuickAccessCards(role: UserRole): QuickAccessCard[] {
         href: "/form-files",
         icon: FileText,
       },
+      // ── BARU: Pengaturan SMTP ─────────────────────────────────
+      {
+        title: "Pengaturan SMTP",
+        description: "Kelola konfigurasi server email untuk notifikasi approval.",
+        href: "/smtp-settings",
+        icon: Mail,
+      },
     ];
   }
 
@@ -69,7 +77,6 @@ function getQuickAccessCards(role: UserRole): QuickAccessCard[] {
         href: "/approval",
         icon: ClipboardList,
       },
-      // ── BARU: SPV bisa kelola akun departemennya ──────────────
       {
         title: "Kelola Akun Departemen",
         description: "Tambah atau hapus akun Administrator di departemen Anda",

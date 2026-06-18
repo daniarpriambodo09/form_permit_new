@@ -1,7 +1,6 @@
 // app/approval/[jenisForm]/[id]/page.tsx
-// REFACTOR: Role 'pga' diganti 'smr' di seluruh label, roleLabel map,
-//           getApproveButtonLabel, dan renderApprovalChain.
-//           Kolom DB mr_pga_approved, mr_pga_approved_by tetap digunakan.
+// REFACTOR: Role 'pga' diganti 'smr'. Kolom DB mr_pga_* tetap.
+// SECURITY: Auth guard via useApproverAuth — tidak lagi mengandalkan sessionStorage untuk auth.
 //
 // WORKFLOW:
 //   Hot-work & Workshop INTERNAL:  SPV(1) → Admin K3(2) → SFO(3) → SMR(4)
@@ -15,8 +14,11 @@ import { useRouter } from "next/navigation";
 import {
   ArrowLeft, CheckCircle, XCircle, AlertCircle,
   Clock, Loader2, Flame, Info, Eye, FileText,
+  LogOut,
 } from "lucide-react";
 import React from "react";
+import { useApproverAuth } from "@/hooks/useApproverAuth";
+import AuthLoadingSpinner from "@/components/AuthLoadingSpinner";
 
 // ── Helpers ───────────────────────────────────────────────────
 const formatDate = (d?: string) => {
@@ -51,7 +53,7 @@ const BF = ({ label, value }: { label: string; value: any }) => {
     <div className="flex items-center justify-between py-2 border-b border-slate-100 last:border-0">
       <span className="text-sm text-slate-600">{label}</span>
       <span className={`text-sm font-bold shrink-0 ${yes ? "text-green-600" : "text-red-500"}`}>
-        {yes ? "✓ Ya" : " Tidak"}
+        {yes ? "✓ Ya" : "✗ Tidak"}
       </span>
     </div>
   );
@@ -113,9 +115,6 @@ const JsaDisplay = ({ perluJsa, jsaFileUrl }: { perluJsa: boolean; jsaFileUrl?: 
 };
 
 // ── Approval chain ────────────────────────────────────────────
-// REFACTOR: key 'mr_pga' (nama kolom DB tanpa suffix _approved) tetap digunakan
-// agar form[`${stage.key}_approved`] → mr_pga_approved tetap cocok dengan kolom DB.
-// Label berubah dari "PGA / MR" / "MR PGA" menjadi "SMR".
 const renderApprovalChain = (form: any, jenisForm: string) => {
   const isEksternal = form.tipe_perusahaan === "eksternal" || form.petugas_ketinggian === "eksternal";
 
@@ -128,32 +127,31 @@ const renderApprovalChain = (form: any, jenisForm: string) => {
         { label: "SPV",        key: "spv",        icon: "👷", dbStage: 2 },
         { label: "Admin K3",   key: "admin_k3",   icon: "🛡️", dbStage: 3 },
         { label: "SFO",        key: "sfo",        icon: "🔒", dbStage: 4 },
-        { label: "SMR",        key: "mr_pga",     icon: "✅", dbStage: 5 }, // label diubah, key kolom DB tetap
+        { label: "SMR",        key: "mr_pga",     icon: "✅", dbStage: 5 },
       ];
     } else {
       stages = [
         { label: "SPV",      key: "spv",      icon: "👷", dbStage: 1 },
         { label: "Admin K3", key: "admin_k3", icon: "🛡️", dbStage: 2 },
         { label: "SFO",      key: "sfo",      icon: "🔒", dbStage: 3 },
-        { label: "SMR",      key: "mr_pga",   icon: "✅", dbStage: 4 }, // label diubah, key kolom DB tetap
+        { label: "SMR",      key: "mr_pga",   icon: "✅", dbStage: 4 },
       ];
     }
   } else {
-    // hot-work & workshop
     if (isEksternal) {
       stages = [
         { label: "Kontraktor", key: "kontraktor", icon: "🏢", dbStage: 1 },
         { label: "SPV",        key: "spv",        icon: "👷", dbStage: 2 },
         { label: "Admin K3",   key: "admin_k3",   icon: "🛡️", dbStage: 3 },
         { label: "SFO",        key: "sfo",        icon: "🔒", dbStage: 4 },
-        { label: "SMR",        key: "mr_pga",     icon: "✅", dbStage: 5 }, // label diubah, key kolom DB tetap
+        { label: "SMR",        key: "mr_pga",     icon: "✅", dbStage: 5 },
       ];
     } else {
       stages = [
         { label: "SPV",      key: "spv",      icon: "👷", dbStage: 1 },
         { label: "Admin K3", key: "admin_k3", icon: "🛡️", dbStage: 2 },
         { label: "SFO",      key: "sfo",      icon: "🔒", dbStage: 3 },
-        { label: "SMR",      key: "mr_pga",   icon: "✅", dbStage: 4 }, // label diubah, key kolom DB tetap
+        { label: "SMR",      key: "mr_pga",   icon: "✅", dbStage: 4 },
       ];
     }
   }
@@ -165,12 +163,12 @@ const renderApprovalChain = (form: any, jenisForm: string) => {
       <h4 className="font-semibold text-slate-800 text-sm mb-4">Status Approval</h4>
       <div className="flex items-center justify-between gap-1">
         {stages.map((stage, idx) => {
-          const approvedKey  = `${stage.key}_approved`;   // → mr_pga_approved (kolom DB)
-          const approvedByKey = `${stage.key}_approved_by`; // → mr_pga_approved_by (kolom DB)
-          const isApproved   = isTruthy(form[approvedKey]);
-          const approvedBy   = form[approvedByKey];
-          const isCurrent    = currentDbStage === stage.dbStage && form.status === "submitted";
-          const isRejected   = form.status === "rejected";
+          const approvedKey   = `${stage.key}_approved`;
+          const approvedByKey = `${stage.key}_approved_by`;
+          const isApproved    = isTruthy(form[approvedKey]);
+          const approvedBy    = form[approvedByKey];
+          const isCurrent     = currentDbStage === stage.dbStage && form.status === "submitted";
+          const isRejected    = form.status === "rejected";
 
           return (
             <React.Fragment key={stage.key}>
@@ -219,44 +217,36 @@ export default function ApprovalDetailPage({
   const { jenisForm, id } = use(params);
   const router = useRouter();
 
-  const [form, setForm]         = useState<any>(null);
-  const [loading, setLoading]   = useState(true);
+  // ── Auth guard ─────────────────────────────────────────────
+  // Validasi auth via cookie JWT, bukan sessionStorage.
+  const { user, loading: authLoading } = useApproverAuth();
+
+  const [form, setForm]             = useState<any>(null);
+  const [loading, setLoading]       = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [showReject, setShowReject] = useState(false);
-  const [catatan, setCatatan]   = useState("");
-  const [done, setDone]         = useState<"approved" | "rejected" | null>(null);
-  const [error, setError]       = useState("");
-
-  const [userNama, setUserNama]     = useState("");
-  const [userNik, setUserNik]       = useState("");
-  const [userRole, setUserRole]     = useState("");
-  const [userJabatan, setUserJabatan] = useState("");
+  const [catatan, setCatatan]       = useState("");
+  const [done, setDone]             = useState<"approved" | "rejected" | null>(null);
+  const [error, setError]           = useState("");
 
   const isHotOrWorkshop = jenisForm !== "height-work";
 
+  // Muat detail form hanya setelah auth selesai
   useEffect(() => {
-    setUserNama(sessionStorage.getItem("user_nama") || "");
-    setUserRole(sessionStorage.getItem("user_role") || "");
-    setUserJabatan(sessionStorage.getItem("user_jabatan") || "");
-
-    fetch("/form-permit/api/auth/me")
-      .then(r => r.json())
-      .then(data => {
-        if (data.user?.nik)     setUserNik(data.user.nik);
-        if (data.user?.nama)    setUserNama(data.user.nama);
-        if (data.user?.role)    setUserRole(data.user.role);
-        if (data.user?.jabatan) setUserJabatan(data.user.jabatan);
-      })
-      .catch(() => {});
-
+    if (authLoading || !user) return;
     loadForm();
-  }, []);
+  }, [authLoading, user]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const loadForm = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`/form-permit/api/approval/${jenisForm}/${id}`);
-      if (res.status === 401) { router.push("/login"); return; }
+      const res = await fetch(`/form-permit/api/approval/${jenisForm}/${id}`, {
+        credentials: "include",
+      });
+      if (res.status === 401) {
+        router.push(`/login/approver?redirect=${encodeURIComponent(`/approval/${jenisForm}/${id}`)}`);
+        return;
+      }
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
       setForm(data.data);
@@ -266,8 +256,6 @@ export default function ApprovalDetailPage({
       setLoading(false);
     }
   };
-
-  const isEksternal = form?.tipe_perusahaan === "eksternal" || form?.petugas_ketinggian === "eksternal";
 
   const handleAction = async (action: "approve" | "reject") => {
     if (action === "reject" && !catatan.trim()) {
@@ -280,9 +268,10 @@ export default function ApprovalDetailPage({
 
     try {
       const res = await fetch(`/form-permit/api/approval/${jenisForm}/${id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action, catatan_reject: catatan }),
+        method:      "PATCH",
+        credentials: "include",
+        headers:     { "Content-Type": "application/json" },
+        body:        JSON.stringify({ action, catatan_reject: catatan }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
@@ -294,7 +283,16 @@ export default function ApprovalDetailPage({
     }
   };
 
-  // ── Loading ───────────────────────────────────────────────
+  const handleLogout = async () => {
+    await fetch("/form-permit/api/auth/logout", { method: "POST", credentials: "include" });
+    sessionStorage.clear();
+    router.push("/login/approver");
+  };
+
+  // ── Auth loading — jangan render halaman sebelum auth selesai ──
+  if (authLoading || !user) return <AuthLoadingSpinner />;
+
+  // ── Form data loading ─────────────────────────────────────
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
@@ -343,25 +341,31 @@ export default function ApprovalDetailPage({
     );
   }
 
-  // REFACTOR: 'pga' → 'smr', label 'PGA / MR' → 'SMR'
+  const isEksternal = form?.tipe_perusahaan === "eksternal" || form?.petugas_ketinggian === "eksternal";
+
+  // Data user dari /api/auth/me (bukan sessionStorage)
+  const userRole    = user.role;
+  const userNama    = user.nama;
+  const userNik     = user.nik ?? "";
+  const userJabatan = user.jabatan;
+
   const roleLabel: Record<string, string> = {
     spv:        "SPV / Pemberi Izin",
     kontraktor: "Kontraktor",
     admin_k3:   "Admin K3",
     sfo:        "SFO",
-    smr:        "SMR",            // sebelumnya: pga: "SMR" / "PGA / MR"
+    smr:        "SMR",
     admin:      "Admin",
     firewatch:  "Fire Watch (Tidak bisa approve)",
     worker:     "Worker",
   };
 
-  // REFACTOR: case 'pga' → 'smr'
   const getApproveButtonLabel = () => {
     if (userRole === "kontraktor") return "Setujui (Kontraktor)";
     if (userRole === "spv")        return "Setujui (SPV)";
     if (userRole === "admin_k3")   return "Setujui (Admin K3)";
     if (userRole === "sfo")        return "Setujui (SFO)";
-    if (userRole === "smr")        return "Setujui (SMR)"; // sebelumnya: "pga" → "Setujui (SMR)"
+    if (userRole === "smr")        return "Setujui (SMR)";
     return "Setujui Form";
   };
 
@@ -395,6 +399,11 @@ export default function ApprovalDetailPage({
             </div>
             <p className="text-xs text-slate-400 mt-0.5">Diajukan: {formatDate(form.tanggal)}</p>
           </div>
+          {/* Logout shortcut di header detail page */}
+          <button onClick={handleLogout}
+            className="flex items-center gap-1.5 px-3 py-2 text-xs text-slate-500 hover:bg-red-50 hover:text-red-600 rounded-lg transition-colors shrink-0">
+            <LogOut className="w-3.5 h-3.5" /> Keluar
+          </button>
         </div>
       </div>
 

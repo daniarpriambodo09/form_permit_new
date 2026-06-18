@@ -104,6 +104,7 @@ export default function DashboardPage() {
     }
   };
 
+  // Data untuk chart & tabel — dipengaruhi oleh selectedJenis
   const filtered = useMemo(() => {
     return permits.filter(p => {
       const d = getDate(p);
@@ -121,6 +122,24 @@ export default function DashboardPage() {
       return true;
     });
   }, [permits, selectedYear, selectedMonth, selectedDay, period, selectedJenis]);
+
+  // Data khusus untuk stat cards — TIDAK dipengaruhi selectedJenis
+  const filteredForCards = useMemo(() => {
+    return permits.filter(p => {
+      const d = getDate(p);
+      if (!d || !selectedYear) return false;
+      if (d.getFullYear().toString() !== selectedYear) return false;
+      if (period === "daily" && selectedDay) {
+        const sel = new Date(selectedDay);
+        if (d.toDateString() !== sel.toDateString()) return false;
+      }
+      if (period === "monthly" && selectedMonth) {
+        const mm = (d.getMonth() + 1).toString().padStart(2, "0");
+        if (mm !== selectedMonth) return false;
+      }
+      return true;
+    });
+  }, [permits, selectedYear, selectedMonth, selectedDay, period]);
 
   const lineData = useMemo(() => {
     if (period === "daily") {
@@ -354,7 +373,7 @@ export default function DashboardPage() {
             <div className="flex items-start justify-between">
               <div>
                 <p className="text-gray-500 text-xs font-medium mb-2 uppercase tracking-wide">Total Izin</p>
-                <p className="text-3xl font-bold text-gray-900">{filtered.length}</p>
+                <p className="text-3xl font-bold text-gray-900">{filteredForCards.length}</p>
                 <p className="text-xs text-gray-400 mt-1">dari {permits.length} total</p>
               </div>
               <div className="p-2.5 bg-red-100 rounded-lg">
@@ -375,7 +394,7 @@ export default function DashboardPage() {
               <div>
                 <p className="text-gray-500 text-xs font-medium mb-2 uppercase tracking-wide">Hot Work</p>
                 <p className="text-3xl font-bold text-gray-900">
-                  {filtered.filter(p => p.jenisForm === "hot-work").length}
+                  {filteredForCards.filter(p => p.jenisForm === "hot-work").length}
                 </p>
                 <p className="text-xs text-gray-400 mt-1">Pekerjaan panas</p>
               </div>
@@ -396,7 +415,7 @@ export default function DashboardPage() {
               <div>
                 <p className="text-gray-500 text-xs font-medium mb-2 uppercase tracking-wide">Height Work</p>
                 <p className="text-3xl font-bold text-gray-900">
-                  {filtered.filter(p => p.jenisForm === "height-work").length}  
+                  {filteredForCards.filter(p => p.jenisForm === "height-work").length}
                 </p>
                 <p className="text-xs text-gray-400 mt-1">Pekerjaan ketinggian</p>
               </div>
@@ -418,7 +437,7 @@ export default function DashboardPage() {
               <div>
                 <p className="text-gray-500 text-xs font-medium mb-2 uppercase tracking-wide">Workshop</p>
                 <p className="text-3xl font-bold text-gray-900">
-                  {filtered.filter(p => p.jenisForm === "workshop").length}
+                  {filteredForCards.filter(p => p.jenisForm === "workshop").length}
                 </p>
                 <p className="text-xs text-gray-400 mt-1">Workshop</p>
               </div>

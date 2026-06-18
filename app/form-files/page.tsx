@@ -2,7 +2,7 @@
 // Halaman admin: daftar seluruh form dari 3 tabel, dengan inline PDF viewer.
 // Reuse generatePermitPdf dari lib/generatePermitPdf.ts (identik dengan Download PDF di DetailModal).
 "use client";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -51,7 +51,9 @@ export default function FormFilesPage() {
 
   const [forms, setForms]         = useState<FormRow[]>([]);
   const [loading, setLoading]     = useState(true);
-  const [filterJenis, setFilter]  = useState<"all" | JenisForm>("all");
+  const [filterJenis, setFilter]       = useState<"all" | JenisForm>("all");
+  const [filterMonth, setFilterMonth]  = useState<string>("all"); // "all" | "01".."12"
+  const [filterYear,  setFilterYear]   = useState<string>("all"); // "all" | "2024" etc.
   const [userName, setUserName]   = useState("");
 
   // PDF viewer state
@@ -147,7 +149,32 @@ export default function FormFilesPage() {
     }
   };
 
-  const filtered = filterJenis === "all" ? forms : forms.filter(f => f.jenis_form === filterJenis);
+  // Daftar tahun unik dari data (otomatis, tidak hardcode)
+  const yearOptions = useMemo(() => {
+    const years = new Set<string>();
+    forms.forEach(f => {
+      if (f.tanggal) years.add(new Date(f.tanggal).getFullYear().toString());
+    });
+    return Array.from(years).sort((a, b) => Number(b) - Number(a));
+  }, [forms]);
+
+  // Data setelah semua filter diterapkan
+  const filtered = useMemo(() => {
+    return forms.filter(f => {
+      if (filterJenis !== "all" && f.jenis_form !== filterJenis) return false;
+      if (filterMonth !== "all") {
+        const mm = f.tanggal
+          ? String(new Date(f.tanggal).getMonth() + 1).padStart(2, "0")
+          : null;
+        if (mm !== filterMonth) return false;
+      }
+      if (filterYear !== "all") {
+        const yyyy = f.tanggal ? new Date(f.tanggal).getFullYear().toString() : null;
+        if (yyyy !== filterYear) return false;
+      }
+      return true;
+    });
+  }, [forms, filterJenis, filterMonth, filterYear]);
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -195,25 +222,77 @@ export default function FormFilesPage() {
       <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-6">
 
         {/* Filter */}
-        <div className="bg-white rounded-xl border border-slate-200 p-4 mb-5 flex items-center gap-2 flex-wrap">
-          <Filter className="w-4 h-4 text-slate-400 mr-1 shrink-0" />
-          <span className="text-xs font-semibold text-slate-500 mr-1">Jenis Form:</span>
-          {(["all", "hot-work", "workshop", "height-work"] as const).map((k) => {
-            const labels: Record<string, string> = {
-              all: "Semua", "hot-work": "Hot Work", workshop: "Workshop", "height-work": "Height Work",
-            };
-            return (
-              <button key={k} onClick={() => setFilter(k)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                  filterJenis === k
-                    ? "bg-orange-600 text-white"
-                    : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                }`}>
-                {labels[k]}
-              </button>
-            );
-          })}
-          <span className="ml-auto text-xs text-slate-400">{filtered.length} form</span>
+        <div className="bg-white rounded-xl border border-slate-200 p-4 mb-5">
+          {/* Baris 1: Jenis Form (buttons) */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <Filter className="w-4 h-4 text-slate-400 shrink-0" />
+            <span className="text-xs font-semibold text-slate-500">Jenis Form:</span>
+            {(["all", "hot-work", "workshop", "height-work"] as const).map((k) => {
+              const labels: Record<string, string> = {
+                all: "Semua", "hot-work": "Hot Work", workshop: "Workshop", "height-work": "Height Work",
+              };
+              return (
+                <button key={k} onClick={() => setFilter(k)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                    filterJenis === k
+                      ? "bg-orange-600 text-white"
+                      : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                  }`}>
+                  {labels[k]}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Baris 2: Bulan + Tahun (dropdowns) + count */}
+          <div className="flex items-center gap-4 flex-wrap mt-3">
+            {/* Bulan */}
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-semibold text-slate-500">Bulan:</span>
+              <select
+                value={filterMonth}
+                onChange={e => setFilterMonth(e.target.value)}
+                className="text-xs font-medium bg-slate-100 text-slate-700 border-0 rounded-lg
+                           px-3 py-1.5 pr-7 cursor-pointer focus:ring-2 focus:ring-orange-400
+                           focus:outline-none appearance-none
+                           bg-[url('data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 20 20%22 fill=%22%236b7280%22><path fill-rule=%22evenodd%22 d=%22M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z%22 clip-rule=%22evenodd%22/></svg>')]
+                           bg-no-repeat bg-[right_0.5rem_center] bg-[length:1rem]">
+                <option value="all">Semua Bulan</option>
+                <option value="01">Januari</option>
+                <option value="02">Februari</option>
+                <option value="03">Maret</option>
+                <option value="04">April</option>
+                <option value="05">Mei</option>
+                <option value="06">Juni</option>
+                <option value="07">Juli</option>
+                <option value="08">Agustus</option>
+                <option value="09">September</option>
+                <option value="10">Oktober</option>
+                <option value="11">November</option>
+                <option value="12">Desember</option>
+              </select>
+            </div>
+
+            {/* Tahun */}
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-semibold text-slate-500">Tahun:</span>
+              <select
+                value={filterYear}
+                onChange={e => setFilterYear(e.target.value)}
+                className="text-xs font-medium bg-slate-100 text-slate-700 border-0 rounded-lg
+                           px-3 py-1.5 pr-7 cursor-pointer focus:ring-2 focus:ring-orange-400
+                           focus:outline-none appearance-none
+                           bg-[url('data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 20 20%22 fill=%22%236b7280%22><path fill-rule=%22evenodd%22 d=%22M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z%22 clip-rule=%22evenodd%22/></svg>')]
+                           bg-no-repeat bg-[right_0.5rem_center] bg-[length:1rem]">
+                <option value="all">Semua Tahun</option>
+                {yearOptions.map(y => (
+                  <option key={y} value={y}>{y}</option>
+                ))}
+              </select>
+            </div>
+
+            <span className="ml-auto text-xs text-slate-400">{filtered.length} form</span>
+          </div>
         </div>
 
         {/* ── Split Layout ── */}

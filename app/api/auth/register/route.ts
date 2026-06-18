@@ -1,5 +1,6 @@
 // app/api/auth/register/route.ts
-// UPDATED: Simpan password_encrypted (AES-256-GCM) bersamaan dengan hash bcrypt.
+// UPDATED: Email wajib diisi (tidak boleh kosong).
+//          Simpan password_encrypted (AES-256-GCM) bersamaan dengan hash bcrypt.
 //          Kolom password_encrypted TIDAK dipakai untuk login.
 //          Login tetap menggunakan kolom password (bcrypt hash).
 
@@ -81,18 +82,16 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // ── Validasi email (opsional) ────────────────────────────
-    const emailValue: string | null =
-      email && typeof email === 'string' && email.trim() !== ''
-        ? email.trim()
-        : null;
-
-    if (emailValue) {
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!emailRegex.test(emailValue)) {
-        return NextResponse.json({ error: 'Format email tidak valid' }, { status: 400 });
-      }
+    // ── Validasi email — WAJIB DIISI ─────────────────────────
+    if (!email || typeof email !== 'string' || email.trim() === '') {
+      return NextResponse.json({ error: 'Email wajib diisi' }, { status: 400 });
     }
+    const emailValue = email.trim().toLowerCase();
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(emailValue)) {
+      return NextResponse.json({ error: 'Format email tidak valid' }, { status: 400 });
+    }
+    // CATATAN: Duplikat email DIIZINKAN — tidak ada cek unique di sini.
 
     // ── Cek duplikat username ────────────────────────────────
     const existingUsername = await queryOne(
@@ -121,7 +120,7 @@ export async function POST(req: NextRequest) {
         nama,
         perusahaan,
         finalDepartmen,
-        emailValue ? emailValue.toLowerCase() : null,
+        emailValue,
         no_telp || null,
         'Administrator Departemen',
         'worker',

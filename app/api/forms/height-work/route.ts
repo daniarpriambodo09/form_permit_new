@@ -1,31 +1,36 @@
 // app/api/forms/height-work/route.ts
 // UPDATED: Tambah kolom perlu_jsa dan jsa_file_url untuk fitur Upload JSA.
 // FIX: Tambah kolom tipe_perusahaan ke INSERT agar alur approval tersimpan dengan benar.
+// ADDED: Email notification ke approver pertama saat form di-submit.
 
 import { NextRequest, NextResponse } from 'next/server';
 import { query, queryOne } from '@/lib/db';
 import { verifyToken, COOKIE_NAME } from '@/lib/auth';
+import { notifyFirstApprover } from '@/lib/approval-email';
 
 async function generateId(): Promise<string> {
   const row = await queryOne<{ id_form: string }>(
     `SELECT id_form FROM form_kerja_ketinggian ORDER BY id_form DESC LIMIT 1`
   );
-  let next = 1000;
+  let next = 1;
   if (row) {
-    const num = parseInt(row.id_form.replace('HEW-', ''), 10);
+    const num = parseInt(row.id_form.replace('HAW-', ''), 10);
     if (!isNaN(num)) next = num + 1;
   }
-  return `HEW-${next}`;
+  return `HAW-${String(next).padStart(4, '0')}`;
 }
 
-function getUserId(req: NextRequest): number | null {
+function getUserFromReq(req: NextRequest): { userId: number | null; nama: string | null } {
   const token = req.cookies.get(COOKIE_NAME)?.value;
-  if (!token) return null;
+  if (!token) return { userId: null, nama: null };
   try {
     const user = verifyToken(token);
-    return user?.userId ?? null;
+    return {
+      userId: user?.userId ?? null,
+      nama:   user?.nama   ?? null,
+    };
   } catch {
-    return null;
+    return { userId: null, nama: null };
   }
 }
 
@@ -75,7 +80,7 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { isSubmit, ...formData } = body;
 
-    const userId      = getUserId(req);
+    const { userId, nama: namaFromToken } = getUserFromReq(req);
     const idForm      = await generateId();
     const status      = isSubmit ? 'submitted' : 'draft';
     const now         = new Date().toISOString();
@@ -90,23 +95,8 @@ export async function POST(req: NextRequest) {
       ? 'Eksternal / Subkontraktor'
       : 'Internal / Karyawan PT.JAI';
 
-    // JSA fields
     const perluJsa   = formData.perluJsa === true;
     const jsaFileUrl = perluJsa ? (formData.jsaFileUrl || null) : null;
-
-    // ── 74 kolom, 74 parameter ────────────────────────────────
-    // Kolom:
-    //  $1  – $4  : id_form, tanggal, tanggal_pelaksanaan, status
-    //  $5  – $6  : petugas_ketinggian (label), tipe_perusahaan
-    //  $7  – $11 : deskripsi_pekerjaan, lokasi, waktu_mulai, waktu_selesai, nama_pengawas_kontraktor
-    //  $12 – $13 : nama_pengawas_departemen, nama_departemen
-    //  $14 – $43 : 10x (nama_petugas_N, petugas_N_sehat, foto_lisensi_N)
-    //  $44 – $50 : APD (kunci_pagar, rompi, no_rompi, helmet×2, harness×2)
-    //  $51 – $61 : keselamatan (11 boolean)
-    //  $62 – $67 : body harness + lanyard (6 boolean)
-    //  $68 – $71 : persetujuan (spv, kontraktor, sfo, mr_pga) ← null saat submit
-    //  $72 – $73 : perlu_jsa, jsa_file_url ← BARU
-    //  $74       : user_id
 
     await query(
       `INSERT INTO form_kerja_ketinggian (
@@ -162,25 +152,15 @@ export async function POST(req: NextRequest) {
         $74
       )`,
       [
-        // $1–$4
         idForm, now, pelaksanaan, status,
-
-        // $5–$6
-        petugasKetinggianLabel,
-        tipePerusahaan,
-
-        // $7–$11
+        petugasKetinggianLabel, tipePerusahaan,
         formData.deskripsiPekerjaan      || null,
         formData.lokasi                  || null,
         formData.waktuMulai              || null,
         formData.waktuSelesai            || null,
         formData.namaPengawasKontraktor  || null,
-
-        // $12–$13
         formData.namaPengawasDepartemen  || null,
         formData.namaDepartemen          || null,
-
-        // $14–$43: petugas 1–10
         formData.namaPetugas?.[0]  || null, formData.berbadanSehat?.[0]  ?? false, formData.fotoLisensi?.[0]  || null,
         formData.namaPetugas?.[1]  || null, formData.berbadanSehat?.[1]  ?? false, formData.fotoLisensi?.[1]  || null,
         formData.namaPetugas?.[2]  || null, formData.berbadanSehat?.[2]  ?? false, formData.fotoLisensi?.[2]  || null,
@@ -191,8 +171,6 @@ export async function POST(req: NextRequest) {
         formData.namaPetugas?.[7]  || null, formData.berbadanSehat?.[7]  ?? false, formData.fotoLisensi?.[7]  || null,
         formData.namaPetugas?.[8]  || null, formData.berbadanSehat?.[8]  ?? false, formData.fotoLisensi?.[8]  || null,
         formData.namaPetugas?.[9]  || null, formData.berbadanSehat?.[9]  ?? false, formData.fotoLisensi?.[9]  || null,
-
-        // $44–$50: APD
         formData.kunceePagar            ?? false,
         formData.rompiKetinggian        ?? false,
         formData.rompiAngka ? parseFloat(formData.rompiAngka) : null,
@@ -200,8 +178,6 @@ export async function POST(req: NextRequest) {
         formData.safetyHelmetCount      ? parseFloat(formData.safetyHelmetCount)    : null,
         formData.fullBodyHarnessCount   ? true  : false,
         formData.fullBodyHarnessCount   ? parseFloat(formData.fullBodyHarnessCount) : null,
-
-        // $51–$61: keselamatan
         formData.areaKerjaAman      ?? false,
         formData.kebakaranProcedure ?? false,
         formData.pekerjaanListrik   ?? false,
@@ -213,29 +189,31 @@ export async function POST(req: NextRequest) {
         formData.bebanBeratTubuh    ?? false,
         formData.helmStandar        ?? false,
         formData.rambuSafetyWarning ?? false,
-
-        // $62–$67: body harness & lanyard
         formData.bodyHarnessWebbing    ?? false,
         formData.bodyHarnessDRing      ?? false,
         formData.bodyHarnessAdjustment ?? false,
         formData.lanyardAbsorber       ?? false,
         formData.lanyardSnapHook       ?? false,
         formData.lanyardRope           ?? false,
-
-        // $68–$71: persetujuan — NULL
-        null,
-        null,
-        null,
-        null,
-
-        // $72–$73: JSA ← BARU
-        perluJsa,
-        jsaFileUrl,
-
-        // $74: user_id
+        null, null, null, null,
+        perluJsa, jsaFileUrl,
         userId,
       ]
     );
+
+    // ── Email: kirim ke approver pertama jika status submitted (fire-and-forget) ──
+    if (status === 'submitted' && userId) {
+      notifyFirstApprover({
+        formType:       'height-work',
+        idForm,
+        tipePerusahaan,
+        userId,
+        namaPemohon:    namaFromToken ?? formData.namaPengawasDepartemen ?? '-',
+        tanggal:        now,
+      }).catch((err) => {
+        console.error(`[EMAIL] Background first-approver email error for ${idForm}:`, err);
+      });
+    }
 
     return NextResponse.json({ success: true, id_form: idForm, status }, { status: 201 });
   } catch (err: any) {

@@ -1,3 +1,46 @@
+jai_permit_db=# \dt
+                 List of relations
+ Schema |         Name          | Type  |  Owner
+--------+-----------------------+-------+----------
+ public | form_kerja_ketinggian | table | postgres
+ public | form_kerja_panas      | table | postgres
+ public | form_kerja_workshop   | table | postgres
+ public | users                 | table | postgres
+(4 rows)
+
+
+jai_permit_db=# \d users
+                                           Table "public.users"
+       Column       |           Type           | Collation | Nullable |              Default
+--------------------+--------------------------+-----------+----------+-----------------------------------
+ id                 | integer                  |           | not null | nextval('users_id_seq'::regclass)
+ username           | character varying(100)   |           | not null |
+ password           | character varying(255)   |           | not null |
+ nama               | character varying(255)   |           | not null |
+ jabatan            | character varying(100)   |           |          |
+ role               | character varying(50)    |           | not null | 'approver'::character varying
+ is_active          | boolean                  |           | not null | true
+ created_at         | timestamp with time zone |           | not null | now()
+ updated_at         | timestamp with time zone |           | not null | now()
+ email              | character varying(255)   |           |          |
+ perusahaan         | character varying(255)   |           |          |
+ no_telp            | character varying(50)    |           |          |
+ nik                | character varying(50)    |           |          |
+ departmen          | character varying(255)   |           |          | 'Unknown'::character varying
+ password_encrypted | text                     |           |          |
+Indexes:
+    "users_pkey" PRIMARY KEY, btree (id)
+    "users_username_key" UNIQUE CONSTRAINT, btree (username)
+Referenced by:
+    TABLE "form_kerja_ketinggian" CONSTRAINT "form_kerja_ketinggian_user_id_fkey" FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
+    TABLE "form_kerja_panas" CONSTRAINT "form_kerja_panas_user_id_fkey" FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
+    TABLE "form_kerja_workshop" CONSTRAINT "form_kerja_workshop_user_id_fkey" FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
+Triggers:
+    set_users_updated_at BEFORE UPDATE ON users FOR EACH ROW EXECUTE FUNCTION update_updated_at_column()
+
+
+jai_permit_db=#
+
 jai_permit_db=# \d form_kerja_panas
                                                         Table "public.form_kerja_panas"
                     Column                     |           Type           | Collation | Nullable |                   Default
@@ -100,6 +143,11 @@ jai_permit_db=# \d form_kerja_panas
  mr_pga_mgr                                    | character varying(255)   |           |          |
  perlu_jsa                                     | boolean                  |           | not null | false
  jsa_file_url                                  | text                     |           |          |
+ kontraktor_nik                                | character varying(100)   |           |          |
+ spv_nik                                       | character varying(100)   |           |          |
+ admin_k3_nik                                  | character varying(100)   |           |          |
+ sfo_nik                                       | character varying(100)   |           |          |
+ mr_pga_nik                                    | character varying(100)   |           |          |
 Indexes:
     "form_kerja_panas_pkey" PRIMARY KEY, btree (id)
     "form_kerja_panas_edit_token_key" UNIQUE CONSTRAINT, btree (edit_token)
@@ -216,6 +264,11 @@ jai_permit_db=# \d form_kerja_ketinggian
  tipe_perusahaan                               | character varying(20)    |           |          |
  perlu_jsa                                     | boolean                  |           | not null | false
  jsa_file_url                                  | text                     |           |          |
+ kontraktor_nik                                | character varying(100)   |           |          |
+ spv_nik                                       | character varying(100)   |           |          |
+ admin_k3_nik                                  | character varying(100)   |           |          |
+ sfo_nik                                       | character varying(100)   |           |          |
+ mr_pga_nik                                    | character varying(100)   |           |          |
 Indexes:
     "form_kerja_ketinggian_pkey" PRIMARY KEY, btree (id)
     "form_kerja_ketinggian_edit_token_key" UNIQUE CONSTRAINT, btree (edit_token)
@@ -333,6 +386,11 @@ jai_permit_db=# \d form_kerja_workshop
  mr_pga_mgr                                    | character varying(255)   |           |          |
  perlu_jsa                                     | boolean                  |           | not null | false
  jsa_file_url                                  | text                     |           |          |
+ kontraktor_nik                                | character varying(100)   |           |          |
+ spv_nik                                       | character varying(100)   |           |          |
+ admin_k3_nik                                  | character varying(100)   |           |          |
+ sfo_nik                                       | character varying(100)   |           |          |
+ mr_pga_nik                                    | character varying(100)   |           |          |
 Indexes:
     "form_kerja_workshop_pkey" PRIMARY KEY, btree (id)
     "form_kerja_workshop_edit_token_key" UNIQUE CONSTRAINT, btree (edit_token)
@@ -346,38 +404,6 @@ Foreign-key constraints:
     "form_kerja_workshop_user_id_fkey" FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
 Triggers:
     trg_workshop_updated BEFORE UPDATE ON form_kerja_workshop FOR EACH ROW EXECUTE FUNCTION update_updated_at()
-
-
-jai_permit_db=#
-
-jai_permit_db=# \d users
-                                       Table "public.users"
-   Column   |           Type           | Collation | Nullable |              Default
-------------+--------------------------+-----------+----------+-----------------------------------
- id         | integer                  |           | not null | nextval('users_id_seq'::regclass)
- username   | character varying(100)   |           | not null |
- password   | character varying(255)   |           | not null |
- nama       | character varying(255)   |           | not null |
- jabatan    | character varying(100)   |           |          |
- role       | character varying(50)    |           | not null | 'approver'::character varying
- is_active  | boolean                  |           | not null | true
- created_at | timestamp with time zone |           | not null | now()
- updated_at | timestamp with time zone |           | not null | now()
- email      | character varying(255)   |           |          |
- perusahaan | character varying(255)   |           |          |
- no_telp    | character varying(50)    |           |          |
- nik        | character varying(50)    |           |          |
- departmen  | character varying(255)   |           |          | 'Unknown'::character varying
-Indexes:
-    "users_pkey" PRIMARY KEY, btree (id)
-    "users_email_key" UNIQUE CONSTRAINT, btree (email)
-    "users_username_key" UNIQUE CONSTRAINT, btree (username)
-Referenced by:
-    TABLE "form_kerja_ketinggian" CONSTRAINT "form_kerja_ketinggian_user_id_fkey" FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
-    TABLE "form_kerja_panas" CONSTRAINT "form_kerja_panas_user_id_fkey" FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
-    TABLE "form_kerja_workshop" CONSTRAINT "form_kerja_workshop_user_id_fkey" FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
-Triggers:
-    set_users_updated_at BEFORE UPDATE ON users FOR EACH ROW EXECUTE FUNCTION update_updated_at_column()
 
 
 jai_permit_db=#

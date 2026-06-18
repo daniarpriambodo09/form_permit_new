@@ -1,6 +1,8 @@
 // app/approval/page.tsx
 // REFACTOR: Role 'pga' diganti 'smr' di seluruh label, mapping stage, dan roleLabelMap.
 //           Kolom DB mr_pga_approved tetap digunakan (tidak diubah).
+// SECURITY: Auth guard via useApproverAuth — panggil /api/auth/me setiap load.
+//           SessionStorage hanya untuk tampilan nama, bukan sumber kebenaran auth.
 "use client";
 import { useState, useEffect } from "react";
 import Link from "next/link";
@@ -10,6 +12,8 @@ import {
   LogOut, User, FileText, RefreshCw,
   Shield, ShieldCheck,
 } from "lucide-react";
+import { useApproverAuth } from "@/hooks/useApproverAuth";
+import AuthLoadingSpinner from "@/components/AuthLoadingSpinner";
 
 // ── Types ─────────────────────────────────────────────────────
 interface FormItem {
@@ -25,9 +29,7 @@ interface FormItem {
   approved_by?: string;
   approved_at?: string;
   current_stage?: number;
-  // tipe_perusahaan berlaku untuk semua jenis form
   tipe_perusahaan?: string;
-  // approval columns — kolom DB mr_pga_* tetap tidak diubah
   spv_approved?: boolean;
   kontraktor_approved?: boolean;
   admin_k3_approved?: boolean;
@@ -59,52 +61,32 @@ const jenisBadge: Record<string, string> = {
   "height-work": "bg-orange-100 text-orange-700",
 };
 
-// REFACTOR: 'pga' → 'smr', label 'PGA / MR' → 'SMR'
 const roleLabelMap: Record<string, string> = {
   firewatch:  "Fire Watch",
   spv:        "SPV",
   kontraktor: "Kontraktor",
   admin_k3:   "Admin K3",
   sfo:        "SFO",
-  smr:        "SMR",   // sebelumnya: pga: "PGA / MR"
+  smr:        "SMR",
   admin:      "Admin",
 };
 
-// ── Helper: label stage sesuai jenis form & tipe_perusahaan ──
 function getStageLabelForForm(form: FormItem): string {
   const stage = form.current_stage ?? 0;
-  const isHw  = form.jenis_form === "height-work";
   const isEksternal = form.tipe_perusahaan === "eksternal";
 
-  if (isHw) {
-    if (isEksternal) {
-      const map: Record<number, string> = {
-        1: "Kontraktor", 2: "SPV", 3: "Admin K3", 4: "SFO", 5: "SMR",
-      };
-      return map[stage] ?? `Tahap ${stage}`;
-    }
-    const map: Record<number, string> = {
-      1: "SPV", 2: "Admin K3", 3: "SFO", 4: "SMR",
-    };
-    return map[stage] ?? `Tahap ${stage}`;
-  }
-
-  // hot-work & workshop
   if (isEksternal) {
     const map: Record<number, string> = {
       1: "Kontraktor", 2: "SPV", 3: "Admin K3", 4: "SFO", 5: "SMR",
     };
     return map[stage] ?? `Tahap ${stage}`;
   }
-
   const map: Record<number, string> = {
     1: "SPV", 2: "Admin K3", 3: "SFO", 4: "SMR",
   };
   return map[stage] ?? `Tahap ${stage}`;
 }
 
-// ── Helper: stages badge untuk approval progress ──
-// key menggunakan nama kolom DB yang sebenarnya (mr_pga_approved, bukan smr_approved)
 function getApprovalStages(form: FormItem): { key: keyof FormItem; label: string }[] {
   const isEksternal = form.tipe_perusahaan === "eksternal";
 
@@ -115,25 +97,24 @@ function getApprovalStages(form: FormItem): { key: keyof FormItem; label: string
         { key: "spv_approved",        label: "SPV" },
         { key: "admin_k3_approved",   label: "Admin K3" },
         { key: "sfo_approved",        label: "SFO" },
-        { key: "mr_pga_approved",     label: "SMR" }, // key kolom DB tetap, label diubah
+        { key: "mr_pga_approved",     label: "SMR" },
       ];
     }
     return [
       { key: "spv_approved",      label: "SPV" },
       { key: "admin_k3_approved", label: "Admin K3" },
       { key: "sfo_approved",      label: "SFO" },
-      { key: "mr_pga_approved",   label: "SMR" }, // key kolom DB tetap, label diubah
+      { key: "mr_pga_approved",   label: "SMR" },
     ];
   }
 
-  // hot-work & workshop
   if (isEksternal) {
     return [
       { key: "kontraktor_approved", label: "Kontraktor" },
       { key: "spv_approved",        label: "SPV" },
       { key: "admin_k3_approved",   label: "Admin K3" },
       { key: "sfo_approved",        label: "SFO" },
-      { key: "mr_pga_approved",     label: "SMR" }, // key kolom DB tetap, label diubah
+      { key: "mr_pga_approved",     label: "SMR" },
     ];
   }
 
@@ -141,40 +122,40 @@ function getApprovalStages(form: FormItem): { key: keyof FormItem; label: string
     { key: "spv_approved",      label: "SPV" },
     { key: "admin_k3_approved", label: "Admin K3" },
     { key: "sfo_approved",      label: "SFO" },
-    { key: "mr_pga_approved",   label: "SMR" }, // key kolom DB tetap, label diubah
+    { key: "mr_pga_approved",   label: "SMR" },
   ];
 }
 
 const statusTabs = [
   { key: "submitted", label: "Belum Disetujui", icon: Clock,        color: "text-blue-600",  bg: "bg-blue-50",  border: "border-blue-500" },
   { key: "approved",  label: "Sudah Disetujui", icon: CheckCircle,  color: "text-green-600", bg: "bg-green-50", border: "border-green-500" },
-  { key: "rejected",  label: "Ditolak",          icon: XCircle,     color: "text-red-600",   bg: "bg-red-50",   border: "border-red-500" },
+  { key: "rejected",  label: "Ditolak",         icon: XCircle,      color: "text-red-600",   bg: "bg-red-50",   border: "border-red-500" },
 ];
 
 // ── Page ──────────────────────────────────────────────────────
 export default function ApprovalPage() {
   const router = useRouter();
-  const [forms, setForms]           = useState<FormItem[]>([]);
-  const [loading, setLoading]       = useState(true);
-  const [activeTab, setActiveTab]   = useState("submitted");
+
+  // ── Auth guard ─────────────────────────────────────────────
+  // Hook memanggil /api/auth/me dan redirect ke /login/approver jika belum login.
+  // Render halaman hanya setelah loading selesai & user valid.
+  const { user, loading: authLoading } = useApproverAuth();
+
+  const [forms, setForms]             = useState<FormItem[]>([]);
+  const [loading, setLoading]         = useState(true);
+  const [activeTab, setActiveTab]     = useState("submitted");
   const [filterJenis, setFilterJenis] = useState("all");
-  const [userName, setUserName]     = useState("");
-  const [userJabatan, setUserJabatan] = useState("");
-  const [userRole, setUserRole]     = useState("");
-  const [formCounts, setFormCounts] = useState<FormCounts>({ submitted: 0, approved: 0, rejected: 0 });
+  const [formCounts, setFormCounts]   = useState<FormCounts>({ submitted: 0, approved: 0, rejected: 0 });
 
+  // Muat data hanya setelah auth selesai & berhasil
   useEffect(() => {
-    const role = sessionStorage.getItem("user_role") || "";
-    setUserName(sessionStorage.getItem("user_nama") || "");
-    setUserJabatan(sessionStorage.getItem("user_jabatan") || "");
-    setUserRole(role);
-
+    if (authLoading || !user) return;
     Promise.all([loadFormCounts(), loadForms("submitted")]).finally(() => setLoading(false));
-  }, []);
+  }, [authLoading, user]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const loadFormCounts = async () => {
     try {
-      const res = await fetch("/form-permit/api/approval?countOnly=1");
+      const res = await fetch("/form-permit/api/approval?countOnly=1", { credentials: "include" });
       if (res.ok) {
         const data = await res.json();
         if (data.counts) setFormCounts(data.counts);
@@ -187,8 +168,11 @@ export default function ApprovalPage() {
   const loadForms = async (status = activeTab) => {
     setLoading(true);
     try {
-      const res = await fetch(`/form-permit/api/approval?status=${status}`);
-      if (res.status === 401) { router.push("/login"); return; }
+      const res = await fetch(`/form-permit/api/approval?status=${status}`, { credentials: "include" });
+      if (res.status === 401) {
+        router.push("/login/approver");
+        return;
+      }
       const data = await res.json();
       setForms(data.data ?? []);
     } catch (err) {
@@ -206,11 +190,16 @@ export default function ApprovalPage() {
   const handleRefresh = async () => {
     await Promise.all([loadFormCounts(), loadForms(activeTab)]);
   };
+
   const handleLogout = async () => {
-    await fetch("/form-permit/api/auth/logout", { method: "POST" });
+    await fetch("/form-permit/api/auth/logout", { method: "POST", credentials: "include" });
     sessionStorage.clear();
-    router.push("/");
+    router.push("/login/approver");    // ← redirect ke approver login, bukan /
   };
+
+  // ── Auth loading ───────────────────────────────────────────
+  // Jangan render halaman sebelum auth selesai
+  if (authLoading || !user) return <AuthLoadingSpinner />;
 
   const filtered = forms.filter(f => filterJenis === "all" || f.jenis_form === filterJenis);
 
@@ -235,15 +224,14 @@ export default function ApprovalPage() {
               </div>
             </div>
             <div className="flex items-center gap-3">
-              {userName && (
-                <div className="hidden md:flex items-center gap-2 bg-slate-100 rounded-lg px-3 py-2">
-                  <User className="w-4 h-4 text-slate-500" />
-                  <div>
-                    <span className="text-sm font-semibold text-slate-700 block">{userName}</span>
-                    <span className="text-xs text-slate-500">{userJabatan} • {roleLabelMap[userRole] || userRole}</span>
-                  </div>
+              {/* Gunakan data dari user (hasil /api/auth/me), bukan sessionStorage */}
+              <div className="hidden md:flex items-center gap-2 bg-slate-100 rounded-lg px-3 py-2">
+                <User className="w-4 h-4 text-slate-500" />
+                <div>
+                  <span className="text-sm font-semibold text-slate-700 block">{user.nama}</span>
+                  <span className="text-xs text-slate-500">{user.jabatan} • {roleLabelMap[user.role] || user.role}</span>
                 </div>
-              )}
+              </div>
               <button onClick={handleRefresh} disabled={loading}
                 className="p-2 hover:bg-slate-100 rounded-lg transition-colors disabled:opacity-50" title="Refresh">
                 <RefreshCw className={`w-4 h-4 text-slate-500 ${loading ? "animate-spin" : ""}`} />
@@ -264,7 +252,7 @@ export default function ApprovalPage() {
             <Shield className="w-5 h-5 text-blue-600" />
             <div>
               <p className="text-sm font-semibold text-blue-900">
-                Anda login sebagai: <span className="font-bold">{roleLabelMap[userRole] || userRole}</span>
+                Anda login sebagai: <span className="font-bold">{roleLabelMap[user.role] || user.role}</span>
               </p>
               <p className="text-xs text-blue-700">
                 {activeTab === "submitted"
@@ -349,7 +337,6 @@ export default function ApprovalPage() {
                         <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${jenisBadge[form.jenis_form] || "bg-slate-100 text-slate-600"}`}>
                           {jenisLabel[form.jenis_form] || form.jenis_form}
                         </span>
-                        {/* Badge tipe perusahaan */}
                         {form.tipe_perusahaan && (
                           <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
                             isEksternal ? "bg-purple-100 text-purple-700" : "bg-blue-100 text-blue-700"
@@ -357,7 +344,6 @@ export default function ApprovalPage() {
                             {isEksternal ? "Eksternal" : "Internal"}
                           </span>
                         )}
-                        {/* Badge tahap saat ini */}
                         {activeTab === "submitted" && (
                           <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 flex items-center gap-1">
                             <Shield className="w-3 h-3" /> Tahap {form.current_stage}: {stageLabel}
@@ -406,7 +392,6 @@ export default function ApprovalPage() {
                         })}
                       </div>
 
-                      {/* Info alur */}
                       {isFwForm && form.tipe_perusahaan && (
                         <p className="text-[10px] text-slate-400 mt-1">
                           Alur: {isEksternal

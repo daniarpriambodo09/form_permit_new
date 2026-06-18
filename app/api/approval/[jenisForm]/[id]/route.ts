@@ -8,6 +8,10 @@
 //        Filter diterapkan di GET (fetch detail) dan PATCH (approve/reject).
 //        Role lain (admin, admin_k3, sfo, smr, kontraktor) tidak terpengaruh.
 //
+// ADDED: Email notification setelah approve (ke approver berikutnya)
+//        dan setelah reject (ke pembuat form).
+//        Email dikirim secara fire-and-forget — tidak memblokir response.
+//
 // WORKFLOW — stage dimulai dari 1:
 //   Hot-work & Workshop INTERNAL:  1=spv → 2=admin_k3 → 3=sfo → 4=smr
 //   Hot-work & Workshop EKSTERNAL: 1=kontraktor → 2=spv → 3=admin_k3 → 4=sfo → 5=smr
@@ -17,14 +21,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query, queryOne } from '@/lib/db';
 import { verifyToken, COOKIE_NAME, UserRole, canUserApproveAtStage, getStageToRoleMap, getStageConfig } from '@/lib/auth';
+import { notifyNextApprover, notifyFormRejected, FormType } from '@/lib/approval-email';
 
 function getUser(req: NextRequest) {
   const token = req.cookies.get(COOKIE_NAME)?.value;
   if (!token) return null;
   return verifyToken(token);
 }
-
-type FormType = 'hot-work' | 'workshop' | 'height-work';
 
 const FORM_CONFIG: Record<FormType, {
   table:      string;
@@ -64,8 +67,6 @@ const TIPE_EXPR_FW = `CASE
 END`;
 
 // ── Helper: ambil departmen SPV yang sedang login dari DB ────
-// Diperlukan karena JWT payload tidak menyimpan departmen.
-// Mengembalikan null jika bukan SPV (sehingga filter tidak diterapkan).
 async function getSpvDepartmen(userId: number, role: UserRole): Promise<string | null> {
   if (role !== 'spv') return null;
   const row = await queryOne<{ departmen: string | null }>(
@@ -144,11 +145,8 @@ export async function GET(
   try {
     const tipeExpr = formType === 'height-work' ? TIPE_EXPR : TIPE_EXPR_FW;
 
-    // Ambil departmen SPV jika role = spv
     const spvDepartmen = await getSpvDepartmen(user.userId, user.role as UserRole);
 
-    // Jika SPV: JOIN ke users pembuat form, filter departmen pembuat = departmen SPV
-    // Jika role lain: query biasa tanpa filter departmen
     let row: any;
     if (spvDepartmen !== null) {
       row = await queryOne(
@@ -169,7 +167,6 @@ export async function GET(
     }
 
     if (!row) {
-      // SPV: kembalikan 403 (bukan 404) agar tidak leak bahwa form ada tapi beda departmen
       if (spvDepartmen !== null) {
         return NextResponse.json(
           { error: 'Form tidak ditemukan atau bukan dari departemen Anda.' },
@@ -223,15 +220,22 @@ export async function PATCH(
 
     const tipeExpr = formType === 'height-work' ? TIPE_EXPR : TIPE_EXPR_FW;
 
-    // Ambil departmen SPV jika role = spv
     const spvDepartmen = await getSpvDepartmen(user.userId, userRole);
 
-    // Fetch form — dengan atau tanpa departmen filter
-    let form: { id_form: string; status: string; current_stage: number; tipe_perusahaan: string } | null;
+    // Fetch form (dengan atau tanpa filter departemen)
+    let form: {
+      id_form:         string;
+      status:          string;
+      current_stage:   number;
+      tipe_perusahaan: string;
+      user_id:         number | null;
+      tanggal:         string;
+    } | null;
 
     if (spvDepartmen !== null) {
-      form = await queryOne<{ id_form: string; status: string; current_stage: number; tipe_perusahaan: string }>(
-        `SELECT f.id_form, f.status, f.current_stage, (${tipeExpr.replace(/tipe_perusahaan/g, 'f.tipe_perusahaan').replace(/petugas_ketinggian/g, 'f.petugas_ketinggian')}) AS tipe_perusahaan
+      form = await queryOne(
+        `SELECT f.id_form, f.status, f.current_stage, f.user_id, f.tanggal,
+                (${tipeExpr.replace(/tipe_perusahaan/g, 'f.tipe_perusahaan').replace(/petugas_ketinggian/g, 'f.petugas_ketinggian')}) AS tipe_perusahaan
          FROM ${config.table} f
          JOIN users creator ON creator.id = f.user_id
          WHERE f.id_form = $1
@@ -239,8 +243,9 @@ export async function PATCH(
         [id, spvDepartmen]
       );
     } else {
-      form = await queryOne<{ id_form: string; status: string; current_stage: number; tipe_perusahaan: string }>(
-        `SELECT id_form, status, current_stage, (${tipeExpr}) AS tipe_perusahaan
+      form = await queryOne(
+        `SELECT id_form, status, current_stage, user_id, tanggal,
+                (${tipeExpr}) AS tipe_perusahaan
          FROM ${config.table}
          WHERE id_form = $1`,
         [id]
@@ -289,6 +294,18 @@ export async function PATCH(
          WHERE id_form = $4`,
         [catatanReject, userName, now, id]
       );
+
+      // ── Email: kirim notifikasi reject ke pembuat form (fire-and-forget) ──
+      notifyFormRejected({
+        formType,
+        idForm:        id,
+        userId:        form.user_id,
+        namaApprover:  userName,
+        catatanReject,
+      }).catch((err) => {
+        console.error(`[EMAIL] Background rejection email error for ${id}:`, err);
+      });
+
       return NextResponse.json({ success: true, action: 'rejected', id_form: id });
     }
 
@@ -335,6 +352,30 @@ export async function PATCH(
       queryParams
     );
 
+    // ── Email: kirim ke approver berikutnya (fire-and-forget) ──
+    // Hanya kirim jika bukan stage terakhir
+    if (!isLastStage) {
+      // Ambil nama pembuat form untuk body email
+      queryOne<{ nama: string }>(
+        `SELECT u.nama FROM ${config.table} f LEFT JOIN users u ON u.id = f.user_id WHERE f.id_form = $1`,
+        [id]
+      ).then((makerRow) => {
+        notifyNextApprover({
+          formType,
+          idForm:         id,
+          tipePerusahaan,
+          nextStage,
+          userId:         form!.user_id,
+          namaPemohon:    makerRow?.nama ?? '-',
+          tanggal:        form!.tanggal,
+        }).catch((err) => {
+          console.error(`[EMAIL] Background approval email error for ${id}:`, err);
+        });
+      }).catch(() => {
+        // Tidak kritikal — approval tetap berhasil
+      });
+    }
+
     return NextResponse.json({
       success:      true,
       action:       'approved',
@@ -347,4 +388,4 @@ export async function PATCH(
     console.error(`[PATCH /api/approval/${jenisForm}/${id}]`, err);
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
-} 
+}
