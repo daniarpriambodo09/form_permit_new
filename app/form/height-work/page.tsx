@@ -17,7 +17,7 @@ import JsaUploadSection, {
   type JsaFileInfo,
   type JsaUploadStatus as JsaStatus,
 } from "@/components/JsaUploadSection";
-import Time24Input, { normalizeTo24h } from "@/components/Time24Input";
+import TimeInput24, { normalizeTo24h } from "@/components/Time24Input";
 
 type UploadStatus = "idle" | "uploading" | "success" | "error";
 
@@ -70,7 +70,6 @@ function LisensiUploadButton({ namaPetugas, index, fotoUrl, uploadStatus, upload
     const r = new FileReader();
     r.onloadend = () => onUploaded(r.result as string, "uploading", "");
     r.readAsDataURL(file);
-
     try {
       const fd = new FormData();
       fd.append("file", file);
@@ -173,13 +172,11 @@ export default function HeightWorkFormPage() {
   const [fotoLisensi, setFotoLisensi] = useState<(string | null)[]>(Array(10).fill(null));
   const [uploadStatus, setUploadStatus] = useState<UploadStatus[]>(Array(10).fill("idle" as UploadStatus));
   const [uploadError, setUploadError] = useState<string[]>(Array(10).fill(""));
-  
   const [kunceePagar, setKunceePagar] = useState(false);
   const [rompiKetinggian, setRompiKetinggian] = useState(false);
   const [rompiAngka, setRompiAngka] = useState("");
   const [safetyHelmetCount, setSafetyHelmetCount] = useState("");
   const [fullBodyHarnessCount, setFullBodyHarnessCount] = useState("");
-  
   const [areaKerjaAman, setAreaKerjaAman] = useState(false);
   const [kebakaranProcedure, setKebakaranProcedure] = useState(false);
   const [pekerjaanListrik, setPekerjaanListrik] = useState(false);
@@ -191,14 +188,12 @@ export default function HeightWorkFormPage() {
   const [bebanBeratTubuh, setBebanBeratTubuh] = useState(false);
   const [helmStandar, setHelmStandar] = useState(false);
   const [rambuSafetyWarning, setRambuSafetyWarning] = useState(false);
-  
   const [bodyHarnessWebbing, setBodyHarnessWebbing] = useState(false);
   const [bodyHarnessDRing, setBodyHarnessDRing] = useState(false);
   const [bodyHarnessAdjustment, setBodyHarnessAdjustment] = useState(false);
   const [lanyardAbsorber, setLanyardAbsorber] = useState(false);
   const [lanyardSnapHook, setLanyardSnapHook] = useState(false);
   const [lanyardRope, setLanyardRope] = useState(false);
-  
   const [harnessLightbox, setHarnessLightbox] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -247,7 +242,7 @@ export default function HeightWorkFormPage() {
   const lisensiMissing = petugasAktif.filter(({ idx }) => !fotoLisensi[idx]);
   const lisensiUploading = uploadStatus.some((s) => s === "uploading");
 
-  // ── Validasi format waktu 24 jam (HH:mm), jam 00-23, menit 00-59 ──
+  // ── Validasi format waktu 24 jam (HH:mm), jam 00-23, menit 00-59 ─
   const TIME_24H_PATTERN = /^([01]\d|2[0-3]):([0-5]\d)$/;
   const isValidTime24 = (val: string) => val === "" || TIME_24H_PATTERN.test(val);
 
@@ -305,7 +300,7 @@ export default function HeightWorkFormPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Gagal menyimpan draft");
-      router.push("/form-permit/my-forms");
+      router.push("/my-forms");
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -374,8 +369,8 @@ export default function HeightWorkFormPage() {
           </div>
           {successId && <p className="text-xs text-slate-400 mb-6">ID Form: <span className="font-mono font-bold text-slate-700">{successId}</span></p>}
           <div className="flex gap-3">
-            <Link href="/form-permit/my-forms" className="flex-1 py-2.5 bg-orange-600 hover:bg-orange-700 text-white font-semibold rounded-lg text-sm transition-colors">Lihat Riwayat</Link>
-            <Link href="/form-permit/home" className="flex-1 py-2.5 border border-slate-200 hover:bg-slate-50 text-slate-700 font-semibold rounded-lg text-sm transition-colors">Kembali</Link>
+            <Link href="/my-forms" className="flex-1 py-2.5 bg-orange-600 hover:bg-orange-700 text-white font-semibold rounded-lg text-sm transition-colors">Lihat Riwayat</Link>
+            <Link href="/home" className="flex-1 py-2.5 border border-slate-200 hover:bg-slate-50 text-slate-700 font-semibold rounded-lg text-sm transition-colors">Kembali</Link>
           </div>
         </div>
       </div>
@@ -398,7 +393,8 @@ export default function HeightWorkFormPage() {
               <h1 className="font-bold text-slate-900 text-sm leading-tight">Form Izin Kerja Ketinggian</h1>
               <div className="flex items-center gap-1 text-xs text-slate-500">
                 <Link href="/my-forms" className="hover:text-orange-600 transition-colors">Beranda</Link>
-                <ChevronRight className="w-3 h-3" /> <span>Kerja Ketinggian</span>
+                <ChevronRight className="w-3 h-3" />
+                <span>Kerja Ketinggian</span>
               </div>
             </div>
           </div>
@@ -419,7 +415,9 @@ export default function HeightWorkFormPage() {
 
           {/* BAGIAN 1 */}
           <section className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-            <div className={sectionHead}> <h2 className="font-bold text-slate-800">Bagian 1: Informasi Pekerjaan</h2> </div>
+            <div className={sectionHead}>
+              <h2 className="font-bold text-slate-800">Bagian 1: Informasi Pekerjaan</h2>
+            </div>
             <div className="p-6 space-y-5">
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-2">Tipe Petugas Ketinggian <span className="text-red-500">*</span></label>
@@ -459,22 +457,25 @@ export default function HeightWorkFormPage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              {/* ── Field Waktu - Layout Rapi (sama seperti hot-work & workshop) ── */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-md">
                 <div>
                   <label className="block text-sm font-semibold text-slate-700 mb-2">Waktu Mulai <span className="text-[10px] font-normal text-slate-400">(24 jam)</span></label>
-                  <Time24Input value={waktuMulai} onChange={setWaktuMulai} />
+                  <TimeInput24 value={waktuMulai} onChange={setWaktuMulai} />
                 </div>
                 <div>
                   <label className="block text-sm font-semibold text-slate-700 mb-2">Waktu Selesai <span className="text-[10px] font-normal text-slate-400">(24 jam)</span></label>
-                  <Time24Input value={waktuSelesai} onChange={setWaktuSelesai} />
+                  <TimeInput24 value={waktuSelesai} onChange={setWaktuSelesai} />
                 </div>
               </div>
+
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-2">
                   {tipePerusahaan === "eksternal" ? "Nama Pengawas Kontraktor" : "Nama Pengawas"} <span className="text-red-500">*</span>
                 </label>
                 <input type="text" value={namaPengawasKontraktor} onChange={(e) => setNamaPengawasKontraktor(e.target.value)} placeholder={tipePerusahaan === "eksternal" ? "Nama pengawas kontraktor" : "Nama pengawas"} required className={inputCls} />
               </div>
+
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-2">Nama Departemen <span className="text-red-500">*</span></label>
                 <select value={namaDepartemen} onChange={(e) => { setNamaDepartemen(e.target.value); setNamaPengawasDepartemen(""); }} required className={`${inputCls} ${!namaDepartemen ? "text-slate-400" : "text-slate-800"}`}>
@@ -499,7 +500,9 @@ export default function HeightWorkFormPage() {
 
           {/* BAGIAN 2: Petugas + Lisensi */}
           <section id="bagian-petugas" className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-            <div className={sectionHead}> <h2 className="font-bold text-slate-800">Bagian 2: Nama Petugas Ketinggian & Status Kesehatan</h2> </div>
+            <div className={sectionHead}>
+              <h2 className="font-bold text-slate-800">Bagian 2: Nama Petugas Ketinggian & Status Kesehatan</h2>
+            </div>
             <div className="p-6">
               <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 mb-5">
                 <p className="text-sm text-amber-700">⚠️ Setiap petugas yang namanya terisi <strong>wajib</strong> melampirkan foto lisensi ketinggian.</p>
@@ -539,7 +542,9 @@ export default function HeightWorkFormPage() {
 
           {/* BAGIAN 3: APD */}
           <section className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-            <div className={sectionHead}> <h2 className="font-bold text-slate-800">Bagian 3: Peminjaman APD</h2> </div>
+            <div className={sectionHead}>
+              <h2 className="font-bold text-slate-800">Bagian 3: Peminjaman APD</h2>
+            </div>
             <div className="p-6 space-y-3">
               <label className="flex items-center gap-3 cursor-pointer p-3 rounded-xl hover:bg-slate-50 border border-transparent hover:border-slate-200 transition-all">
                 <input type="checkbox" checked={kunceePagar} onChange={(e) => setKunceePagar(e.target.checked)} className={cb} />
@@ -574,7 +579,9 @@ export default function HeightWorkFormPage() {
 
           {/* BAGIAN 4: Keselamatan */}
           <section className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-            <div className={sectionHead}> <h2 className="font-bold text-slate-800">Bagian 4: Keselamatan Kerja Ketinggian</h2> </div>
+            <div className={sectionHead}>
+              <h2 className="font-bold text-slate-800">Bagian 4: Keselamatan Kerja Ketinggian</h2>
+            </div>
             <div className="p-6">
               <div className="space-y-1">
                 {[
@@ -601,7 +608,9 @@ export default function HeightWorkFormPage() {
 
           {/* BAGIAN 5: Body Harness */}
           <section className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-            <div className={sectionHead}> <h2 className="font-bold text-slate-800">Bagian 5: Pengecekan Body Harness & Lanyard</h2> </div>
+            <div className={sectionHead}>
+              <h2 className="font-bold text-slate-800">Bagian 5: Pengecekan Body Harness & Lanyard</h2>
+            </div>
             <div className="p-6">
               <div className="flex gap-6">
                 <div className="flex-1 space-y-5">
@@ -709,9 +718,9 @@ export default function HeightWorkFormPage() {
             </button>
             <button type="submit" disabled={submitting || saving || lisensiUploading || jsaUploadStatus === "uploading"} className="flex-1 py-3.5 bg-orange-600 hover:bg-orange-700 disabled:bg-orange-300 text-white font-semibold rounded-xl text-sm transition-all shadow-lg shadow-orange-600/20 flex items-center justify-center gap-2">
               {submitting ? <><Loader2 className="w-4 h-4 animate-spin" />Mengirim...</>
-               : lisensiUploading ? <><Loader2 className="w-4 h-4 animate-spin" />Upload foto...</>
-               : jsaUploadStatus === "uploading" ? <><Loader2 className="w-4 h-4 animate-spin" />Upload JSA...</>
-               : <><AlertTriangle className="w-4 h-4" />Kirim Izin Kerja</>}
+                : lisensiUploading ? <><Loader2 className="w-4 h-4 animate-spin" />Upload foto...</>
+                  : jsaUploadStatus === "uploading" ? <><Loader2 className="w-4 h-4 animate-spin" />Upload JSA...</>
+                    : <><AlertTriangle className="w-4 h-4" />Kirim Izin Kerja</>}
             </button>
           </div>
         </form>

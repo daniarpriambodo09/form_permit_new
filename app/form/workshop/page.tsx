@@ -8,6 +8,7 @@ import JsaUploadSection, {
   type JsaFileInfo,
   type JsaUploadStatus as JsaStatus,
 } from "@/components/JsaUploadSection";
+import TimeInput24, { normalizeTo24h } from "@/components/Time24Input";
 
 type WorkDetail = { detail: string; mulai: string; selesai: string };
 
@@ -155,7 +156,6 @@ export default function WorkshopPermitForm() {
 
   const submit = async (isSubmit: boolean) => {
     setValidationError("");
-    
     // Validate Fire Watch selection
     if (!formData.namaFireWatch || !formData.nikFireWatch) {
       setValidationError("Fire Watch wajib dipilih");
@@ -170,11 +170,29 @@ export default function WorkshopPermitForm() {
 
     setSubmitting(true);
     try {
+      // Helper: hanya kirim waktu jika detail ada
+      const normalizeWork = (work: WorkDetail) => ({
+        detail: work.detail || null,
+        mulai: work.detail ? normalizeTo24h(work.mulai) : null,
+        selesai: work.detail ? normalizeTo24h(work.selesai) : null,
+      });
+
+      const normalizedData = {
+        ...formData,
+        waktuPukul: normalizeTo24h(formData.waktuPukul),
+        jenisPekerjaan: {
+          ...formData.jenisPekerjaan,
+          cutting: normalizeWork(formData.jenisPekerjaan.cutting),
+          grinding: normalizeWork(formData.jenisPekerjaan.grinding),
+          welding: normalizeWork(formData.jenisPekerjaan.welding),
+          painting: normalizeWork(formData.jenisPekerjaan.painting),
+        },
+      };
       const res = await fetch("/form-permit/api/forms/workshop", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          ...formData,
+          ...normalizedData,
           isSubmit,
           perluJsa,
           jsaFileUrl: jsaFile?.url ?? null,
@@ -196,7 +214,7 @@ export default function WorkshopPermitForm() {
       alert("Gagal: " + e.message);
     }
   };
-  
+
   const handleSubmit = async () => {
     if (validationError) {
       alert(validationError);
@@ -214,10 +232,6 @@ export default function WorkshopPermitForm() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
-      <style>{`
-        input[type="time"]::-webkit-datetime-edit-ampm-field { display: none; }
-        input[type="time"] { -webkit-appearance: textfield; }
-      `}</style>
       <div className="bg-white shadow-sm border-b border-slate-200 sticky top-0 z-50">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-5 flex items-center justify-between">
           <div className="flex items-center gap-4">
@@ -279,7 +293,7 @@ export default function WorkshopPermitForm() {
 
             <div>
               <label className="block text-sm font-semibold text-slate-700 mb-2">
-                Nama Kontraktor{" "}
+                Nama Kontraktor{"  "}
                 {isInternal
                   ? <span className="text-slate-400 font-normal text-xs ml-1">(tidak diperlukan untuk Internal)</span>
                   : <span className="text-red-500">*</span>
@@ -312,9 +326,13 @@ export default function WorkshopPermitForm() {
               </div>
             </div>
 
-            <div>
+            {/* Waktu Pukul - Layout Rapi */}
+            <div className="max-w-xs">
               <label className="block text-sm font-semibold text-slate-700 mb-2">Waktu (Pukul)</label>
-              <input type="time" step="60" value={formData.waktuPukul} onChange={e => setFormData(p => ({ ...p, waktuPukul: e.target.value }))} className={inputCls} />
+              <TimeInput24
+                value={formData.waktuPukul}
+                onChange={val => setFormData(p => ({ ...p, waktuPukul: val }))}
+              />
             </div>
 
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
@@ -384,7 +402,7 @@ export default function WorkshopPermitForm() {
           </div>
         </Section>
 
-        {/* ── BAGIAN 2 ── */}
+        {/* ─ BAGIAN 2 ── */}
         <Section title="BAGIAN 2: JENIS PEKERJAAN & AREA BERISIKO TINGGI"
           section="bagian2" description="Pilih jenis pekerjaan dan identifikasi area berisiko"
           expanded={expanded} toggle={toggle}>
@@ -394,6 +412,7 @@ export default function WorkshopPermitForm() {
               {[{ key: "preventive", label: "Preventive Genset / Pump room" }, { key: "tangki", label: "Tangki Solar" }, { key: "panel", label: "Panel Listrik" }]
                 .map(item => <CheckItem key={item.key} label={item.label} checked={(formData.jenisPekerjaan as any)[item.key]} onChange={() => setJ({ [item.key]: !(formData.jenisPekerjaan as any)[item.key] })} />)}
             </div>
+
             <div>
               <h4 className="font-bold text-slate-900 text-base mb-4 pb-3 border-b border-slate-200">B. Detail Pekerjaan</h4>
               <div className="space-y-4">
@@ -401,11 +420,40 @@ export default function WorkshopPermitForm() {
                   const item = formData.jenisPekerjaan[key];
                   return (
                     <div key={key} className="border border-slate-200 rounded-lg p-4 bg-slate-50 hover:bg-orange-50 transition-colors">
-                      <p className="text-sm font-semibold text-slate-900 mb-3 capitalize">{key}</p>
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                        <div className="md:col-span-1"> <label className="block text-xs font-medium text-slate-600 mb-1">Detail</label> <input type="text" value={item.detail} onChange={e => setWork(key, "detail", e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm text-black" /> </div>
-                        <div> <label className="block text-xs font-medium text-slate-600 mb-1">Mulai</label> <input type="time" step="60" value={item.mulai} onChange={e => setWork(key, "mulai", e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm text-black" /> </div>
-                        <div> <label className="block text-xs font-medium text-slate-600 mb-1">Selesai</label> <input type="time" step="60" value={item.selesai} onChange={e => setWork(key, "selesai", e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm text-black" /> </div>
+                      <p className="text-sm font-bold text-slate-900 mb-3 capitalize">{key}</p>
+                      {/* Grid layout yang lebih rapi - Detail lebih lebar, waktu lebih compact */}
+                      <div className="grid grid-cols-12 gap-4 items-end">
+                        {/* Detail - 5 kolom */}
+                        <div className="col-span-12 md:col-span-5">
+                          <label className="block text-xs font-semibold text-slate-600 mb-1.5">Detail Pekerjaan</label>
+                          <input
+                            type="text"
+                            value={item.detail}
+                            onChange={e => setWork(key, "detail", e.target.value)}
+                            className="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm text-black focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                            placeholder="Deskripsi pekerjaan"
+                          />
+                        </div>
+
+                        {/* Mulai - 3 kolom */}
+                        <div className="col-span-6 md:col-span-3">
+                          <label className="block text-xs font-semibold text-slate-600 mb-1.5">Mulai</label>
+                          <TimeInput24
+                            value={item.mulai}
+                            onChange={val => setWork(key, "mulai", val)}
+                            label=""
+                          />
+                        </div>
+
+                        {/* Selesai - 4 kolom */}
+                        <div className="col-span-6 md:col-span-4">
+                          <label className="block text-xs font-semibold text-slate-600 mb-1.5">Selesai</label>
+                          <TimeInput24
+                            value={item.selesai}
+                            onChange={val => setWork(key, "selesai", val)}
+                            label=""
+                          />
+                        </div>
                       </div>
                       {key === "painting" && (
                         <div className="grid grid-cols-2 gap-4 mt-4 pt-4 border-t border-slate-300">
@@ -424,11 +472,13 @@ export default function WorkshopPermitForm() {
                 })}
               </div>
             </div>
+
             <div>
               <h4 className="font-bold text-slate-900 text-base mb-3 pb-3 border-b border-slate-200">C. Pekerjaan Lainnya</h4>
               <CheckItem label="Ada pekerjaan lain yang menggunakan aplikasi panas lainnya" checked={formData.jenisPekerjaan.lainnya} onChange={() => setJ({ lainnya: !formData.jenisPekerjaan.lainnya })} />
-              {formData.jenisPekerjaan.lainnya && <textarea rows={2} value={formData.jenisPekerjaan.lainnyaKeterangan} onChange={e => setJ({ lainnyaKeterangan: e.target.value })} className="w-full mt-3 px-4 py-2.5 border border-slate-300 rounded-lg text-sm text-black" />}
+              {formData.jenisPekerjaan.lainnya && <textarea rows={2} value={formData.jenisPekerjaan.lainnyaKeterangan} onChange={e => setJ({ lainnyaKeterangan: e.target.value })} className="w-full mt-3 px-4 py-2.5 border border-slate-300 rounded-lg text-sm text-black" placeholder="Sebutkan..." />}
             </div>
+
             <div>
               <h4 className="font-bold text-slate-900 text-base mb-4 pb-3 border-b border-slate-200">Area / Equipment Berisiko Tinggi</h4>
               <div className="bg-red-50 p-4 rounded-lg border border-red-200 space-y-1">
@@ -460,6 +510,7 @@ export default function WorkshopPermitForm() {
                 </div>
               </div>
             ))}
+
             <div className="border border-blue-200 rounded-lg p-4 bg-blue-50">
               <h4 className="font-bold text-blue-900 text-sm mb-4">5. PERAN API (FIRE WATCH)</h4>
               <div className="space-y-3">
@@ -479,6 +530,7 @@ export default function WorkshopPermitForm() {
                   ))}
               </div>
             </div>
+
             <div className="border border-slate-200 rounded-lg p-4">
               <label className="block text-sm font-medium text-slate-700 mb-2">Permintaan Tambahan Tindakan Pengamanan</label>
               <textarea rows={3} value={formData.pencegahan.permintaan_tambahan} onChange={e => setP({ permintaan_tambahan: e.target.value })} className={inputCls} placeholder="Sebutkan..." />
@@ -522,7 +574,7 @@ export default function WorkshopPermitForm() {
           jsaUploadError={jsaUploadError}
           setJsaUploadError={setJsaUploadError}
           sectionTitle="BAGIAN 5: UPLOAD JSA"
-          sectionStyle="hot-work"
+          sectionStyle="workshop"
         />
 
         {/* Action buttons */}

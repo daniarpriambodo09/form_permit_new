@@ -42,7 +42,7 @@ interface JsaUploadSectionProps {
   setJsaUploadError: (v: string) => void;
   sectionTitle?: string;
   /** Gaya header section — opsional, default mirip hot-work */
-  sectionStyle?: "hot-work" | "height-work";
+  sectionStyle?: "hot-work" | "height-work" | "workshop";
 }
 
 const ALLOWED_MIME = [

@@ -159,6 +159,7 @@ export default function SmtpSettingsPage() {
             new Date(json.data.updatedAt).toLocaleString('id-ID', {
               day: '2-digit', month: 'short', year: 'numeric',
               hour: '2-digit', minute: '2-digit',
+              hour12: false,
             })
           );
         }
@@ -227,6 +228,7 @@ export default function SmtpSettingsPage() {
       const ts = new Date(json.data.updatedAt).toLocaleString('id-ID', {
         day: '2-digit', month: 'short', year: 'numeric',
         hour: '2-digit', minute: '2-digit',
+        hour12: false,
       });
       setSavedAt(ts);
       setSaveMsg('✅ Konfigurasi SMTP berhasil disimpan!');

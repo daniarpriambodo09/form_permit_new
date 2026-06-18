@@ -24,7 +24,7 @@ const formatDate = (ts?: string) => {
 const formatTime = (ts?: string) => {
   if (!ts) return "-";
   return new Date(ts).toLocaleTimeString("id-ID", {
-    hour: "2-digit", minute: "2-digit", second: "2-digit", timeZoneName: "short",
+    hour: "2-digit", minute: "2-digit", second: "2-digit", timeZoneName: "short", hour12: false,
   });
 };
 
@@ -99,6 +99,7 @@ export default async function ApprovalVerificationPage({ params }: PageProps) {
     day: "2-digit", month: "long", year: "numeric",
     hour: "2-digit", minute: "2-digit", second: "2-digit",
     timeZoneName: "short",
+    hour12: false,
   });
 
   // ── INVALID / NOT FOUND ──────────────────────────────────

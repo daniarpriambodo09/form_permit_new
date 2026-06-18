@@ -296,7 +296,7 @@ export default function DetailModal({ isOpen, onClose, formId, formType }: Detai
             { l: "Grinding", d: p.detail_grinding, m: p.t_mulai_grinding, s: p.t_selesai_grinding },
             { l: "Welding",  d: p.detail_welding,  m: p.t_mulai_welding,  s: p.t_selesai_welding },
             { l: "Painting", d: p.detail_painting, m: p.t_mulai_painting, s: p.t_selesai_painting },
-          ].filter(x => x.d || x.m).map(x => (
+          ].filter(x => x.d && x.m && x.m !== "00:00").map(x => (
             <div key={x.l} className="mb-3 p-3 bg-slate-50 rounded-lg">
               <div className="flex justify-between items-start mb-2">
                 <span className="font-bold text-slate-700">{x.l}</span>
@@ -540,7 +540,7 @@ export default function DetailModal({ isOpen, onClose, formId, formType }: Detai
             { l: "Grinding", d: p.detail_grinding, m: p.t_mulai_grinding, s: p.t_selesai_grinding },
             { l: "Welding",  d: p.detail_welding,  m: p.t_mulai_welding,  s: p.t_selesai_welding },
             { l: "Painting", d: p.detail_painting, m: p.t_mulai_painting, s: p.t_selesai_painting },
-          ].filter(x => x.d || x.m).map(x => (
+          ].filter(x => x.d && x.m && x.m !== "00:00").map(x => (
             <div key={x.l} className="mb-3 p-3 bg-slate-50 rounded-lg">
               <div className="flex justify-between items-start mb-2">
                 <span className="font-bold text-slate-700">{x.l}</span>

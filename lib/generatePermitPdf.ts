@@ -76,7 +76,7 @@ const fmtDT = (d?: string | null): { date: string; time: string } => {
   const dt = new Date(d);
   return {
     date: dt.toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" }),
-    time: dt.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit", second: "2-digit" }),
+    time: dt.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false }),
   };
 };
 const cleanFile = (url?: string | null) => {
@@ -416,7 +416,7 @@ function drawCheckItem(d: jsPDFType, item: CItem, x: number, y: number, w: numbe
   d.text(ls[0] ?? item.lbl, x + 2, y + h - 1.2);
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ═══════��═══════════════════════════════════════════════════════════════════
 // JOB GRID — 2x2 grid (Cutting | Grinding / Welding | Painting)
 // ═══════════════════════════════════════════════════════════════════════════
 

@@ -1,9 +1,4 @@
 // app/form/hot-work/page.tsx
-// UPDATED: Tambah Bagian 5 — Upload JSA
-// Alur baru (UPDATED):
-//   Internal:  SPV → Admin K3 → SFO → SMR
-//   Eksternal: Kontraktor → SPV → Admin K3 → SFO → SMR
-// Fire Watch dipilih saat form dibuat, tidak lagi menjadi approver
 "use client";
 import { useState, useEffect } from "react";
 import Link from "next/link";
@@ -13,11 +8,12 @@ import JsaUploadSection, {
   type JsaFileInfo,
   type JsaUploadStatus as JsaStatus,
 } from "@/components/JsaUploadSection";
+import TimeInput24, { normalizeTo24h } from "@/components/Time24Input";
 
 type WorkDetail = { detail: string; mulai: string; selesai: string };
 
 interface FormData {
-  tipePerusahaan: "internal" | "eksternal"; 
+  tipePerusahaan: "internal" | "eksternal";
   namaKontraktor: string;
   namaPekerjaNIK: string;
   lokasi: string;
@@ -124,14 +120,14 @@ export default function HotWorkPermitForm() {
   const [submitting, setSubmitting] = useState(false);
   const [expanded, setExpanded] = useState({ bagian1: true, bagian2: true, bagian3: true, bagian4: true });
   const [user, setUser] = useState<any>(null);
-  const [fireWatchList, setFireWatchList] = useState<Array<{nama: string; nik: string}>>([]);
+  const [fireWatchList, setFireWatchList] = useState<Array<{ nama: string; nik: string }>>([]);
   const [validationError, setValidationError] = useState<string>("");
 
   // ── JSA state ──────────────────────────────────────────────
-  const [perluJsa,        setPerluJsa]        = useState(false);
-  const [jsaFile,         setJsaFile]         = useState<JsaFileInfo | null>(null);
+  const [perluJsa, setPerluJsa] = useState(false);
+  const [jsaFile, setJsaFile] = useState<JsaFileInfo | null>(null);
   const [jsaUploadStatus, setJsaUploadStatus] = useState<JsaStatus>("idle");
-  const [jsaUploadError,  setJsaUploadError]  = useState("");
+  const [jsaUploadError, setJsaUploadError] = useState("");
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -156,7 +152,7 @@ export default function HotWorkPermitForm() {
   const setJ = (patch: any) => setFormData(prev => ({ ...prev, jenisPekerjaan: { ...prev.jenisPekerjaan, ...patch } }));
   const setA = (patch: any) => setFormData(prev => ({ ...prev, areaBerisiko: { ...prev.areaBerisiko, ...patch } }));
   const setP = (patch: any) => setFormData(prev => ({ ...prev, pencegahan: { ...prev.pencegahan, ...patch } }));
-  const setWork = (key: "cutting"|"grinding"|"welding"|"painting", field: keyof WorkDetail, val: string) =>
+  const setWork = (key: "cutting" | "grinding" | "welding" | "painting", field: keyof WorkDetail, val: string) =>
     setJ({ [key]: { ...formData.jenisPekerjaan[key], [field]: val } });
 
   const isInternal = formData.tipePerusahaan === "internal";
@@ -165,7 +161,6 @@ export default function HotWorkPermitForm() {
 
   const submit = async (isSubmit: boolean) => {
     setValidationError("");
-
     // Validasi Fire Watch
     if (!formData.namaFireWatch || !formData.nikFireWatch) {
       setValidationError("Fire Watch wajib dipilih");
@@ -180,10 +175,29 @@ export default function HotWorkPermitForm() {
 
     setSubmitting(true);
     try {
+      // Helper: hanya kirim waktu jika detail ada
+      const normalizeWork = (work: WorkDetail) => ({
+        detail: work.detail || null,
+        mulai: work.detail ? normalizeTo24h(work.mulai) : null,
+        selesai: work.detail ? normalizeTo24h(work.selesai) : null,
+      });
+
+      const normalizedData = {
+        ...formData,
+        waktuPukul: normalizeTo24h(formData.waktuPukul),
+        jenisPekerjaan: {
+          ...formData.jenisPekerjaan,
+          cutting: normalizeWork(formData.jenisPekerjaan.cutting),
+          grinding: normalizeWork(formData.jenisPekerjaan.grinding),
+          welding: normalizeWork(formData.jenisPekerjaan.welding),
+          painting: normalizeWork(formData.jenisPekerjaan.painting),
+        },
+      };
       const res = await fetch("/form-permit/api/forms/hot-work", {
-        method: "POST", headers: { "Content-Type": "application/json" },
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          ...formData,
+          ...normalizedData,
           isSubmit,
           perluJsa,
           jsaFileUrl: jsaFile?.url ?? null,
@@ -192,10 +206,12 @@ export default function HotWorkPermitForm() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Terjadi kesalahan server");
       return data;
-    } finally { setSubmitting(false); }
+    } finally {
+      setSubmitting(false);
+    }
   };
 
-  const handleSave   = async () => { try { const r = await submit(false); alert(`Draft disimpan! ID: ${r.id_form}`); } catch (e: any) { alert("Gagal: " + e.message); } };
+  const handleSave = async () => { try { const r = await submit(false); alert(`Draft disimpan! ID: ${r.id_form}`); } catch (e: any) { alert("Gagal: " + e.message); } };
   const handleSubmit = async () => {
     if (validationError) { alert(validationError); return; }
     try {
@@ -208,10 +224,6 @@ export default function HotWorkPermitForm() {
 
   return (
     <div className="min-h-screen bg-slate-50">
-        <style>{`
-          input[type="time"]::-webkit-datetime-edit-ampm-field { display: none; }
-          input[type="time"] { -webkit-appearance: textfield; }
-        `}</style>
       <header className="bg-white border-b border-slate-200 sticky top-0 z-10">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
           <div className="flex items-center gap-4">
@@ -243,13 +255,11 @@ export default function HotWorkPermitForm() {
               <label className="block text-sm font-semibold text-slate-700 mb-2">Tipe Pekerja / Perusahaan <span className="text-red-500">*</span></label>
               <div className="grid grid-cols-2 gap-3">
                 {[
-                  { value: "internal",  label: "Internal / Karyawan PT.JAI", desc: "Alur: SPV → Admin K3 → SFO → SMR" },
-                  { value: "eksternal", label: "Eksternal / Subkontraktor",   desc: "Alur: Kontraktor → SPV → Admin K3 → SFO → SMR" },
+                  { value: "internal", label: "Internal / Karyawan PT.JAI", desc: "Alur: SPV → Admin K3 → SFO → SMR" },
+                  { value: "eksternal", label: "Eksternal / Subkontraktor", desc: "Alur: Kontraktor → SPV → Admin K3 → SFO → SMR" },
                 ].map(opt => (
                   <label key={opt.value}
-                    className={`flex flex-col gap-1 p-3 rounded-xl border-2 cursor-pointer transition-all ${
-                      formData.tipePerusahaan === opt.value ? "border-orange-400 bg-orange-50" : "border-slate-200 hover:border-orange-200"
-                    }`}>
+                    className={`flex flex-col gap-1 p-3 rounded-xl border-2 cursor-pointer transition-all ${formData.tipePerusahaan === opt.value ? "border-orange-400 bg-orange-50" : "border-slate-200 hover:border-orange-200"}`}>
                     <div className="flex items-center gap-2">
                       <input type="radio" name="tipePerusahaan" value={opt.value}
                         checked={formData.tipePerusahaan === opt.value}
@@ -278,10 +288,12 @@ export default function HotWorkPermitForm() {
                 placeholder={isInternal ? "Tidak diperlukan untuk Internal / Karyawan PT.JAI" : "PT ABC"}
                 className={`${inputCls} ${isInternal ? "bg-slate-100 text-slate-400 cursor-not-allowed opacity-60" : ""}`} />
             </div>
+
             <div>
               <label className="block text-sm font-semibold text-slate-700 mb-2">Nama Pekerja / NIK *</label>
               <input type="text" value={formData.namaPekerjaNIK} onChange={e => setFormData(p => ({ ...p, namaPekerjaNIK: e.target.value }))} className={inputCls} placeholder="Nama lengkap atau NIK" />
             </div>
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-2">Lokasi Pekerjaan *</label>
@@ -292,9 +304,10 @@ export default function HotWorkPermitForm() {
                 <input type="date" value={formData.tanggalPelaksanaan} onChange={e => setFormData(p => ({ ...p, tanggalPelaksanaan: e.target.value }))} className={inputCls} />
               </div>
             </div>
-            <div>
+
+            <div className="max-w-xs">
               <label className="block text-sm font-semibold text-slate-700 mb-2">Waktu (Pukul)</label>
-              <input type="time" step="60" value={formData.waktuPukul} onChange={e => setFormData(p => ({ ...p, waktuPukul: e.target.value }))} className={inputCls} />
+              <TimeInput24 value={formData.waktuPukul} onChange={val => setFormData(p => ({ ...p, waktuPukul: val }))} />
             </div>
 
             {/* Fire Watch */}
@@ -346,8 +359,8 @@ export default function HotWorkPermitForm() {
                 <p className="text-xs text-green-700">Jabatan dan NIK Pemberi Izin akan <strong>terisi otomatis</strong> dari profil SPV saat approval.</p>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div><label className="block text-sm font-semibold text-slate-400 mb-2">Jabatan Pemberi Izin</label><DisabledField placeholder="Diisi otomatis oleh SPV" /></div>
-                <div><label className="block text-sm font-semibold text-slate-400 mb-2">Nama / NIK Pemberi Izin</label><DisabledField placeholder="Diisi otomatis oleh SPV" /></div>
+                <div> <label className="block text-sm font-semibold text-slate-400 mb-2">Jabatan Pemberi Izin</label> <DisabledField placeholder="Diisi otomatis oleh SPV" /> </div>
+                <div> <label className="block text-sm font-semibold text-slate-400 mb-2">Nama / NIK Pemberi Izin</label> <DisabledField placeholder="Diisi otomatis oleh SPV" /> </div>
               </div>
             </div>
           </div>
@@ -363,6 +376,7 @@ export default function HotWorkPermitForm() {
               {[{ key: "preventive", label: "Preventive Genset / Pump room" }, { key: "tangki", label: "Tangki Solar" }, { key: "panel", label: "Panel Listrik" }]
                 .map(item => <CheckItem key={item.key} label={item.label} checked={(formData.jenisPekerjaan as any)[item.key]} onChange={() => setJ({ [item.key]: !(formData.jenisPekerjaan as any)[item.key] })} />)}
             </div>
+
             <div>
               <h4 className="font-bold text-slate-900 text-base mb-4 pb-3 border-b border-slate-200">B. Detail Pekerjaan Panas</h4>
               <div className="space-y-4">
@@ -370,22 +384,53 @@ export default function HotWorkPermitForm() {
                   const item = formData.jenisPekerjaan[key];
                   return (
                     <div key={key} className="border border-slate-200 rounded-lg p-4 bg-slate-50 hover:bg-orange-50 transition-colors">
-                      <p className="text-sm font-semibold text-slate-900 mb-3 capitalize">{key}</p>
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                        <div className="md:col-span-1"><label className="block text-xs font-medium text-slate-600 mb-1">Detail</label><input type="text" value={item.detail} onChange={e => setWork(key, "detail", e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm text-black" /></div>
-                        <div><label className="block text-xs font-medium text-slate-600 mb-1">Mulai</label><input type="time" step="60" value={item.mulai} onChange={e => setWork(key, "mulai", e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm text-black" /></div>
-                        <div><label className="block text-xs font-medium text-slate-600 mb-1">Selesai</label><input type="time" step="60" value={item.selesai} onChange={e => setWork(key, "selesai", e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm text-black" /></div>
+                      <p className="text-sm font-bold text-slate-900 mb-3 capitalize">{key}</p>
+                      {/* Grid layout yang lebih rapi - Detail lebih lebar, waktu lebih compact */}
+                      <div className="grid grid-cols-12 gap-4 items-end">
+                        {/* Detail - 5 kolom */}
+                        <div className="col-span-12 md:col-span-5">
+                          <label className="block text-xs font-semibold text-slate-600 mb-1.5">Detail Pekerjaan</label>
+                          <input
+                            type="text"
+                            value={item.detail}
+                            onChange={e => setWork(key, "detail", e.target.value)}
+                            className="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm text-black focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                            placeholder="Deskripsi pekerjaan"
+                          />
+                        </div>
+
+                        {/* Mulai - 3 kolom */}
+                        <div className="col-span-6 md:col-span-3">
+                          <label className="block text-xs font-semibold text-slate-600 mb-1.5">Mulai</label>
+                          <TimeInput24
+                            value={item.mulai}
+                            onChange={val => setWork(key, "mulai", val)}
+                            label=""
+                          />
+                        </div>
+
+                        {/* Selesai - 4 kolom */}
+                        <div className="col-span-6 md:col-span-4">
+                          <label className="block text-xs font-semibold text-slate-600 mb-1.5">Selesai</label>
+                          <TimeInput24
+                            value={item.selesai}
+                            onChange={val => setWork(key, "selesai", val)}
+                            label=""
+                          />
+                        </div>
                       </div>
                     </div>
                   );
                 })}
               </div>
             </div>
+
             <div>
               <h4 className="font-bold text-slate-900 text-base mb-3 pb-3 border-b border-slate-200">C. Pekerjaan Lainnya</h4>
               <CheckItem label="Ada pekerjaan lain yang menggunakan aplikasi panas lainnya" checked={formData.jenisPekerjaan.lainnya} onChange={() => setJ({ lainnya: !formData.jenisPekerjaan.lainnya })} />
               {formData.jenisPekerjaan.lainnya && <textarea rows={2} value={formData.jenisPekerjaan.lainnyaKeterangan} onChange={e => setJ({ lainnyaKeterangan: e.target.value })} className="w-full mt-3 px-4 py-2.5 border border-slate-300 rounded-lg text-sm text-black" placeholder="Sebutkan..." />}
             </div>
+
             <div>
               <h4 className="font-bold text-slate-900 text-base mb-4 pb-3 border-b border-slate-200">Area / Equipment Berisiko Tinggi</h4>
               <div className="bg-red-50 p-4 rounded-lg border border-red-200 space-y-1">
@@ -405,10 +450,10 @@ export default function HotWorkPermitForm() {
           section="bagian3" description="Checklist keselamatan" expanded={expanded} toggle={toggle}>
           <div className="space-y-6">
             {[
-              { t: "1. UMUM", items: [{ k:"equipment", l:"Equipment / Tools kondisi baik" }, { k:"apar", l:"Alat pemadam api tersedia" }, { k:"sensor", l:"Sensor Smoke Detector non-aktif" }, { k:"apd", l:"APD lengkap dipakai" }] },
-              { t: "2. DAERAH 11 METER", items: [{ k:"meter11_cairan", l:"Tidak ada cairan mudah terbakar" }, { k:"lantai", l:"Lantai bersih dari benda mudah terbakar" }, { k:"lantaiBasah", l:"Lantai dibasahi / ditutupi pasir basah" }, { k:"cairan_diproteksi", l:"Cairan mudah terbakar diproteksi" }, { k:"lembaran", l:"Lembaran di bawah pekerjaan" }, { k:"lindungi_conveyor", l:"Lindungi conveyor dan instalasi kabel" }] },
-              { t: "3. RUANGAN TERTUTUP", items: [{ k:"ruang_tertutup_dibersihkan", l:"Alat dibersihkan dari bahan mudah terbakar" }, { k:"uap_dibuang", l:"Uap menyala dibuang dari ruangan" }] },
-              { t: "4. DINDING / LANGIT-LANGIT", items: [{ k:"dinding_konstruksi", l:"Konstruksi tidak mudah terbakar" }, { k:"bahan_dipindahkan", l:"Bahan mudah terbakar dipindahkan dari dinding" }] },
+              { t: "1. UMUM", items: [{ k: "equipment", l: "Equipment / Tools kondisi baik" }, { k: "apar", l: "Alat pemadam api tersedia" }, { k: "sensor", l: "Sensor Smoke Detector non-aktif" }, { k: "apd", l: "APD lengkap dipakai" }] },
+              { t: "2. DAERAH 11 METER", items: [{ k: "meter11_cairan", l: "Tidak ada cairan mudah terbakar" }, { k: "lantai", l: "Lantai bersih dari benda mudah terbakar" }, { k: "lantaiBasah", l: "Lantai dibasahi / ditutupi pasir basah" }, { k: "cairan_diproteksi", l: "Cairan mudah terbakar diproteksi" }, { k: "lembaran", l: "Lembaran di bawah pekerjaan" }, { k: "lindungi_conveyor", l: "Lindungi conveyor dan instalasi kabel" }] },
+              { t: "3. RUANGAN TERTUTUP", items: [{ k: "ruang_tertutup_dibersihkan", l: "Alat dibersihkan dari bahan mudah terbakar" }, { k: "uap_dibuang", l: "Uap menyala dibuang dari ruangan" }] },
+              { t: "4. DINDING / LANGIT-LANGIT", items: [{ k: "dinding_konstruksi", l: "Konstruksi tidak mudah terbakar" }, { k: "bahan_dipindahkan", l: "Bahan mudah terbakar dipindahkan dari dinding" }] },
             ].map(group => (
               <div key={group.t} className="border border-slate-200 rounded-lg p-4">
                 <h4 className="font-bold text-slate-900 text-sm mb-4">{group.t}</h4>
@@ -417,15 +462,16 @@ export default function HotWorkPermitForm() {
                 </div>
               </div>
             ))}
+
             <div className="border border-blue-200 rounded-lg p-4 bg-blue-50">
               <h4 className="font-bold text-blue-900 text-sm mb-4">5. PERAN API (FIRE WATCH)</h4>
               <div className="space-y-3">
-                {[{ k:"firewatch_ada", l:"Fire Watch ada memastikan area aman selama proses dan 30 menit setelahnya" }, { k:"firewatch_pelatihan", l:"Fire Watch sudah mendapat pelatihan menggunakan alat pemadam kebakaran" }]
+                {[{ k: "firewatch_ada", l: "Fire Watch ada memastikan area aman selama proses dan 30 menit setelahnya" }, { k: "firewatch_pelatihan", l: "Fire Watch sudah mendapat pelatihan menggunakan alat pemadam kebakaran" }]
                   .map(item => (
                     <div key={item.k} className="flex items-center justify-between p-3 bg-white rounded-lg">
                       <span className="text-sm text-slate-700 flex-1 mr-4">{item.l}</span>
                       <div className="flex gap-4 shrink-0">
-                        {["ya","tidak"].map(v => (
+                        {["ya", "tidak"].map(v => (
                           <label key={v} className="flex items-center gap-1.5 cursor-pointer">
                             <input type="radio" name={item.k} value={v} checked={formData.pencegahan[item.k as keyof typeof formData.pencegahan] === v} onChange={() => setP({ [item.k]: v })} className="w-4 h-4 text-orange-600" />
                             <span className="text-sm">{v === "ya" ? "YA" : "TIDAK"}</span>
@@ -436,6 +482,7 @@ export default function HotWorkPermitForm() {
                   ))}
               </div>
             </div>
+
             <div className="border border-slate-200 rounded-lg p-4">
               <h4 className="font-bold text-slate-900 text-sm mb-4">6. FIRE BLANKET / PERISAI METAL</h4>
               <div className="space-y-4">
