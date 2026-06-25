@@ -36,6 +36,7 @@ interface AdminUser {
   id:         number;
   nama:       string;
   username:   string;
+  nik:        string | null;
   departmen:  string | null;
   perusahaan: string | null;
   email:      string | null;
@@ -49,6 +50,7 @@ interface ApproverUser {
   nama:       string;
   username:   string;
   role:       string;
+  nik:        string | null;
   departmen:  string | null;
   email:      string | null;
   no_telp:    string | null;
@@ -395,7 +397,7 @@ export default function AdminUsersPage() {
   // ── Form state — Administrator Departemen ─────────────────────
   const emptyAdminForm = {
     nama: "", username: "", perusahaan: "",
-    departmen: "", email: "", no_telp: "",
+    departmen: "", email: "", nik: "", no_telp: "",
     password: "", password2: "",
   };
   const [adminForm,   setAdminForm]   = useState(emptyAdminForm);
@@ -407,7 +409,7 @@ export default function AdminUsersPage() {
   // ── Form state — Approver ─────────────────────────────────────
   const emptyApproverForm = {
     nama: "", username: "", role: "",
-    departmen: "", email: "", no_telp: "",
+    departmen: "", email: "", nik: "", no_telp: "",
     password: "", password2: "",
   };
   const [approverForm, setApproverForm] = useState(emptyApproverForm);
@@ -487,6 +489,9 @@ export default function AdminUsersPage() {
     if (!adminForm.email.trim())        { setFormError("Email wajib diisi"); return; }
     const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRe.test(adminForm.email)) { setFormError("Format email tidak valid"); return; }
+    if (!adminForm.nik.trim())          { setFormError("NIK wajib diisi"); return; }
+    const nikRe = /^[0-9]{4,20}$/;
+    if (!nikRe.test(adminForm.nik.trim())) { setFormError("Format NIK tidak valid"); return; }
     if (adminForm.password !== adminForm.password2) { setFormError("Password dan konfirmasi password tidak cocok"); return; }
     if (adminForm.password.length < 6)  { setFormError("Password minimal 6 karakter"); return; }
 
@@ -498,6 +503,7 @@ export default function AdminUsersPage() {
         username:  adminForm.username,
         perusahaan: adminForm.perusahaan,
         email:     adminForm.email,
+        nik:       adminForm.nik,
         no_telp:   adminForm.no_telp,
         password:  adminForm.password,
       };
@@ -538,6 +544,9 @@ export default function AdminUsersPage() {
     if (!approverForm.email.trim())       { setFormError("Email wajib diisi"); return; }
     const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRe.test(approverForm.email)) { setFormError("Format email tidak valid"); return; }
+    if (!approverForm.nik.trim())         { setFormError("NIK wajib diisi"); return; }
+    const nikRe = /^[0-9]{4,20}$/;
+    if (!nikRe.test(approverForm.nik.trim())) { setFormError("Format NIK tidak valid"); return; }
     if (approverForm.password !== approverForm.password2) { setFormError("Password dan konfirmasi password tidak cocok"); return; }
     if (approverForm.password.length < 6) { setFormError("Password minimal 6 karakter"); return; }
 
@@ -758,6 +767,7 @@ export default function AdminUsersPage() {
                       <tr className="bg-slate-50 border-b border-slate-200">
                         <th className="text-left px-6 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Nama</th>
                         <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Username</th>
+                        <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">NIK</th>
                         <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Departemen</th>
                         <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Perusahaan</th>
                         <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Email</th>
@@ -778,6 +788,15 @@ export default function AdminUsersPage() {
                             <code className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded font-mono">
                               {user.username}
                             </code>
+                          </td>
+                          <td className="px-4 py-4">
+                            {user.nik ? (
+                              <code className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded font-mono">
+                                {user.nik}
+                              </code>
+                            ) : (
+                              <span className="text-slate-400 text-xs">—</span>
+                            )}
                           </td>
                           <td className="px-4 py-4">
                             {user.departmen ? (
@@ -934,6 +953,7 @@ export default function AdminUsersPage() {
                       <tr className="bg-slate-50 border-b border-slate-200">
                         <th className="text-left px-6 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Nama</th>
                         <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Username</th>
+                        <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">NIK</th>
                         <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Role</th>
                         <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Departemen</th>
                         <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Email</th>
@@ -954,6 +974,15 @@ export default function AdminUsersPage() {
                             <code className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded font-mono">
                               {user.username}
                             </code>
+                          </td>
+                          <td className="px-4 py-4">
+                            {user.nik ? (
+                              <code className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded font-mono">
+                                {user.nik}
+                              </code>
+                            ) : (
+                              <span className="text-slate-400 text-xs">—</span>
+                            )}
                           </td>
                           <td className="px-4 py-4">
                             <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border ${ROLE_COLOR[user.role] ?? "bg-slate-100 text-slate-600 border-slate-200"}`}>
@@ -1221,6 +1250,14 @@ export default function AdminUsersPage() {
                           placeholder="user@company.com" required className={inputCls} />
                       </div>
                       <div>
+                        <label className="block text-sm font-medium text-slate-300 mb-1.5">
+                          NIK <span className="text-red-400">*</span>
+                        </label>
+                        <input type="text" inputMode="numeric" value={adminForm.nik}
+                          onChange={e => handleAdminChange("nik", e.target.value.replace(/[^0-9]/g, ""))}
+                          placeholder="4-20 digit angka" required maxLength={20} className={inputCls} />
+                      </div>
+                      <div>
                         <label className="block text-sm font-medium text-slate-300 mb-1.5">No. Telepon</label>
                         <input type="text" value={adminForm.no_telp}
                           onChange={e => handleAdminChange("no_telp", e.target.value)}
@@ -1352,6 +1389,14 @@ export default function AdminUsersPage() {
                         <input type="email" value={approverForm.email}
                           onChange={e => handleApproverChange("email", e.target.value)}
                           placeholder="user@company.com" required className={inputCls} />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-slate-300 mb-1.5">
+                          NIK <span className="text-red-400">*</span>
+                        </label>
+                        <input type="text" inputMode="numeric" value={approverForm.nik}
+                          onChange={e => handleApproverChange("nik", e.target.value.replace(/[^0-9]/g, ""))}
+                          placeholder="4-20 digit angka" required maxLength={20} className={inputCls} />
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-slate-300 mb-1.5">No. Telepon</label>

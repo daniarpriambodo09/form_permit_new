@@ -2,6 +2,7 @@
 // UPDATED: Email wajib diisi (tidak boleh kosong).
 //          Simpan password_encrypted (AES-256-GCM) bersamaan dengan hash bcrypt.
 //          Kolom password_encrypted TIDAK dipakai untuk login.
+//          NIK wajib diisi (hanya angka, 4-20 digit).
 
 import { NextRequest, NextResponse } from 'next/server';
 import { query, queryOne } from '@/lib/db';
@@ -46,7 +47,7 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const { nama, username, role, departmen, email, no_telp, password } =
+    const { nama, username, role, departmen, email, nik, no_telp, password } =
       await req.json();
 
     // ── Validasi password ────────────────────────────────────
@@ -91,6 +92,16 @@ export async function POST(req: NextRequest) {
     }
     // CATATAN: Duplikat email DIIZINKAN — tidak ada cek unique di sini.
 
+    // ── Validasi NIK — WAJIB DIISI, hanya angka, 4-20 digit ──
+    if (!nik || typeof nik !== 'string' || nik.trim() === '') {
+      return NextResponse.json({ error: 'NIK wajib diisi' }, { status: 400 });
+    }
+    const nikValue = nik.trim();
+    const nikRegex = /^[0-9]{4,20}$/;
+    if (!nikRegex.test(nikValue)) {
+      return NextResponse.json({ error: 'Format NIK tidak valid' }, { status: 400 });
+    }
+
     // ── Cek duplikat username ────────────────────────────────
     const existingUsername = await queryOne(
       `SELECT id FROM users WHERE username = $1`,
@@ -108,14 +119,15 @@ export async function POST(req: NextRequest) {
 
     await query(
       `INSERT INTO users
-         (username, password, password_encrypted, nama, departmen,
+         (username, password, password_encrypted, nama, nik, departmen,
           email, no_telp, jabatan, role, is_active)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
       [
         username.toLowerCase().trim(),
         hashedPassword,
         encryptedPassword,           // AES-GCM — BUKAN untuk login
         nama,
+        nikValue,
         departmenValue ?? null,
         emailValue,
         no_telp || null,

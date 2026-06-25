@@ -1,6 +1,7 @@
 // app/api/admin-users/route.ts
 // UPDATED: SPV dapat mengakses endpoint ini untuk melihat Administrator Departemen
 //          milik departemennya sendiri.
+// UPDATED: Tambah field `nik` pada SELECT dan response JSON.
 //
 // Behavior:
 //   role = admin  → mengembalikan semua worker (WHERE role='worker')
@@ -43,6 +44,7 @@ export async function GET(req: NextRequest) {
         id:         number;
         nama:       string;
         username:   string;
+        nik:        string | null;
         departmen:  string | null;
         perusahaan: string | null;
         email:      string | null;
@@ -50,7 +52,7 @@ export async function GET(req: NextRequest) {
         is_active:  boolean;
         created_at: string;
       }>(
-        `SELECT id, nama, username, departmen, perusahaan,
+        `SELECT id, nama, username, nik, departmen, perusahaan,
                 email, no_telp, is_active, created_at
          FROM users
          WHERE role = 'worker'
@@ -77,6 +79,7 @@ export async function GET(req: NextRequest) {
       id:         number;
       nama:       string;
       username:   string;
+      nik:        string | null;
       departmen:  string | null;
       perusahaan: string | null;
       email:      string | null;
@@ -84,7 +87,7 @@ export async function GET(req: NextRequest) {
       is_active:  boolean;
       created_at: string;
     }>(
-      `SELECT id, nama, username, departmen, perusahaan,
+      `SELECT id, nama, username, nik, departmen, perusahaan,
               email, no_telp, is_active, created_at
        FROM users
        WHERE role = 'worker'

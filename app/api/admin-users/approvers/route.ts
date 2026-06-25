@@ -1,4 +1,5 @@
 // app/api/admin-users/approvers/route.ts
+// UPDATED: Tambah field `nik` pada SELECT dan response JSON.
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { verifyToken, COOKIE_NAME } from '@/lib/auth';
@@ -27,6 +28,7 @@ export async function GET(req: NextRequest) {
       nama:       string;
       username:   string;
       role:       string;
+      nik:        string | null;
       departmen:  string | null;
       email:      string | null;
       no_telp:    string | null;
@@ -38,6 +40,7 @@ export async function GET(req: NextRequest) {
          nama,
          username,
          role,
+         nik,
          departmen,
          email,
          no_telp,
