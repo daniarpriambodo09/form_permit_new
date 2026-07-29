@@ -28,7 +28,7 @@ export async function POST(req: NextRequest) {
       `SELECT id, username, password, nama, jabatan, role, is_active
        FROM users
        WHERE username = $1`,
-      [username.toLowerCase().trim()]
+      [username.trim()]
     );
 
     if (!user || !user.is_active) {

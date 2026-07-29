@@ -20,7 +20,7 @@ export async function GET(req: NextRequest) {
     // Cek apakah username sudah ada
     const existing = await queryOne(
       `SELECT id FROM users WHERE username = $1`,
-      [username.toLowerCase().trim()]
+      [username.trim()]
     );
 
     return NextResponse.json({

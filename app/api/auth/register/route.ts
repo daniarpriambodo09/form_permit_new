@@ -107,7 +107,7 @@ export async function POST(req: NextRequest) {
     // ── Cek duplikat username ────────────────────────────────
     const existingUsername = await queryOne(
       `SELECT id FROM users WHERE username = $1`,
-      [username.toLowerCase().trim()]
+      [username.trim()]
     );
     if (existingUsername) {
       return NextResponse.json({ error: 'Username sudah digunakan' }, { status: 409 });
@@ -125,7 +125,7 @@ export async function POST(req: NextRequest) {
           email, no_telp, jabatan, role, is_active)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
       [
-        username.toLowerCase().trim(),
+        username.trim(),
         hashedPassword,
         encryptedPassword,           // AES-GCM — BUKAN untuk login
         nama,
