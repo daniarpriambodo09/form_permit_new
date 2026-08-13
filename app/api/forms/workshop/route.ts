@@ -46,7 +46,7 @@ export async function GET(req: NextRequest) {
     const selectCols = full
       ? '*'
       : `id_form, tanggal, tanggal_pelaksanaan, status,
-         no_registrasi, nama_kontraktor_nik, nama_pekerja_nik,
+         no_registrasi, nama_kontraktor_nik, nama_pekerja_nik, nik_pekerja,
          lokasi_pekerjaan, waktu_pukul, tipe_perusahaan, spv_terkait,
          perlu_jsa, jsa_file_url`;
 
@@ -83,6 +83,10 @@ export async function POST(req: NextRequest) {
     const startStage = 1;
     const status = isSubmit ? 'submitted' : 'draft';
 
+    const pekerjaNama = f.namaPekerja || f.namaNIK || null;
+    const pekerjaNik  = f.nikPekerja || (typeof f.namaNIK === 'string' && /^[0-9]+$/.test(f.namaNIK) ? f.namaNIK : null) || null;
+    const namaPekerjaNik = pekerjaNama && pekerjaNik ? `${pekerjaNama} / ${pekerjaNik}` : pekerjaNama || null;
+
     const perluJsa   = f.perluJsa === true;
     const jsaFileUrl = perluJsa ? (f.jsaFileUrl || null) : null;
 
@@ -90,7 +94,7 @@ export async function POST(req: NextRequest) {
       `INSERT INTO form_kerja_workshop (
         id_form, tanggal, tanggal_pelaksanaan, status,
         tipe_perusahaan, current_stage,
-        no_registrasi, nama_kontraktor_nik, nama_pekerja_nik,
+        no_registrasi, nama_kontraktor_nik, nama_pekerja_nik, nik_pekerja,
         lokasi_pekerjaan, waktu_pukul,
         nama_fire_watch, nik_fire_watch,
         jabatan_pemberi_izin, nik_pemberi_ijin,
@@ -128,13 +132,14 @@ export async function POST(req: NextRequest) {
         $58,
         $59,$60,$61,$62,
         $63,$64,
-        $65
+        $65,$66
       )`,
       [
         idForm, now,
         f.tanggalPelaksanaan ? new Date(f.tanggalPelaksanaan).toISOString() : null,
         status, tipePerusahaan, startStage,
-        f.noRegistrasi   || null, f.namaKontraktor || null, f.namaNIK   || null,
+        f.noRegistrasi   || null, f.namaKontraktor || null, namaPekerjaNik,
+        pekerjaNik,
         f.lokasi         || null, f.waktuPukul     || null,
         f.namaFireWatch  || null, f.nikFireWatch   || null,
         null, null,

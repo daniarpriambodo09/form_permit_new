@@ -35,7 +35,7 @@ const ROLE_LABELS: Record<string, string> = {
   admin:      "Administrator",
 };
 
-type ActiveTab = "info" | "username" | "password";
+type ActiveTab = "info" | "username" | "email" | "password";
 
 type ToastType = "success" | "error";
 interface Toast { type: ToastType; message: string }
@@ -86,6 +86,11 @@ export default function ProfilePage() {
   const [usernameErr, setUsernameErr] = useState("");
   const [savingUser, setSavingUser]   = useState(false);
 
+  // Email form
+  const [newEmail, setNewEmail]       = useState("");
+  const [emailErr, setEmailErr]       = useState("");
+  const [savingEmail, setSavingEmail] = useState(false);
+
   // Password form
   const [oldPw, setOldPw]             = useState("");
   const [newPw, setNewPw]             = useState("");
@@ -103,6 +108,7 @@ export default function ProfilePage() {
         if (!data?.user) { router.push("/"); return; }
         setProfile(data.user);
         setNewUsername(data.user.username);
+        setNewEmail(data.user.email ?? "");
       })
       .catch(() => router.push("/"))
       .finally(() => setLoading(false));
@@ -136,6 +142,37 @@ export default function ProfilePage() {
       setUsernameErr("Terjadi kesalahan. Coba lagi.");
     } finally {
       setSavingUser(false);
+    }
+  };
+
+  // ── Ubah Email ────────────────────────────────────────────────
+  const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  const handleChangeEmail = async () => {
+    setEmailErr("");
+    const trimmed = newEmail.trim();
+    if (!trimmed)                { setEmailErr("Email tidak boleh kosong."); return; }
+    if (!EMAIL_REGEX.test(trimmed)) { setEmailErr("Format email tidak valid."); return; }
+    if (trimmed.toLowerCase() === (profile?.email ?? "").toLowerCase()) {
+      setEmailErr("Email baru sama dengan email saat ini.");
+      return;
+    }
+
+    setSavingEmail(true);
+    try {
+      const res = await fetch("/form-permit/api/profile/email", {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: trimmed }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setEmailErr(data.error || "Gagal mengubah email."); return; }
+      setProfile(p => p ? { ...p, email: trimmed } : p);
+      showToast("success", "Email berhasil diubah.");
+    } catch {
+      setEmailErr("Terjadi kesalahan. Coba lagi.");
+    } finally {
+      setSavingEmail(false);
     }
   };
 
@@ -214,7 +251,7 @@ export default function ProfilePage() {
 
         {/* Tab navigation */}
         <div className="flex gap-1 bg-slate-100 rounded-xl p-1 mb-6">
-          {(["info", "username", "password"] as ActiveTab[]).map(tab => (
+          {(["info", "username", "email", "password"] as ActiveTab[]).map(tab => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -225,8 +262,9 @@ export default function ProfilePage() {
             >
               {tab === "info"     && <BadgeInfo className="w-4 h-4" />}
               {tab === "username" && <User className="w-4 h-4" />}
+              {tab === "email"    && <Mail className="w-4 h-4" />}
               {tab === "password" && <Lock className="w-4 h-4" />}
-              {tab === "info" ? "Informasi" : tab === "username" ? "Username" : "Password"}
+              {tab === "info" ? "Informasi" : tab === "username" ? "Username" : tab === "email" ? "Email" : "Password"}
             </button>
           ))}
         </div>
@@ -287,6 +325,42 @@ export default function ProfilePage() {
             >
               {savingUser ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
               Simpan Username
+            </button>
+          </div>
+        )}
+
+        {/* Tab: Ubah Email */}
+        {activeTab === "email" && (
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+            <h2 className="text-base font-bold text-slate-900 mb-1">Ubah Email</h2>
+            <p className="text-sm text-slate-500 mb-6">Email boleh sama dengan akun lain, tidak perlu unik.</p>
+
+            <label className="block text-sm font-semibold text-slate-700 mb-1.5">
+              Email
+            </label>
+            <input
+              type="email"
+              value={newEmail}
+              onChange={e => { setNewEmail(e.target.value); setEmailErr(""); }}
+              className="w-full px-4 py-3 border border-slate-200 rounded-xl text-slate-900
+                         focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent
+                         text-sm font-medium"
+              placeholder="nama@email.com"
+            />
+            {emailErr && (
+              <p className="flex items-center gap-1.5 mt-2 text-sm text-red-600">
+                <AlertCircle className="w-4 h-4 flex-shrink-0" /> {emailErr}
+              </p>
+            )}
+
+            <button
+              onClick={handleChangeEmail}
+              disabled={savingEmail}
+              className="mt-6 flex items-center gap-2 bg-orange-500 hover:bg-orange-600 disabled:opacity-60
+                         text-white text-sm font-bold px-6 py-3 rounded-xl transition-colors"
+            >
+              {savingEmail ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+              Simpan Email
             </button>
           </div>
         )}

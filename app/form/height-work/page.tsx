@@ -5,13 +5,44 @@
 // Data waktu lama (jika ada yang tersimpan dengan AM/PM) tetap bisa dibaca
 // melalui normalizeTo24h(), dan saat form disimpan ulang akan otomatis
 // tersimpan dalam format 24 jam ("HH:mm").
+// UPDATED: Bagian 5 (Pengecekan Body Harness & Lanyard) DI-DISABLE.
+// Worker/administrator departemen TIDAK LAGI mengisi checklist ini —
+// pengecekan fisik dipindahkan ke tahap approval Admin K3
+// (lihat /approval/height-work/[id]). Checklist di bagian ini murni
+// referensi visual dan tidak dapat diinteraksikan. Nilai yang dikirim
+// tetap default false; nilai final akan ditimpa oleh Admin K3 saat approve.
+// UPDATED: Bagian 5 sekarang juga menyertakan checklist "Helm" (item baru,
+// disabled sama seperti item Body Harness/Lanyard lainnya), karena
+// sebelumnya belum ada checklist untuk helm. Nilai final juga diisi oleh
+// Admin K3 saat approval.
+//
+// UPDATED (Bagian 2 — Nama Petugas Ketinggian & Status Kesehatan):
+// - Tipe Petugas EKSTERNAL: TIDAK BERUBAH — tetap input nama manual +
+//   upload foto lisensi manual (LisensiUploadButton, seperti sebelumnya).
+// - Tipe Petugas INTERNAL: Bagian 2 sekarang jadi DROPDOWN pekerja yang
+//   diambil dari Master Lisence (GET /api/master-lisence/workers),
+//   difilter berdasarkan jenisKerja=height_work DAN departemen yang
+//   dipilih di Bagian 1 (namaDepartemen). Admin/pengawas tinggal pilih
+//   nama pekerja dari dropdown, centang berbadan sehat, dan lisence-nya
+//   otomatis terisi dari data master (bisa dilihat lewat tombol "Lihat
+//   Lisensi", tidak perlu upload manual lagi).
+// - Field yang dikirim ke backend (namaPetugas[], berbadanSehat[],
+//   fotoLisensi[]) TETAP SAMA BENTUKNYA di kedua mode, jadi tidak perlu
+//   perubahan apa pun di app/api/forms/height-work/route.ts.
+// UPDATED: Bagian 1 — "Nama Pengawas Departemen" diubah dari dropdown
+// (berdasarkan DEPT_SPV_MAP[].spv) menjadi input teks manual. Field
+// "Nama Departemen" tetap dropdown (masih memakai DEPT_SPV_MAP untuk
+// daftar departemen, dan tetap dipakai untuk memfilter dropdown pekerja
+// di Bagian 2). Tidak ada perubahan di backend — namaPengawasDepartemen
+// tetap dikirim & disimpan sebagai string biasa.
 "use client";
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   AlertTriangle, Shield, ChevronRight, AlertCircle,
-  CheckCircle, Loader2, Camera, Upload, X, ZoomIn, ImageIcon,
+  CheckCircle, Loader2, Camera, Upload, X, ZoomIn, ImageIcon, Lock,
+  Eye, FileText, CalendarClock,
 } from "lucide-react";
 import JsaUploadSection, {
   type JsaFileInfo,
@@ -20,6 +51,7 @@ import JsaUploadSection, {
 import TimeInput24, { normalizeTo24h } from "@/components/Time24Input";
 
 type UploadStatus = "idle" | "uploading" | "success" | "error";
+type MasterFileType = "pdf" | "image";
 
 function ImagePreviewModal({ src, label, onClose }: { src: string; label: string; onClose: () => void }) {
   return (
@@ -145,6 +177,67 @@ function LisensiUploadButton({ namaPetugas, index, fotoUrl, uploadStatus, upload
   );
 }
 
+// ── Master Lisence — pekerja internal (dari /api/master-lisence/workers) ──
+interface WorkerLisenceOption {
+  nik: string;
+  nama: string;
+  departemen: string | null;
+  file_url: string;
+  file_type: MasterFileType;
+  tanggal_exp: string;
+}
+
+function getExpStatus(tanggalExp: string): "expired" | "soon" | "active" {
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const exp = new Date(tanggalExp); exp.setHours(0, 0, 0, 0);
+  const diffDays = Math.round((exp.getTime() - today.getTime()) / 86400000);
+  if (diffDays < 0) return "expired";
+  if (diffDays <= 30) return "soon";
+  return "active";
+}
+
+function formatDate(iso: string) {
+  return new Date(iso).toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" });
+}
+
+// Modal preview lisence dari Master Lisence — mendukung gambar & PDF
+// (LisensiUploadButton di atas cuma untuk gambar, karena upload manual
+// eksternal memang dibatasi image saja; data master bisa berupa PDF).
+function MasterLisenceViewModal({ worker, onClose }: { worker: WorkerLisenceOption; onClose: () => void }) {
+  const status = getExpStatus(worker.tanggal_exp);
+  const statusMeta = {
+    expired: { label: "Kadaluarsa", cls: "bg-red-100 text-red-700 border-red-200" },
+    soon:    { label: "Segera Habis", cls: "bg-amber-100 text-amber-700 border-amber-200" },
+    active:  { label: "Aktif", cls: "bg-green-100 text-green-700 border-green-200" },
+  }[status];
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4" onClick={onClose}>
+      <div className="relative bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[90vh] flex flex-col overflow-hidden" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-100 shrink-0">
+          <div>
+            <p className="font-semibold text-slate-800 text-sm">{worker.nama} <span className="text-slate-400 font-normal">— {worker.nik}</span></p>
+            <span className={`inline-flex items-center gap-1.5 mt-1 text-xs font-semibold px-2.5 py-0.5 rounded-full border ${statusMeta.cls}`}>
+              <CalendarClock className="w-3.5 h-3.5" /> Exp: {formatDate(worker.tanggal_exp)} — {statusMeta.label}
+            </span>
+          </div>
+          <button onClick={onClose} className="p-1.5 hover:bg-slate-100 rounded-lg transition-colors shrink-0">
+            <X className="w-4 h-4 text-slate-500" />
+          </button>
+        </div>
+        <div className="flex-1 overflow-auto bg-slate-100 flex items-center justify-center p-4">
+          {worker.file_type === "image" ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={worker.file_url} alt={`Lisensi ${worker.nama}`} className="max-w-full max-h-[60vh] object-contain rounded-lg bg-white" />
+          ) : (
+            <iframe src={worker.file_url} title={`Lisensi ${worker.nama}`} className="w-full h-[60vh] rounded-lg bg-white border border-slate-200" />
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 const DEPT_SPV_MAP: { dept: string; spv: string[] }[] = [
   { dept: "QA", spv: ["TONI WIJAYA"] },
   { dept: "ENG", spv: ["TKR", "KAR", "YHE", "AYP"] },
@@ -172,6 +265,13 @@ export default function HeightWorkFormPage() {
   const [fotoLisensi, setFotoLisensi] = useState<(string | null)[]>(Array(10).fill(null));
   const [uploadStatus, setUploadStatus] = useState<UploadStatus[]>(Array(10).fill("idle" as UploadStatus));
   const [uploadError, setUploadError] = useState<string[]>(Array(10).fill(""));
+
+  // ── State khusus dropdown Master Lisence (tipe Internal) ────────────────
+  const [selectedNik, setSelectedNik] = useState<(string | null)[]>(Array(10).fill(null));
+  const [workerOptions, setWorkerOptions] = useState<WorkerLisenceOption[]>([]);
+  const [loadingWorkers, setLoadingWorkers] = useState(false);
+  const [previewWorker, setPreviewWorker] = useState<WorkerLisenceOption | null>(null);
+
   const [kunceePagar, setKunceePagar] = useState(false);
   const [rompiKetinggian, setRompiKetinggian] = useState(false);
   const [rompiAngka, setRompiAngka] = useState("");
@@ -188,12 +288,18 @@ export default function HeightWorkFormPage() {
   const [bebanBeratTubuh, setBebanBeratTubuh] = useState(false);
   const [helmStandar, setHelmStandar] = useState(false);
   const [rambuSafetyWarning, setRambuSafetyWarning] = useState(false);
+  // ── Body Harness & Lanyard: state DIPERTAHANKAN untuk kompatibilitas
+  // buildBody(), namun input pada bagian ini sudah DI-DISABLE di UI.
+  // Nilai selalu false saat submit; nilai final diisi Admin K3 saat approval.
   const [bodyHarnessWebbing, setBodyHarnessWebbing] = useState(false);
   const [bodyHarnessDRing, setBodyHarnessDRing] = useState(false);
   const [bodyHarnessAdjustment, setBodyHarnessAdjustment] = useState(false);
   const [lanyardAbsorber, setLanyardAbsorber] = useState(false);
   const [lanyardSnapHook, setLanyardSnapHook] = useState(false);
   const [lanyardRope, setLanyardRope] = useState(false);
+  // ── Helm: item checklist baru pada Bagian 5, sama seperti Body Harness &
+  // Lanyard — disabled di form ini, nilai final diisi Admin K3 saat approval.
+  const [helmKondisiBaik, setHelmKondisiBaik] = useState(false);
   const [harnessLightbox, setHarnessLightbox] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -206,6 +312,33 @@ export default function HeightWorkFormPage() {
   const [jsaFile, setJsaFile] = useState<JsaFileInfo | null>(null);
   const [jsaUploadStatus, setJsaUploadStatus] = useState<JsaStatus>("idle");
   const [jsaUploadError, setJsaUploadError] = useState("");
+
+  // ── Reset semua baris Bagian 2 (dipakai saat ganti tipe/departemen) ─────
+  const resetPetugasRows = useCallback(() => {
+    setNamaPetugas(Array(10).fill(""));
+    setBerbadanSehat(Array(10).fill(false));
+    setFotoLisensi(Array(10).fill(null));
+    setUploadStatus(Array(10).fill("idle" as UploadStatus));
+    setUploadError(Array(10).fill(""));
+    setSelectedNik(Array(10).fill(null));
+  }, []);
+
+  // ── Fetch daftar pekerja dari Master Lisence saat Internal + departemen dipilih ──
+  useEffect(() => {
+    if (tipePerusahaan !== "internal" || !namaDepartemen) {
+      setWorkerOptions([]);
+      return;
+    }
+    setLoadingWorkers(true);
+    fetch(
+      `/form-permit/api/master-lisence/workers?jenisKerja=height_work&departemen=${encodeURIComponent(namaDepartemen)}`,
+      { credentials: "include" }
+    )
+      .then((r) => (r.ok ? r.json() : { data: [] }))
+      .then((d) => setWorkerOptions(d.data || []))
+      .catch(() => setWorkerOptions([]))
+      .finally(() => setLoadingWorkers(false));
+  }, [tipePerusahaan, namaDepartemen]);
 
   const handleNamaChange = (i: number, val: string) => {
     setNamaPetugas((prev) => { const n = [...prev]; n[i] = val; return n; });
@@ -232,6 +365,21 @@ export default function HeightWorkFormPage() {
     setUploadError((prev) => { const n = [...prev]; n[i] = ""; return n; });
   }, []);
 
+  // ── Handler pilih pekerja dari dropdown Master Lisence (Internal) ───────
+  const handleWorkerSelect = (i: number, nik: string) => {
+    if (!nik) {
+      setNamaPetugas((prev) => { const n = [...prev]; n[i] = ""; return n; });
+      setFotoLisensi((prev) => { const n = [...prev]; n[i] = null; return n; });
+      setSelectedNik((prev) => { const n = [...prev]; n[i] = null; return n; });
+      return;
+    }
+    const worker = workerOptions.find((w) => w.nik === nik);
+    if (!worker) return;
+    setNamaPetugas((prev) => { const n = [...prev]; n[i] = worker.nama; return n; });
+    setFotoLisensi((prev) => { const n = [...prev]; n[i] = worker.file_url; return n; });
+    setSelectedNik((prev) => { const n = [...prev]; n[i] = worker.nik; return n; });
+  };
+
   const visibleCount = (() => {
     let c = 1;
     for (let i = 0; i < 9; i++) if (namaPetugas[i]?.trim()) c = i + 2;
@@ -256,9 +404,10 @@ export default function HeightWorkFormPage() {
     // termasuk jika value berasal dari data lama berformat AM/PM.
     waktuMulai: normalizeTo24h(waktuMulai),
     waktuSelesai: normalizeTo24h(waktuSelesai),
-    namaPengawasKontraktor,
-    namaPengawasDepartemen,
-    namaDepartemen,
+    // Field berikut hanya disertakan sesuai tipePerusahaan yang aktif,
+    // sehingga field yang disembunyikan di UI benar-benar tidak ikut terkirim.
+    ...(tipePerusahaan === "eksternal" ? { namaPengawasKontraktor } : {}),
+    ...(tipePerusahaan === "internal" ? { namaPengawasDepartemen, namaDepartemen } : {}),
     namaPetugas,
     berbadanSehat,
     fotoLisensi,
@@ -278,12 +427,15 @@ export default function HeightWorkFormPage() {
     bebanBeratTubuh,
     helmStandar,
     rambuSafetyWarning,
+    // Body Harness, Lanyard & Helm: selalu terkirim false (disabled di form ini).
+    // Nilai final akan diisi/diverifikasi oleh Admin K3 saat approval.
     bodyHarnessWebbing,
     bodyHarnessDRing,
     bodyHarnessAdjustment,
     lanyardAbsorber,
     lanyardSnapHook,
     lanyardRope,
+    helmKondisiBaik,
     // ── JSA fields ──
     perluJsa,
     jsaFileUrl: jsaFile?.url ?? null,
@@ -380,6 +532,8 @@ export default function HeightWorkFormPage() {
   const inputCls = "w-full px-4 py-3 border border-slate-200 rounded-xl text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent placeholder-slate-400";
   const sectionHead = "bg-slate-50 border-b border-slate-200 px-6 py-4";
   const cb = "w-5 h-5 rounded border-slate-300 text-orange-500 focus:ring-orange-400 shrink-0";
+  // Style checkbox khusus Bagian 5 — disabled/read-only
+  const cbDisabled = "w-5 h-5 rounded border-slate-300 text-slate-400 shrink-0 cursor-not-allowed";
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -428,7 +582,29 @@ export default function HeightWorkFormPage() {
                   ].map((opt) => (
                     <label key={opt.value} className={`flex flex-col gap-1 p-3 rounded-xl border-2 cursor-pointer transition-all ${tipePerusahaan === opt.value ? "border-orange-400 bg-orange-50" : "border-slate-200 hover:border-orange-200"}`}>
                       <div className="flex items-center gap-2">
-                        <input type="radio" name="tipePerusahaan" value={opt.value} checked={tipePerusahaan === opt.value} onChange={() => setTipePerusahaan(opt.value as any)} className="text-orange-500" />
+                        <input
+                          type="radio"
+                          name="tipePerusahaan"
+                          value={opt.value}
+                          checked={tipePerusahaan === opt.value}
+                          onChange={() => {
+                            const val = opt.value as "internal" | "eksternal";
+                            setTipePerusahaan(val);
+                            // Reset field yang akan disembunyikan sesuai tipe baru,
+                            // supaya tidak ada data basi yang tersisa saat toggle bolak-balik.
+                            if (val === "internal") {
+                              setNamaPengawasKontraktor("");
+                            } else {
+                              setNamaDepartemen("");
+                              setNamaPengawasDepartemen("");
+                            }
+                            // Bagian 2 berubah total cara pengisiannya (dropdown vs manual
+                            // upload) antar tipe, jadi reset semua baris petugas supaya
+                            // tidak ada data yang salah tercampur antar mode.
+                            resetPetugasRows();
+                          }}
+                          className="text-orange-500"
+                        />
                         <span className="text-sm font-medium text-slate-700">{opt.label}</span>
                       </div>
                       <p className="text-[10px] text-slate-500 ml-5">{opt.desc}</p>
@@ -469,32 +645,60 @@ export default function HeightWorkFormPage() {
                 </div>
               </div>
 
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2">
-                  {tipePerusahaan === "eksternal" ? "Nama Pengawas Kontraktor" : "Nama Pengawas"} <span className="text-red-500">*</span>
-                </label>
-                <input type="text" value={namaPengawasKontraktor} onChange={(e) => setNamaPengawasKontraktor(e.target.value)} placeholder={tipePerusahaan === "eksternal" ? "Nama pengawas kontraktor" : "Nama pengawas"} required className={inputCls} />
-              </div>
+              {/* Nama Pengawas Kontraktor — hanya untuk pekerja EKSTERNAL.
+                  Internal tidak butuh pengawas kontraktor, jadi field ini
+                  tidak dirender sama sekali (bukan cuma disembunyikan via CSS). */}
+              {tipePerusahaan === "eksternal" && (
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-2">
+                    Nama Pengawas Kontraktor <span className="text-red-500">*</span>
+                  </label>
+                  <input type="text" value={namaPengawasKontraktor} onChange={(e) => setNamaPengawasKontraktor(e.target.value)} placeholder="Nama pengawas kontraktor" required className={inputCls} />
+                </div>
+              )}
 
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2">Nama Departemen <span className="text-red-500">*</span></label>
-                <select value={namaDepartemen} onChange={(e) => { setNamaDepartemen(e.target.value); setNamaPengawasDepartemen(""); }} required className={`${inputCls} ${!namaDepartemen ? "text-slate-400" : "text-slate-800"}`}>
-                  <option value="" disabled>— Pilih Departemen —</option>
-                  {DEPT_SPV_MAP.map((d) => (<option key={d.dept} value={d.dept}>{d.dept}</option>))}
-                </select>
-              </div>
+              {/* Nama Departemen & Nama Pengawas Departemen — hanya untuk pekerja INTERNAL.
+                  Eksternal cukup pakai Nama Pengawas Kontraktor di atas.
+                  Departemen yang dipilih di sini JUGA dipakai untuk memfilter
+                  dropdown pekerja di Bagian 2 (lihat useEffect workerOptions). */}
+              {tipePerusahaan === "internal" && (
+                <>
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-700 mb-2">Nama Departemen <span className="text-red-500">*</span></label>
+                    <select
+                      value={namaDepartemen}
+                      onChange={(e) => {
+                        setNamaDepartemen(e.target.value);
+                        setNamaPengawasDepartemen("");
+                        // Departemen ganti → daftar pekerja Bagian 2 juga berubah,
+                        // jadi baris petugas yang sudah dipilih perlu direset.
+                        resetPetugasRows();
+                      }}
+                      required
+                      className={`${inputCls} ${!namaDepartemen ? "text-slate-400" : "text-slate-800"}`}
+                    >
+                      <option value="" disabled>— Pilih Departemen —</option>
+                      {DEPT_SPV_MAP.map((d) => (<option key={d.dept} value={d.dept}>{d.dept}</option>))}
+                    </select>
+                  </div>
 
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2">Nama Pengawas Departemen <span className="text-red-500">*</span></label>
-                {namaDepartemen ? (
-                  <select value={namaPengawasDepartemen} onChange={(e) => setNamaPengawasDepartemen(e.target.value)} required className={`${inputCls} ${!namaPengawasDepartemen ? "text-slate-400" : "text-slate-800"}`}>
-                    <option value="" disabled>— Pilih Pengawas —</option>
-                    {(DEPT_SPV_MAP.find((d) => d.dept === namaDepartemen)?.spv ?? []).map((spv) => (<option key={spv} value={spv}>{spv}</option>))}
-                  </select>
-                ) : (
-                  <div className={`${inputCls} text-slate-400 italic cursor-not-allowed bg-slate-50`}>Pilih departemen terlebih dahulu</div>
-                )}
-              </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-700 mb-2">Nama Pengawas Departemen <span className="text-red-500">*</span></label>
+                    {namaDepartemen ? (
+                      <input
+                        type="text"
+                        value={namaPengawasDepartemen}
+                        onChange={(e) => setNamaPengawasDepartemen(e.target.value)}
+                        placeholder="Nama pengawas departemen"
+                        required
+                        className={inputCls}
+                      />
+                    ) : (
+                      <div className={`${inputCls} text-slate-400 italic cursor-not-allowed bg-slate-50`}>Pilih departemen terlebih dahulu</div>
+                    )}
+                  </div>
+                </>
+              )}
             </div>
           </section>
 
@@ -504,39 +708,127 @@ export default function HeightWorkFormPage() {
               <h2 className="font-bold text-slate-800">Bagian 2: Nama Petugas Ketinggian & Status Kesehatan</h2>
             </div>
             <div className="p-6">
-              <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 mb-5">
-                <p className="text-sm text-amber-700">⚠️ Setiap petugas yang namanya terisi <strong>wajib</strong> melampirkan foto lisensi ketinggian.</p>
-              </div>
-              <div className="hidden sm:flex items-center gap-2 px-3 mb-2 text-xs font-semibold text-slate-500 uppercase tracking-wide">
-                <span className="w-5 shrink-0">#</span>
-                <span className="flex-1">Nama Petugas</span>
-                <span className="w-28 text-center shrink-0">Berbadan Sehat</span>
-                <span className="w-24 text-center shrink-0">Foto Lisensi</span>
-              </div>
-              <div className="space-y-2.5">
-                {Array.from({ length: visibleCount }).map((_, i) => {
-                  const namaFilled = !!namaPetugas[i]?.trim();
-                  const fotoMissing = namaFilled && !fotoLisensi[i];
-                  return (
-                    <div key={i} className={`flex items-center gap-2 sm:gap-3 p-3 rounded-xl border transition-all ${fotoMissing ? "bg-amber-50 border-amber-200" : namaFilled ? "bg-white border-slate-200 shadow-sm" : "bg-slate-50 border-slate-200"}`}>
-                      <span className="text-xs font-bold text-slate-400 w-5 shrink-0 text-center">{i + 1}</span>
-                      <div className="flex-1 min-w-0">
-                        <input type="text" placeholder={`Nama Petugas ${i + 1}`} value={namaPetugas[i]} onChange={(e) => handleNamaChange(i, e.target.value)} className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-orange-400 bg-white placeholder-slate-400" />
-                      </div>
-                      <label className="flex items-center gap-1.5 cursor-pointer shrink-0">
-                        <input type="checkbox" checked={berbadanSehat[i]} onChange={(e) => handleSehatChange(i, e.target.checked)} className="w-4 h-4 rounded border-slate-300 text-orange-500 focus:ring-orange-400" />
-                        <span className="text-xs font-medium text-slate-600 hidden sm:inline">Berbadan Sehat</span>
-                        <span className="text-xs font-medium text-slate-600 sm:hidden">Sehat</span>
-                      </label>
-                      {namaFilled && (
-                        <LisensiUploadButton namaPetugas={namaPetugas[i]} index={i + 1} fotoUrl={fotoLisensi[i]} uploadStatus={uploadStatus[i]} uploadError={uploadError[i]} onUploaded={(url, status, err) => handleFotoUploaded(i, url, status, err)} onRemoved={() => handleFotoRemoved(i)} />
-                      )}
-                      {fotoMissing && <span className="text-xs text-amber-600 font-medium shrink-0 hidden lg:block">Wajib foto</span>}
+              {tipePerusahaan === "eksternal" ? (
+                <>
+                  {/* ── MODE EKSTERNAL: TIDAK BERUBAH — input manual + upload foto ── */}
+                  <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 mb-5">
+                    <p className="text-sm text-amber-700">⚠️ Setiap petugas yang namanya terisi <strong>wajib</strong> melampirkan foto lisensi ketinggian.</p>
+                  </div>
+                  <div className="hidden sm:flex items-center gap-2 px-3 mb-2 text-xs font-semibold text-slate-500 uppercase tracking-wide">
+                    <span className="w-5 shrink-0">#</span>
+                    <span className="flex-1">Nama Petugas</span>
+                    <span className="w-28 text-center shrink-0">Berbadan Sehat</span>
+                    <span className="w-24 text-center shrink-0">Foto Lisensi</span>
+                  </div>
+                  <div className="space-y-2.5">
+                    {Array.from({ length: visibleCount }).map((_, i) => {
+                      const namaFilled = !!namaPetugas[i]?.trim();
+                      const fotoMissing = namaFilled && !fotoLisensi[i];
+                      return (
+                        <div key={i} className={`flex items-center gap-2 sm:gap-3 p-3 rounded-xl border transition-all ${fotoMissing ? "bg-amber-50 border-amber-200" : namaFilled ? "bg-white border-slate-200 shadow-sm" : "bg-slate-50 border-slate-200"}`}>
+                          <span className="text-xs font-bold text-slate-400 w-5 shrink-0 text-center">{i + 1}</span>
+                          <div className="flex-1 min-w-0">
+                            <input type="text" placeholder={`Nama Petugas ${i + 1}`} value={namaPetugas[i]} onChange={(e) => handleNamaChange(i, e.target.value)} className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-orange-400 bg-white placeholder-slate-400" />
+                          </div>
+                          <label className="flex items-center gap-1.5 cursor-pointer shrink-0">
+                            <input type="checkbox" checked={berbadanSehat[i]} onChange={(e) => handleSehatChange(i, e.target.checked)} className="w-4 h-4 rounded border-slate-300 text-orange-500 focus:ring-orange-400" />
+                            <span className="text-xs font-medium text-slate-600 hidden sm:inline">Berbadan Sehat</span>
+                            <span className="text-xs font-medium text-slate-600 sm:hidden">Sehat</span>
+                          </label>
+                          {namaFilled && (
+                            <LisensiUploadButton namaPetugas={namaPetugas[i]} index={i + 1} fotoUrl={fotoLisensi[i]} uploadStatus={uploadStatus[i]} uploadError={uploadError[i]} onUploaded={(url, status, err) => handleFotoUploaded(i, url, status, err)} onRemoved={() => handleFotoRemoved(i)} />
+                          )}
+                          {fotoMissing && <span className="text-xs text-amber-600 font-medium shrink-0 hidden lg:block">Wajib foto</span>}
+                        </div>
+                      );
+                    })}
+                  </div>
+                  {visibleCount < 10 && <p className="text-xs text-slate-400 text-center mt-3">Isi nama petugas {visibleCount} untuk menambah baris berikutnya</p>}
+                </>
+              ) : (
+                <>
+                  {/* ── MODE INTERNAL: dropdown pekerja dari Master Lisence ── */}
+                  {!namaDepartemen ? (
+                    <div className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-6 text-center">
+                      <p className="text-sm text-slate-500">Pilih <strong>Nama Departemen</strong> di Bagian 1 terlebih dahulu untuk menampilkan daftar pekerja.</p>
                     </div>
-                  );
-                })}
-              </div>
-              {visibleCount < 10 && <p className="text-xs text-slate-400 text-center mt-3">Isi nama petugas {visibleCount} untuk menambah baris berikutnya</p>}
+                  ) : loadingWorkers ? (
+                    <div className="flex items-center justify-center gap-2 py-8 text-slate-400 text-sm">
+                      <Loader2 className="w-4 h-4 animate-spin" /> Memuat daftar pekerja...
+                    </div>
+                  ) : workerOptions.length === 0 ? (
+                    <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-6 text-center">
+                      <p className="text-sm text-amber-700">
+                        Belum ada pekerja dengan lisence Height Work terdaftar di departemen <strong>{namaDepartemen}</strong>.
+                      </p>
+                      <p className="text-xs text-amber-600 mt-1">Hubungi Admin untuk mendaftarkan lisence pekerja melalui Master Lisence.</p>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 mb-5 flex items-start gap-2.5">
+                        <Lock className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
+                        <p className="text-sm text-blue-700">Pilih pekerja dari daftar yang sudah terdaftar lisence Height Work-nya di departemen <strong>{namaDepartemen}</strong>. Lisence otomatis terisi dari data master.</p>
+                      </div>
+                      <div className="hidden sm:flex items-center gap-2 px-3 mb-2 text-xs font-semibold text-slate-500 uppercase tracking-wide">
+                        <span className="w-5 shrink-0">#</span>
+                        <span className="flex-1">Nama Petugas</span>
+                        <span className="w-28 text-center shrink-0">Berbadan Sehat</span>
+                        <span className="w-24 text-center shrink-0">Lisensi</span>
+                      </div>
+                      <div className="space-y-2.5">
+                        {Array.from({ length: visibleCount }).map((_, i) => {
+                          const nikTerpakai = selectedNik.filter((nik, idx) => nik && idx !== i);
+                          const availableOptions = workerOptions.filter((w) => !nikTerpakai.includes(w.nik));
+                          const currentWorker = workerOptions.find((w) => w.nik === selectedNik[i]);
+                          const status = currentWorker ? getExpStatus(currentWorker.tanggal_exp) : null;
+                          const namaFilled = !!namaPetugas[i]?.trim();
+
+                          return (
+                            <div key={i} className={`p-3 rounded-xl border transition-all ${namaFilled ? "bg-white border-slate-200 shadow-sm" : "bg-slate-50 border-slate-200"}`}>
+                              <div className="flex items-center gap-2 sm:gap-3">
+                                <span className="text-xs font-bold text-slate-400 w-5 shrink-0 text-center">{i + 1}</span>
+                                <div className="flex-1 min-w-0">
+                                  <select
+                                    value={selectedNik[i] ?? ""}
+                                    onChange={(e) => handleWorkerSelect(i, e.target.value)}
+                                    className={`w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400 bg-white ${!selectedNik[i] ? "text-slate-400" : "text-slate-800"}`}
+                                  >
+                                    <option value="">— Pilih Petugas —</option>
+                                    {availableOptions.map((w) => (
+                                      <option key={w.nik} value={w.nik}>{w.nama} ({w.nik})</option>
+                                    ))}
+                                  </select>
+                                </div>
+                                <label className="flex items-center gap-1.5 cursor-pointer shrink-0">
+                                  <input type="checkbox" checked={berbadanSehat[i]} onChange={(e) => handleSehatChange(i, e.target.checked)} className="w-4 h-4 rounded border-slate-300 text-orange-500 focus:ring-orange-400" />
+                                  <span className="text-xs font-medium text-slate-600 hidden sm:inline">Berbadan Sehat</span>
+                                  <span className="text-xs font-medium text-slate-600 sm:hidden">Sehat</span>
+                                </label>
+                                {currentWorker && (
+                                  <button
+                                    type="button"
+                                    onClick={() => setPreviewWorker(currentWorker)}
+                                    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium border bg-orange-50 border-orange-200 text-orange-700 hover:bg-orange-100 hover:border-orange-400 transition-all shrink-0"
+                                  >
+                                    <Eye className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Lihat Lisensi</span>
+                                  </button>
+                                )}
+                              </div>
+                              {currentWorker && status !== "active" && (
+                                <p className={`text-xs font-medium mt-2 ml-8 flex items-center gap-1 ${status === "expired" ? "text-red-600" : "text-amber-600"}`}>
+                                  <AlertCircle className="w-3.5 h-3.5" />
+                                  {status === "expired" ? "Lisensi pekerja ini sudah kadaluarsa" : "Lisensi pekerja ini segera habis"} (Exp: {formatDate(currentWorker.tanggal_exp)})
+                                </p>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                      {visibleCount < 10 && <p className="text-xs text-slate-400 text-center mt-3">Pilih petugas {visibleCount} untuk menambah baris berikutnya</p>}
+                    </>
+                  )}
+                </>
+              )}
             </div>
           </section>
 
@@ -606,27 +898,45 @@ export default function HeightWorkFormPage() {
             </div>
           </section>
 
-          {/* BAGIAN 5: Body Harness */}
+          {/* BAGIAN 5: Body Harness — DISABLED, dipindahkan ke tahap approval Admin K3 */}
           <section className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
             <div className={sectionHead}>
               <h2 className="font-bold text-slate-800">Bagian 5: Pengecekan Body Harness & Lanyard</h2>
             </div>
             <div className="p-6">
+              <div className="mb-5 p-3.5 bg-blue-50 border border-blue-200 rounded-xl flex items-start gap-2.5">
+                <Lock className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
+                <p className="text-xs text-blue-700">
+                  Pengecekan fisik Helm, Body Harness &amp; Lanyard akan dilakukan dan diverifikasi oleh <strong>Admin K3</strong> pada tahap approval. Checklist di bawah ini bersifat referensi saja dan tidak dapat diisi di form ini.
+                </p>
+              </div>
               <div className="flex gap-6">
-                <div className="flex-1 space-y-5">
+                <div className="flex-1 space-y-5 opacity-60">
+                  <div>
+                    <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Helm</h3>
+                    <div className="space-y-1">
+                      <label className="flex items-start gap-3 cursor-not-allowed p-3 rounded-xl">
+                        <input type="checkbox" checked={helmKondisiBaik} disabled className={`${cbDisabled} mt-0.5`} />
+                        <div>
+                          <span className="text-sm font-semibold text-slate-600">Helm</span>
+                          <p className="text-xs text-slate-400 mt-0.5">Kondisi baik (tidak retak/pecah, tali pengait masih kokoh, ukuran sesuai kepala petugas)</p>
+                        </div>
+                      </label>
+                    </div>
+                  </div>
                   <div>
                     <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Body Harness</h3>
                     <div className="space-y-1">
                       {[
-                        [bodyHarnessWebbing, setBodyHarnessWebbing, "Webbing", "Kondisi jahitan baik (tidak lepas, tidak berserabut)"],
-                        [bodyHarnessDRing, setBodyHarnessDRing, "D-Ring", "Kondisi baik (tidak retak/bengkok/berkarat, dapat diputar bebas/fleksibel)"],
-                        [bodyHarnessAdjustment, setBodyHarnessAdjustment, "Adjustment Buckle (Gesper)", "Kondisi baik (tidak retak/bengkok/berkarat, dapat mengunci sempurna)"],
-                      ].map(([val, set, name, desc]: any, idx) => (
-                        <label key={idx} className="flex items-start gap-3 cursor-pointer p-3 rounded-xl hover:bg-slate-50 transition-colors">
-                          <input type="checkbox" checked={val} onChange={(e) => set(e.target.checked)} className={`${cb} mt-0.5`} />
+                        [bodyHarnessWebbing, "Webbing", "Kondisi jahitan baik (tidak lepas, tidak berserabut)"],
+                        [bodyHarnessDRing, "D-Ring", "Kondisi baik (tidak retak/bengkok/berkarat, dapat diputar bebas/fleksibel)"],
+                        [bodyHarnessAdjustment, "Adjustment Buckle (Gesper)", "Kondisi baik (tidak retak/bengkok/berkarat, dapat mengunci sempurna)"],
+                      ].map(([val, name, desc]: any, idx) => (
+                        <label key={idx} className="flex items-start gap-3 cursor-not-allowed p-3 rounded-xl">
+                          <input type="checkbox" checked={val} disabled className={`${cbDisabled} mt-0.5`} />
                           <div>
-                            <span className="text-sm font-semibold text-slate-700">{name}</span>
-                            <p className="text-xs text-slate-500 mt-0.5">{desc}</p>
+                            <span className="text-sm font-semibold text-slate-600">{name}</span>
+                            <p className="text-xs text-slate-400 mt-0.5">{desc}</p>
                           </div>
                         </label>
                       ))}
@@ -636,15 +946,15 @@ export default function HeightWorkFormPage() {
                     <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Lanyard</h3>
                     <div className="space-y-1">
                       {[
-                        [lanyardAbsorber, setLanyardAbsorber, "Absorber & Timbles", "Kondisi baik (sarung penutup tidak rusak, terpasang tepat pada ujung mata sambungan)"],
-                        [lanyardSnapHook, setLanyardSnapHook, "Snap Hook", "Kondisi baik (tidak retak/bengkok/berkarat, dapat terkunci dengan sempurna)"],
-                        [lanyardRope, setLanyardRope, "Rope Lanyard", "Kondisi baik (tidak berserabut, fiber tidak aus/terpotong)"],
-                      ].map(([val, set, name, desc]: any, idx) => (
-                        <label key={idx} className="flex items-start gap-3 cursor-pointer p-3 rounded-xl hover:bg-slate-50 transition-colors">
-                          <input type="checkbox" checked={val} onChange={(e) => set(e.target.checked)} className={`${cb} mt-0.5`} />
+                        [lanyardAbsorber, "Absorber & Timbles", "Kondisi baik (sarung penutup tidak rusak, terpasang tepat pada ujung mata sambungan)"],
+                        [lanyardSnapHook, "Snap Hook", "Kondisi baik (tidak retak/bengkok/berkarat, dapat terkunci dengan sempurna)"],
+                        [lanyardRope, "Rope Lanyard", "Kondisi baik (tidak berserabut, fiber tidak aus/terpotong)"],
+                      ].map(([val, name, desc]: any, idx) => (
+                        <label key={idx} className="flex items-start gap-3 cursor-not-allowed p-3 rounded-xl">
+                          <input type="checkbox" checked={val} disabled className={`${cbDisabled} mt-0.5`} />
                           <div>
-                            <span className="text-sm font-semibold text-slate-700">{name}</span>
-                            <p className="text-xs text-slate-500 mt-0.5">{desc}</p>
+                            <span className="text-sm font-semibold text-slate-600">{name}</span>
+                            <p className="text-xs text-slate-400 mt-0.5">{desc}</p>
                           </div>
                         </label>
                       ))}
@@ -657,7 +967,7 @@ export default function HeightWorkFormPage() {
                     <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 text-center">Referensi Body Harness</p>
                     <button type="button" onClick={() => setHarnessLightbox(true)} className="group relative w-full rounded-xl overflow-hidden border border-slate-200 shadow-sm hover:border-orange-400 hover:shadow-md transition-all cursor-zoom-in" title="Klik untuk perbesar">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src="/form-permit/images/Cek_Body_Harness.jpg" alt="Diagram pengecekan body harness" className="w-full object-contain bg-white" />
+                      <img src="/form-permit/images/Body_Harness_Check.png" alt="Diagram pengecekan body harness" className="w-full object-contain bg-white" />
                       <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
                         <div className="opacity-0 group-hover:opacity-100 transition-opacity bg-black/60 rounded-full p-2">
                           <ZoomIn className="w-5 h-5 text-white" />
@@ -679,7 +989,7 @@ export default function HeightWorkFormPage() {
                       </div>
                       <div className="bg-white rounded-b-2xl overflow-auto max-h-[80vh] flex items-center justify-center p-4">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src="/form-permit/images/Cek_Body_Harness.jpg" alt="Diagram pengecekan body harness" className="w-full h-auto object-contain" style={{ maxHeight: "75vh" }} />
+                        <img src="/form-permit/images/Body_Harness_Check.png" alt="Diagram pengecekan body harness" className="w-full h-auto object-contain" style={{ maxHeight: "75vh" }} />
                       </div>
                       <p className="text-white/50 text-xs text-center mt-2">Klik di luar gambar untuk menutup</p>
                     </div>
@@ -725,6 +1035,10 @@ export default function HeightWorkFormPage() {
           </div>
         </form>
       </main>
+
+      {previewWorker && (
+        <MasterLisenceViewModal worker={previewWorker} onClose={() => setPreviewWorker(null)} />
+      )}
     </div>
   );
 }

@@ -3,6 +3,8 @@
 //           Kolom DB mr_pga_approved tetap digunakan (tidak diubah).
 // SECURITY: Auth guard via useApproverAuth — panggil /api/auth/me setiap load.
 //           SessionStorage hanya untuk tampilan nama, bukan sumber kebenaran auth.
+// ADDED: Tombol "Download Excel (Workshop)" — hanya tampil untuk role admin.
+//        Mengunduh rekap form Workshop sesuai tab status yang sedang aktif.
 "use client";
 import { useState, useEffect } from "react";
 import Link from "next/link";
@@ -10,7 +12,7 @@ import { useRouter } from "next/navigation";
 import {
   Home, CheckCircle, XCircle, Clock, Eye,
   LogOut, User, FileText, RefreshCw,
-  Shield, ShieldCheck,
+  Shield, ShieldCheck, Download, Loader2,
 } from "lucide-react";
 import { useApproverAuth } from "@/hooks/useApproverAuth";
 import AuthLoadingSpinner from "@/components/AuthLoadingSpinner";
@@ -146,6 +148,7 @@ export default function ApprovalPage() {
   const [activeTab, setActiveTab]     = useState("submitted");
   const [filterJenis, setFilterJenis] = useState("all");
   const [formCounts, setFormCounts]   = useState<FormCounts>({ submitted: 0, approved: 0, rejected: 0 });
+  const [exportLoading, setExportLoading] = useState(false); // ADDED: loading state download excel
 
   // Muat data hanya setelah auth selesai & berhasil
   useEffect(() => {
@@ -197,11 +200,41 @@ export default function ApprovalPage() {
     router.push("/login/approver");    // ← redirect ke approver login, bukan /
   };
 
+  // ── ADDED: Download rekap Excel khusus Workshop (sesuai tab aktif) ──
+  const handleExportWorkshop = async () => {
+    setExportLoading(true);
+    try {
+      const res = await fetch(`/form-permit/api/approval/export/workshop?status=${activeTab}`, {
+        credentials: "include",
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        alert(err.error || "Gagal mengunduh rekap Excel Workshop.");
+        return;
+      }
+      const blob = await res.blob();
+      const url  = window.URL.createObjectURL(blob);
+      const a    = document.createElement("a");
+      a.href     = url;
+      a.download = `Rekap_Workshop_${activeTab}_${new Date().toISOString().slice(0, 10)}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("Failed to export workshop excel:", err);
+      alert("Terjadi kesalahan saat mengunduh rekap Excel Workshop.");
+    } finally {
+      setExportLoading(false);
+    }
+  };
+
   // ── Auth loading ───────────────────────────────────────────
   // Jangan render halaman sebelum auth selesai
   if (authLoading || !user) return <AuthLoadingSpinner />;
 
   const filtered = forms.filter(f => filterJenis === "all" || f.jenis_form === filterJenis);
+  const isAdmin  = user.role === "admin";
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -287,17 +320,34 @@ export default function ApprovalPage() {
           })}
         </div>
 
-        {/* Filter jenis */}
-        <div className="bg-white rounded-xl border border-slate-200 p-4 flex items-center gap-2 flex-wrap">
-          <span className="text-xs font-semibold text-slate-500 mr-1">Filter:</span>
-          {["all", "hot-work", "workshop", "height-work"].map(type => (
-            <button key={type} onClick={() => setFilterJenis(type)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                filterJenis === type ? "bg-orange-600 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-              }`}>
-              {type === "all" ? "Semua" : jenisLabel[type]}
+        {/* Filter jenis + Export Excel Workshop (admin only) */}
+        <div className="bg-white rounded-xl border border-slate-200 p-4 flex items-center gap-2 flex-wrap justify-between">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-xs font-semibold text-slate-500 mr-1">Filter:</span>
+            {["all", "hot-work", "workshop", "height-work"].map(type => (
+              <button key={type} onClick={() => setFilterJenis(type)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                  filterJenis === type ? "bg-orange-600 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                }`}>
+                {type === "all" ? "Semua" : jenisLabel[type]}
+              </button>
+            ))}
+          </div>
+
+          {/* ADDED: Tombol download rekap Excel Workshop — hanya untuk admin */}
+          {isAdmin && (
+            <button
+              onClick={handleExportWorkshop}
+              disabled={exportLoading}
+              title="Download rekap Excel khusus Workshop Permit sesuai tab yang sedang aktif"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold
+                         bg-green-600 hover:bg-green-700 text-white transition-colors disabled:opacity-50">
+              {exportLoading
+                ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                : <Download className="w-3.5 h-3.5" />}
+              Excel Workshop
             </button>
-          ))}
+          )}
         </div>
 
         {/* List */}

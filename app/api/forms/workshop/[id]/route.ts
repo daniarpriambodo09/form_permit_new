@@ -76,6 +76,7 @@ export async function PUT(
     const body = await req.json();
     const {
       no_registrasi, nama_kontraktor_nik, nama_pekerja_nik,
+      namaPekerja, nikPekerja,
       lokasi_pekerjaan, tanggal_pelaksanaan, waktu_pukul,
       nama_fire_watch, nik_fire_watch,
       jabatan_pemberi_izin, nik_pemberi_ijin,
@@ -119,6 +120,9 @@ export async function PUT(
       return NextResponse.json({ error: 'Tidak memiliki izin untuk mengedit form ini' }, { status: 403 });
     }
 
+    const pekerjaNama = namaPekerja || nama_pekerja_nik || null;
+    const pekerjaNik  = nikPekerja || null;
+    const namaPekerjaNik = pekerjaNama && pekerjaNik ? `${pekerjaNama} / ${pekerjaNik}` : pekerjaNama || nama_pekerja_nik || null;
     const newStatus = status === 'submitted' ? 'submitted' : 'draft';
     const now = new Date().toISOString();
 
@@ -127,16 +131,17 @@ export async function PUT(
         no_registrasi = $1,
         nama_kontraktor_nik = $2,
         nama_pekerja_nik = $3,
-        lokasi_pekerjaan = $4,
-        tanggal_pelaksanaan = $5,
-        waktu_pukul = $6,
-        nama_fire_watch = $7,
-        nik_fire_watch = $8,
-        jabatan_pemberi_izin = $9,
-        nik_pemberi_ijin = $10,
-        preventive_genset_pump_room = $11,
-        tangki_solar = $12,
-        panel_listrik = $13,
+        nik_pekerja = $4,
+        lokasi_pekerjaan = $5,
+        tanggal_pelaksanaan = $6,
+        waktu_pukul = $7,
+        nama_fire_watch = $8,
+        nik_fire_watch = $9,
+        jabatan_pemberi_izin = $10,
+        nik_pemberi_ijin = $11,
+        preventive_genset_pump_room = $12,
+        tangki_solar = $13,
+        panel_listrik = $14,
         detail_cutting = $14,
         t_mulai_cutting = $15,
         t_selesai_cutting = $16,
@@ -191,7 +196,8 @@ export async function PUT(
       [
         no_registrasi,
         nama_kontraktor_nik,
-        nama_pekerja_nik,
+        namaPekerjaNik,
+        pekerjaNik,
         lokasi_pekerjaan,
         tanggal_pelaksanaan ? new Date(tanggal_pelaksanaan).toISOString() : null,
         waktu_pukul || null,

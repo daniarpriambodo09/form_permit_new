@@ -1,6 +1,7 @@
 // components/Time24Input.tsx
 "use client";
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useLayoutEffect, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { Clock, ChevronDown } from "lucide-react";
 
 export const normalizeTo24h = (timeStr: string | undefined | null): string => {
@@ -46,15 +47,21 @@ interface MiniSelectProps {
 
 const MiniSelect: React.FC<MiniSelectProps> = ({ value, options, onChange, label }) => {
   const [isOpen, setIsOpen] = useState(false);
-  const listRef = useRef<HTMLDivElement>(null);
+  // FIX: sebelumnya "listRef" dipakai dobel untuk wrapper luar DAN list
+  // scrollable di dalam — akibatnya listRef.current selalu menunjuk ke
+  // wrapper luar (bukan elemen yang benar-benar discroll), jadi auto-scroll
+  // ke item terpilih tidak pernah jalan dengan benar. Sekarang dipisah jadi
+  // dua ref berbeda dengan tugas masing-masing.
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  const innerListRef = useRef<HTMLDivElement>(null);
   const itemHeight = 36;
   const visibleCount = 5;
 
   useEffect(() => {
-    if (isOpen && listRef.current) {
+    if (isOpen && innerListRef.current) {
       const selectedIndex = options.indexOf(value);
       if (selectedIndex !== -1) {
-        listRef.current.scrollTop = Math.max(0, selectedIndex * itemHeight - itemHeight * 2);
+        innerListRef.current.scrollTop = Math.max(0, selectedIndex * itemHeight - itemHeight * 2);
       }
     }
   }, [isOpen, value, options]);
@@ -62,7 +69,7 @@ const MiniSelect: React.FC<MiniSelectProps> = ({ value, options, onChange, label
   useEffect(() => {
     if (!isOpen) return;
     const handleClickOutside = (e: MouseEvent) => {
-      if (listRef.current && !listRef.current.contains(e.target as Node)) {
+      if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) {
         setIsOpen(false);
       }
     };
@@ -73,7 +80,7 @@ const MiniSelect: React.FC<MiniSelectProps> = ({ value, options, onChange, label
   const selectedLabel = String(value).padStart(2, "0");
 
   return (
-    <div className="flex flex-col items-center gap-1.5" ref={listRef}>
+    <div className="flex flex-col items-center gap-1.5" ref={wrapperRef}>
       <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
         {label}
       </span>
@@ -97,7 +104,7 @@ const MiniSelect: React.FC<MiniSelectProps> = ({ value, options, onChange, label
             style={{ width: "72px" }}
           >
             <div
-              ref={listRef}
+              ref={innerListRef}
               className="overflow-y-auto scrollbar-hide"
               style={{ maxHeight: `${itemHeight * visibleCount}px` }}
             >
@@ -149,7 +156,98 @@ const TimeInput24: React.FC<TimeInput24Props> = ({
   const [isOpen, setIsOpen] = useState(false);
   const [tempHour, setTempHour] = useState(hour);
   const [tempMinute, setTempMinute] = useState(minute);
-  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // ── Wadah trigger (label + tombol) — dipakai untuk deteksi klik-di-luar ──
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  // ── Tombol trigger itu sendiri — dipakai untuk menghitung posisi popup ──
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  // ── Panel popup (di-portal ke document.body) — dipakai untuk deteksi
+  //     klik-di-luar juga, dan untuk mengukur dimensi aktualnya saat flip/clamp ──
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  // Portal hanya boleh dirender di client (document.body belum ada saat SSR).
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+
+  // Posisi popup dihitung manual dari getBoundingClientRect() trigger —
+  // pendekatan floating-ui yang ringan tanpa perlu dependency tambahan.
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
+
+  const computePosition = useCallback(() => {
+    const trigger = triggerRef.current;
+    if (!trigger) return;
+    const rect = trigger.getBoundingClientRect();
+    const panelEl = panelRef.current;
+    // Estimasi dimensi dipakai sebagai fallback sebelum panel pertama kali
+    // ter-render; setelah itu dimensi aktual dari panelRef dipakai.
+    const panelWidth = panelEl?.offsetWidth ?? 240;
+    const panelHeight = panelEl?.offsetHeight ?? 220;
+    const viewportW = window.innerWidth;
+    const viewportH = window.innerHeight;
+    const gap = 6;
+    const margin = 8;
+
+    // Vertikal: default di bawah trigger, flip ke atas kalau ruang bawah tak cukup.
+    let top = rect.bottom + gap;
+    if (top + panelHeight > viewportH - margin && rect.top - panelHeight - gap > margin) {
+      top = rect.top - panelHeight - gap;
+    }
+    top = Math.max(margin, Math.min(top, viewportH - margin));
+
+    // Horizontal: sejajar kiri trigger, clamp supaya tidak keluar viewport.
+    let left = rect.left;
+    if (left + panelWidth > viewportW - margin) {
+      left = viewportW - panelWidth - margin;
+    }
+    left = Math.max(margin, left);
+
+    setPos({ top, left });
+  }, []);
+
+  // Hitung ulang posisi begitu popup dibuka (panelRef sudah ter-attach
+  // di titik ini karena useLayoutEffect berjalan setelah commit DOM,
+  // termasuk konten yang di-portal).
+  useLayoutEffect(() => {
+    if (isOpen) computePosition();
+  }, [isOpen, computePosition]);
+
+  // FIX BUG UTAMA:
+  // Sebelumnya, SETIAP event "scroll" di window (capture: true) langsung
+  // menutup popup — termasuk saat user scroll di dalam list Jam/Menit,
+  // karena listener capture tetap kebaca meskipun target scroll ada di
+  // elemen turunan (event scroll tidak bubble, tapi capture-phase tetap
+  // jalan dari window ke bawah). Akibatnya popup langsung close begitu user
+  // coba scroll memilih waktu.
+  //
+  // Sekarang: kalau target scroll ada DI DALAM panel popup (misal list Jam
+  // atau Menit), event diabaikan (popup tetap terbuka, biarkan user scroll
+  // bebas). Popup hanya ditutup kalau scroll terjadi DI LUAR popup — misal
+  // halaman/body ikut ter-scroll, sama seperti perilaku DatePicker pada
+  // umumnya.
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleScroll = (e: Event) => {
+      const target = e.target as Node | null;
+      if (target && panelRef.current && panelRef.current.contains(target)) {
+        return; // scroll terjadi di dalam popup (mis. list Jam/Menit) — jangan close
+      }
+      setIsOpen(false);
+    };
+    const handleResize = () => computePosition();
+    // capture: true supaya scroll di container manapun (bukan cuma window)
+    // tetap terdeteksi, lalu kita filter sendiri di dalam handleScroll.
+    window.addEventListener("scroll", handleScroll, true);
+    window.addEventListener("resize", handleResize);
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setIsOpen(false);
+    };
+    document.addEventListener("keydown", handleEscape);
+    return () => {
+      window.removeEventListener("scroll", handleScroll, true);
+      window.removeEventListener("resize", handleResize);
+      document.removeEventListener("keydown", handleEscape);
+    };
+  }, [isOpen, computePosition]);
 
   useEffect(() => {
     setTempHour(hour);
@@ -158,7 +256,10 @@ const TimeInput24: React.FC<TimeInput24Props> = ({
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+      const target = event.target as Node;
+      const clickedTrigger = wrapperRef.current?.contains(target);
+      const clickedPanel = panelRef.current?.contains(target);
+      if (!clickedTrigger && !clickedPanel) {
         setIsOpen(false);
       }
     };
@@ -198,11 +299,12 @@ const TimeInput24: React.FC<TimeInput24Props> = ({
   const minuteOptions = Array.from({ length: 60 }, (_, i) => i);
 
   return (
-    <div className={`space-y-1.5 ${className}`} ref={dropdownRef}>
+    <div className={`space-y-1.5 ${className}`} ref={wrapperRef}>
       {label && <p className="text-xs font-medium text-slate-600">{label}</p>}
 
       <button
         type="button"
+        ref={triggerRef}
         onClick={() => setIsOpen(!isOpen)}
         className={`${triggerBase} bg-white flex items-center justify-between gap-2 transition-all text-left ${
           isOpen
@@ -219,43 +321,58 @@ const TimeInput24: React.FC<TimeInput24Props> = ({
         <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform shrink-0 ${isOpen ? "rotate-180" : ""}`} />
       </button>
 
-      {isOpen && (
-        <div className="relative">
-          <div className="absolute left-0 top-full mt-1 z-50 p-3 bg-white border border-slate-200 rounded-xl shadow-xl min-w-[220px]">
-            <div className="flex items-center justify-center gap-3">
-              <MiniSelect
-                value={tempHour}
-                options={hourOptions}
-                onChange={setTempHour}
-                label="Jam"
-              />
+      {/* Popup di-portal ke document.body dan pakai position: fixed dengan
+          koordinat hasil hitung (computePosition), sehingga:
+          - tidak pernah ke-clip oleh section/card manapun yang overflow-hidden
+          - tidak menambah tinggi layout (fixed = keluar dari document flow)
+          - z-index tinggi (z-[9999]) benar-benar berlaku karena jadi sibling <body>
+          Desain visual panel (kelas, spacing, warna) TIDAK diubah — hanya cara
+          panel diposisikan yang berubah. */}
+      {isOpen && mounted && createPortal(
+        <div
+          ref={panelRef}
+          style={{
+            position: "fixed",
+            top: pos?.top ?? -9999,
+            left: pos?.left ?? -9999,
+            visibility: pos ? "visible" : "hidden",
+          }}
+          className="z-[9999] p-3 bg-white border border-slate-200 rounded-xl shadow-xl min-w-[220px]"
+        >
+          <div className="flex items-center justify-center gap-3">
+            <MiniSelect
+              value={tempHour}
+              options={hourOptions}
+              onChange={setTempHour}
+              label="Jam"
+            />
 
-              <span className="text-xl font-bold text-slate-300 mt-4">:</span>
+            <span className="text-xl font-bold text-slate-300 mt-4">:</span>
 
-              <MiniSelect
-                value={tempMinute}
-                options={minuteOptions}
-                onChange={setTempMinute}
-                label="Menit"
-              />
-            </div>
-
-            <div className="flex gap-2 mt-3 pt-3 border-t border-slate-200">
-              <button
-                onClick={handleCancel}
-                className="flex-1 px-3 py-2 text-xs font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors"
-              >
-                Batal
-              </button>
-              <button
-                onClick={handleApply}
-                className="flex-1 px-3 py-2 text-xs font-semibold text-white bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 rounded-lg transition-all shadow-md"
-              >
-                Pilih Waktu
-              </button>
-            </div>
+            <MiniSelect
+              value={tempMinute}
+              options={minuteOptions}
+              onChange={setTempMinute}
+              label="Menit"
+            />
           </div>
-        </div>
+
+          <div className="flex gap-2 mt-3 pt-3 border-t border-slate-200">
+            <button
+              onClick={handleCancel}
+              className="flex-1 px-3 py-2 text-xs font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors"
+            >
+              Batal
+            </button>
+            <button
+              onClick={handleApply}
+              className="flex-1 px-3 py-2 text-xs font-semibold text-white bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 rounded-lg transition-all shadow-md"
+            >
+              Pilih Waktu
+            </button>
+          </div>
+        </div>,
+        document.body
       )}
     </div>
   );

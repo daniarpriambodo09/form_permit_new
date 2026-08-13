@@ -132,7 +132,7 @@
 │   ├── supabase.ts
 ├── public
 │   ├── images
-│   │   ├── Cek_Body_Harness.jpg
+│   │   ├── Body_Harness_Check.png
 │   │   ├── safety_first.png
 │   ├── uploads
 │   │   ├── jsa

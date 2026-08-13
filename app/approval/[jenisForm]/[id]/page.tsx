@@ -1,6 +1,28 @@
 // app/approval/[jenisForm]/[id]/page.tsx
 // REFACTOR: Role 'pga' diganti 'smr'. Kolom DB mr_pga_* tetap.
 // SECURITY: Auth guard via useApproverAuth — tidak lagi mengandalkan sessionStorage untuk auth.
+// FIX: Halaman detail approval sekarang menampilkan SELURUH informasi form yang diisi worker,
+//      termasuk field yang sebelumnya tidak ditampilkan sama sekali:
+//        - Height-work: daftar petugas + status sehat + foto lisensi (Bagian 2),
+//          peminjaman APD (Bagian 3), dan seluruh item checklist Bagian 4 & 5.
+//        - Hot-work/Workshop: cairan/gas bertekanan, bahaya lain, pekerjaan lainnya,
+//          fire blanket (hot-work), spray/non-spray (workshop), dan permintaan tambahan.
+//
+// UPDATED: Height-work Bagian 5 (Pengecekan Body Harness & Lanyard) TIDAK LAGI diisi
+//          worker di form pembuatan. Sekarang:
+//            - Role SEBELUM Admin K3 (SPV untuk internal; Kontraktor & SPV untuk
+//              eksternal) melihat teks placeholder — checklist belum tersedia.
+//            - Role Admin K3, pada gilirannya (status submitted & current_stage
+//              == stage Admin K3), melihat checklist INTERAKTIF dan mengisinya
+//              bersamaan dengan aksi approve.
+//            - Setelah Admin K3 approve (admin_k3_approved = true), SEMUA role
+//              (termasuk SFO, SMR, dan Admin K3 sendiri jika kembali membuka
+//              halaman ini) melihat hasil checklist dalam mode read-only.
+//
+// UPDATED: Bagian 5 sekarang juga menyertakan checklist "Helm" (sebelumnya
+//          belum ada), mengikuti pola yang sama seperti item Body Harness &
+//          Lanyard lainnya — diisi oleh Admin K3 saat approve, kolom DB
+//          helm_kondisi_baik, dikirim via body.harness_checklist.
 //
 // WORKFLOW:
 //   Hot-work & Workshop INTERNAL:  SPV(1) → Admin K3(2) → SFO(3) → SMR(4)
@@ -14,7 +36,7 @@ import { useRouter } from "next/navigation";
 import {
   ArrowLeft, CheckCircle, XCircle, AlertCircle,
   Clock, Loader2, Flame, Info, Eye, FileText,
-  LogOut,
+  LogOut, ZoomIn, X, Lock,
 } from "lucide-react";
 import React from "react";
 import { useApproverAuth } from "@/hooks/useApproverAuth";
@@ -37,6 +59,11 @@ const jenisLabel: Record<string, string> = {
 function getTipeLabel(tipe?: string): string {
   if (tipe === "eksternal") return "Eksternal / Subkontraktor";
   return "Internal / Karyawan PT.JAI";
+}
+
+function resolveFileUrl(url: string): string {
+  if (!url) return url;
+  return url.startsWith("http") ? url : `${window.location.origin}${url}`;
 }
 
 // ── Sub-components ────────────────────────────────────────────
@@ -81,9 +108,7 @@ const JsaDisplay = ({ perluJsa, jsaFileUrl }: { perluJsa: boolean; jsaFileUrl?: 
 
   if (jsaFileUrl) {
     const fileName = jsaFileUrl.split("/").pop() || "Dokumen JSA";
-    const fileUrl = jsaFileUrl.startsWith("http")
-      ? jsaFileUrl
-      : `${window.location.origin}${jsaFileUrl}`;
+    const fileUrl = resolveFileUrl(jsaFileUrl);
 
     return (
       <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg border border-green-200">
@@ -111,6 +136,85 @@ const JsaDisplay = ({ perluJsa, jsaFileUrl }: { perluJsa: boolean; jsaFileUrl?: 
       <AlertCircle className="w-5 h-5 text-amber-600 shrink-0" />
       <span className="text-sm text-amber-800">JSA <strong>Diperlukan</strong>, namun file belum diupload.</span>
     </div>
+  );
+};
+
+// ── Image lightbox untuk foto lisensi petugas ketinggian ──────
+function ImageLightbox({ src, label, onClose }: { src: string; label: string; onClose: () => void }) {
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4" onClick={onClose}>
+      <div className="relative bg-white rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100">
+          <p className="font-semibold text-slate-800 text-sm truncate pr-4">{label}</p>
+          <button onClick={onClose} className="p-1.5 hover:bg-slate-100 rounded-lg transition-colors shrink-0">
+            <X className="w-4 h-4 text-slate-500" />
+          </button>
+        </div>
+        <div className="p-4">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={src} alt={label} className="w-full max-h-[70vh] object-contain rounded-lg bg-slate-50" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Bagian 2 Height-work: Petugas Ketinggian & Status Kesehatan ──
+const PetugasKetinggianSection = ({ form }: { form: any }) => {
+  const [preview, setPreview] = useState<{ src: string; label: string } | null>(null);
+
+  const petugasList = Array.from({ length: 10 })
+    .map((_, i) => {
+      const idx = i + 1;
+      const nama = form[`nama_petugas_${idx}`];
+      if (!nama) return null;
+      return {
+        idx,
+        nama,
+        sehat: isTruthy(form[`petugas_${idx}_sehat`]),
+        foto: form[`foto_lisensi_${idx}`] as string | null,
+      };
+    })
+    .filter(Boolean) as { idx: number; nama: string; sehat: boolean; foto: string | null }[];
+
+  if (petugasList.length === 0) {
+    return <p className="text-sm text-slate-400 italic">Belum ada petugas yang diisi pada form ini.</p>;
+  }
+
+  return (
+    <>
+      <div className="space-y-2">
+        {petugasList.map(({ idx, nama, sehat, foto }) => (
+          <div key={idx} className="flex items-center justify-between gap-3 p-3 bg-slate-50 rounded-lg border border-slate-200">
+            <div className="flex items-center gap-3 min-w-0">
+              <span className="text-xs font-bold text-slate-400 w-5 shrink-0 text-center">{idx}</span>
+              <span className="text-sm font-semibold text-slate-800 truncate">{nama}</span>
+            </div>
+            <div className="flex items-center gap-3 shrink-0">
+              <span className={`text-xs font-bold ${sehat ? "text-green-600" : "text-red-500"}`}>
+                {sehat ? "✓ Berbadan Sehat" : "✗ Tidak Sehat"}
+              </span>
+              {foto ? (
+                <button
+                  type="button"
+                  onClick={() => setPreview({ src: resolveFileUrl(foto), label: `Lisensi — ${nama}` })}
+                  className="flex items-center gap-1 px-2.5 py-1.5 bg-blue-50 border border-blue-200 text-blue-600 text-xs font-semibold rounded-lg hover:bg-blue-100 transition-colors"
+                >
+                  <ZoomIn className="w-3.5 h-3.5" /> Lihat Lisensi
+                </button>
+              ) : (
+                <span className="flex items-center gap-1 text-xs text-amber-600 font-semibold">
+                  <AlertCircle className="w-3.5 h-3.5" /> Belum Ada Foto
+                </span>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+      {preview && (
+        <ImageLightbox src={preview.src} label={preview.label} onClose={() => setPreview(null)} />
+      )}
+    </>
   );
 };
 
@@ -229,7 +333,22 @@ export default function ApprovalDetailPage({
   const [done, setDone]             = useState<"approved" | "rejected" | null>(null);
   const [error, setError]           = useState("");
 
+  // ── Height-work: state checklist Helm, Body Harness & Lanyard (Bagian 5),
+  //    diisi oleh Admin K3 saat approve. Harus dideklarasikan sebelum
+  //    early return apa pun agar urutan hooks tetap konsisten.
+  const [harness, setHarness] = useState({
+    helm:     false,
+    webbing:  false,
+    dring:    false,
+    gesper:   false,
+    absorber: false,
+    snapHook: false,
+    rope:     false,
+  });
+
   const isHotOrWorkshop = jenisForm !== "height-work";
+  const isWorkshop      = jenisForm === "workshop";
+  const isHotWork       = jenisForm === "hot-work";
 
   // Muat detail form hanya setelah auth selesai
   useEffect(() => {
@@ -267,11 +386,27 @@ export default function ApprovalDetailPage({
     setError("");
 
     try {
+      const patchBody: Record<string, any> = { action, catatan_reject: catatan };
+
+      // Height-work: sertakan checklist Helm, Body Harness & Lanyard hanya saat
+      // Admin K3 melakukan approve — role lain tidak mengirim field ini.
+      if (jenisForm === "height-work" && user?.role === "admin_k3" && action === "approve") {
+        patchBody.harness_checklist = {
+          helm_kondisi_baik:                 harness.helm,
+          webbing_kondisi_baik:              harness.webbing,
+          dring_kondisi_baik:                harness.dring,
+          gesper_kondisi_baik:               harness.gesper,
+          absorter_dan_timbes_kondisi_baik:  harness.absorber,
+          snap_hook_kondisi_baik:            harness.snapHook,
+          rope_lanyard_kondisi_baik:         harness.rope,
+        };
+      }
+
       const res = await fetch(`/form-permit/api/approval/${jenisForm}/${id}`, {
         method:      "PATCH",
         credentials: "include",
         headers:     { "Content-Type": "application/json" },
-        body:        JSON.stringify({ action, catatan_reject: catatan }),
+        body:        JSON.stringify(patchBody),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
@@ -371,6 +506,26 @@ export default function ApprovalDetailPage({
 
   const isFirewatchRole = userRole === "firewatch" || userRole === "worker";
 
+  // ── Height-work: kapan Bagian 5 (Helm, Body Harness & Lanyard) editable ──
+  // Stage Admin K3: internal = 2, eksternal = 3 (lihat penomoran di renderApprovalChain).
+  const heightWorkAdminK3Stage = isEksternal ? 3 : 2;
+  const harnessAlreadyApproved = isTruthy(form.admin_k3_approved);
+  const isAdminK3TurnForHarness =
+    jenisForm === "height-work" &&
+    userRole === "admin_k3" &&
+    form.status === "submitted" &&
+    (form.current_stage ?? 1) === heightWorkAdminK3Stage;
+
+  // Badge area berisiko tinggi (hot-work & workshop)
+  const areaBerisikoBadges: { label: string; active: boolean }[] = [
+    { label: "Ruang Tertutup",        active: isTruthy(form.ruang_tertutup) },
+    { label: "Bahan Mudah Terbakar",  active: isTruthy(form.bahan_mudah_terbakar) },
+    { label: "Gas/Bejana/Tangki",     active: isTruthy(form.gas_bejana_tangki) },
+    { label: "Ketinggian",            active: isTruthy(form.height_work) },
+    { label: "Cairan/Gas Bertekanan", active: isTruthy(form.cairan_gas_bertekan) },
+    { label: "Cairan Hydrocarbon",    active: isTruthy(form.cairan_hydrocarbon) },
+  ];
+
   return (
     <div className="min-h-screen bg-slate-50">
       {/* Header */}
@@ -439,7 +594,7 @@ export default function ApprovalDetailPage({
         )}
 
         {/* Info alur approval */}
-        {isHotOrWorkshop && form.tipe_perusahaan && (
+        {form.tipe_perusahaan && (
           <div className={`rounded-xl p-4 flex items-start gap-3 border ${
             isEksternal ? "bg-purple-50 border-purple-200" : "bg-blue-50 border-blue-200"
           }`}>
@@ -478,6 +633,7 @@ export default function ApprovalDetailPage({
                 <F label="No. Registrasi"        value={form.no_registrasi} />
                 <F label="Nama Kontraktor / NIK"  value={form.nama_kontraktor_nik} />
                 <F label="Nama Pekerja / NIK"     value={form.nama_pekerja_nik} />
+                {form.nik_pekerja && <F label="NIK Pekerja" value={form.nik_pekerja} />}
                 <F label="Lokasi Pekerjaan"       value={form.lokasi_pekerjaan} />
                 <F label="Tanggal Pelaksanaan"    value={formatDate(form.tanggal_pelaksanaan)} />
                 <F label="Waktu Pukul"            value={formatTime(form.waktu_pukul)} />
@@ -528,13 +684,34 @@ export default function ApprovalDetailPage({
                   {(x.m || x.s) && <span className="text-xs text-slate-400 shrink-0">{formatTime(x.m)}–{formatTime(x.s)}</span>}
                 </div>
               ))}
+
+              {/* Painting: Spray / Non Spray — khusus Workshop */}
+              {isWorkshop && (isTruthy(form.painting_spray) || isTruthy(form.painting_non_spray)) && (
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {isTruthy(form.painting_spray)    && <span className="px-2 py-1 bg-orange-50 border border-orange-200 text-orange-700 rounded text-xs font-semibold">SPRAY</span>}
+                  {isTruthy(form.painting_non_spray) && <span className="px-2 py-1 bg-orange-50 border border-orange-200 text-orange-700 rounded text-xs font-semibold">NON SPRAY</span>}
+                </div>
+              )}
+
+              {/* Pekerjaan lainnya */}
+              {isTruthy(form.ada_kerja_lainnya) && (
+                <div className="mt-3 p-3 bg-slate-50 border border-slate-200 rounded-lg text-sm">
+                  <span className="font-semibold text-slate-700">Pekerjaan Lainnya: </span>
+                  <span className="text-slate-600">{form.jenis_kerjaan_lainnya || "-"}</span>
+                </div>
+              )}
+
               <div className="mt-3 flex flex-wrap gap-1.5">
-                {isTruthy(form.ruang_tertutup)         && <span className="px-2 py-0.5 bg-red-50 text-red-600 text-xs rounded-full border border-red-200">Ruang Tertutup</span>}
-                {isTruthy(form.bahan_mudah_terbakar)   && <span className="px-2 py-0.5 bg-red-50 text-red-600 text-xs rounded-full border border-red-200">Bahan Mudah Terbakar</span>}
-                {isTruthy(form.gas_bejana_tangki)      && <span className="px-2 py-0.5 bg-red-50 text-red-600 text-xs rounded-full border border-red-200">Gas/Bejana/Tangki</span>}
-                {isTruthy(form.height_work)            && <span className="px-2 py-0.5 bg-red-50 text-red-600 text-xs rounded-full border border-red-200">Ketinggian</span>}
-                {isTruthy(form.cairan_hydrocarbon)     && <span className="px-2 py-0.5 bg-red-50 text-red-600 text-xs rounded-full border border-red-200">Hydrocarbon</span>}
+                {areaBerisikoBadges.filter(b => b.active).map(b => (
+                  <span key={b.label} className="px-2 py-0.5 bg-red-50 text-red-600 text-xs rounded-full border border-red-200">{b.label}</span>
+                ))}
               </div>
+              {form.bahaya_lain && (
+                <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg text-sm">
+                  <span className="font-semibold text-red-700">Bahaya Lain: </span>
+                  <span className="text-red-700">{form.bahaya_lain}</span>
+                </div>
+              )}
             </Sec>
 
             <Sec title="Bagian 3: Upaya Pencegahan">
@@ -560,6 +737,18 @@ export default function ApprovalDetailPage({
                   <BF label="Fire watch terlatih pakai APAR"      value={form.firwatch_terlatih} />
                 </div>
               </div>
+
+              {/* Fire Blanket / Perisai Metal — khusus Hot Work */}
+              {isHotWork && (form.kondisi_fire_blanket !== null && form.kondisi_fire_blanket !== undefined) && (
+                <div className="mt-4 pt-4 border-t border-slate-200">
+                  <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Fire Blanket / Perisai Metal</p>
+                  <div className="grid grid-cols-2 gap-4">
+                    <F label="Kondisi" value={isTruthy(form.kondisi_fire_blanket) ? "Layak" : "Tidak Layak"} />
+                    <F label="Jumlah"  value={form.jumlah_fire_blanket ?? "-"} />
+                  </div>
+                </div>
+              )}
+
               {form.permintaan_tambahan && (
                 <div className="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm">
                   <span className="font-semibold text-amber-700">Permintaan Tambahan: </span>
@@ -570,7 +759,7 @@ export default function ApprovalDetailPage({
           </>
         ) : (
           <>
-            <Sec title="Informasi Pekerjaan di Ketinggian">
+            <Sec title="Bagian 1: Informasi Pekerjaan di Ketinggian">
               <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                 <F label="Tipe Petugas"           value={getTipeLabel(form.tipe_perusahaan || form.petugas_ketinggian)} />
                 <F label="Deskripsi Pekerjaan"    value={form.deskripsi_pekerjaan} />
@@ -578,29 +767,164 @@ export default function ApprovalDetailPage({
                 <F label="Tanggal Pelaksanaan"    value={formatDate(form.tanggal_pelaksanaan)} />
                 <F label="Waktu Mulai"            value={formatTime(form.waktu_mulai)} />
                 <F label="Waktu Selesai"          value={formatTime(form.waktu_selesai)} />
-                <F label="Pengawas Kontraktor"    value={form.nama_pengawas_kontraktor} />
-                <F label="Pengawas Departemen"    value={form.nama_pengawas_departemen} />
-                <F label="Departemen"             value={form.nama_departemen} />
+                {isEksternal ? (
+                  <F label="Pengawas Kontraktor"  value={form.nama_pengawas_kontraktor} />
+                ) : (
+                  <>
+                    <F label="Departemen"            value={form.nama_departemen} />
+                    <F label="Pengawas Departemen"   value={form.nama_pengawas_departemen} />
+                  </>
+                )}
               </div>
             </Sec>
 
-            <Sec title="Pengecekan Keselamatan">
+            <Sec title="Bagian 2: Nama Petugas Ketinggian & Status Kesehatan">
+              <PetugasKetinggianSection form={form} />
+            </Sec>
+
+            <Sec title="Bagian 3: Peminjaman APD">
+              <div className="space-y-0">
+                <BF label="Kunci Pagar Tangga Listrik" value={form.ada_kunci_pagar} />
+                <BF label="Rompi Ketinggian"           value={form.ada_rompi_ketinggian} />
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-3">
+                {isTruthy(form.ada_rompi_ketinggian) && (
+                  <F label="No. Rompi" value={form.no_rompi ?? "-"} />
+                )}
+                <F label="Jumlah Safety Helmet"      value={form.jumlah_safety_helmet ?? "-"} />
+                <F label="Jumlah Full Body Harness"  value={form.jumlah_full_body_harness ?? "-"} />
+              </div>
+            </Sec>
+
+            <Sec title="Bagian 4: Keselamatan Kerja Ketinggian">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8">
                 <div>
-                  <BF label="Area kerja aman"                  value={form.area_diperiksa_aman} />
-                  <BF label="Paham prosedur kebakaran"         value={form.paham_cara_menggunakan_alat_pemadam_kebakaran} />
-                  <BF label="Ada pekerjaan listrik"            value={form.ada_kerja_listrik} />
-                  <BF label="Prosedur LOTO"                    value={form.prosedur_loto} />
-                  <BF label="Safety line baik"                 value={form.safetyline_tersedia} />
+                  <BF label="Area kerja diperiksa dan aman"                       value={form.area_diperiksa_aman} />
+                  <BF label="Paham cara menggunakan alat pemadam kebakaran"       value={form.paham_cara_menggunakan_alat_pemadam_kebakaran} />
+                  <BF label="Ada pekerjaan listrik"                               value={form.ada_kerja_listrik} />
+                  <BF label="Prosedur LOTO diterapkan"                            value={form.prosedur_loto} />
+                  <BF label="Menutupi area bawah dengan prisai"                   value={form.menutupi_area_bawah_prisai} />
+                  <BF label="Safety line tersedia"                                value={form.safetyline_tersedia} />
                 </div>
                 <div>
-                  <BF label="Webbing harness baik"             value={form.webbing_kondisi_baik} />
-                  <BF label="D-Ring baik"                      value={form.dring_kondisi_baik} />
-                  <BF label="Snap Hook baik"                   value={form.snap_hook_kondisi_baik} />
-                  <BF label="Helm sesuai standar"              value={form.helm_sesuai_sop} />
-                  <BF label="Rambu safety tersedia"            value={form.rambu2_tersedia} />
+                  <BF label="Alat bantu kerja dalam kondisi aman"                 value={form.alat_bantu_kerja_aman} />
+                  <BF label="Menggunakan rompi saat bekerja"                      value={form.menggunakan_rompi} />
+                  <BF label="Beban tidak melebihi 5 kg"                           value={form.beban_tidak_5kg} />
+                  <BF label="Helm sesuai standar SOP"                             value={form.helm_sesuai_sop} />
+                  <BF label="Rambu-rambu keselamatan tersedia"                    value={form.rambu2_tersedia} />
                 </div>
               </div>
+            </Sec>
+
+            <Sec title="Bagian 5: Pengecekan Helm, Body Harness & Lanyard">
+              {harnessAlreadyApproved ? (
+                // ── Sudah diperiksa Admin K3 — tampilkan hasil, read-only untuk semua role ──
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8">
+                  <div>
+                    <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Helm</p>
+                    <BF label="Helm kondisi baik"                value={form.helm_kondisi_baik} />
+                    <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1 mt-3">Body Harness</p>
+                    <BF label="Webbing kondisi baik"            value={form.webbing_kondisi_baik} />
+                    <BF label="D-Ring kondisi baik"              value={form.dring_kondisi_baik} />
+                    <BF label="Adjustment Buckle (Gesper) baik"  value={form.gesper_kondisi_baik} />
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Lanyard</p>
+                    <BF label="Absorber & Timbles kondisi baik"  value={form.absorter_dan_timbes_kondisi_baik} />
+                    <BF label="Snap Hook kondisi baik"           value={form.snap_hook_kondisi_baik} />
+                    <BF label="Rope Lanyard kondisi baik"        value={form.rope_lanyard_kondisi_baik} />
+                  </div>
+                  {form.admin_k3_approved_by && (
+                    <div className="md:col-span-2 mt-3 pt-3 border-t border-slate-100 flex items-center gap-1.5">
+                      <CheckCircle className="w-3.5 h-3.5 text-green-500 shrink-0" />
+                      <span className="text-xs text-slate-500">
+                        Diperiksa &amp; disetujui oleh Admin K3: <strong className="text-slate-700">{form.admin_k3_approved_by}</strong>
+                      </span>
+                    </div>
+                  )}
+                </div>
+              ) : isAdminK3TurnForHarness ? (
+                // ── Giliran Admin K3 — checklist interaktif, tersimpan saat approve ──
+                <div className="space-y-4">
+                  <div className="flex items-start gap-2 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2.5">
+                    <Info className="w-4 h-4 text-blue-500 shrink-0 mt-0.5" />
+                    <p className="text-xs text-blue-700">
+                      Lakukan pengecekan fisik Helm, Body Harness &amp; Lanyard, lalu centang item yang kondisinya baik. Checklist ini akan tersimpan otomatis saat Anda menekan tombol <strong>Setujui (Admin K3)</strong> di bawah.
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Helm</p>
+                    <label className="flex items-start gap-3 cursor-pointer p-3 rounded-xl hover:bg-slate-50 transition-colors">
+                      <input
+                        type="checkbox"
+                        checked={harness.helm}
+                        onChange={(e) => setHarness((prev) => ({ ...prev, helm: e.target.checked }))}
+                        className="w-5 h-5 rounded border-slate-300 text-orange-500 focus:ring-orange-400 shrink-0 mt-0.5"
+                      />
+                      <div>
+                        <span className="text-sm font-semibold text-slate-700">Helm</span>
+                        <p className="text-xs text-slate-500 mt-0.5">Kondisi baik (tidak retak/pecah, tali pengait masih kokoh, ukuran sesuai kepala petugas)</p>
+                      </div>
+                    </label>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8">
+                    <div>
+                      <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Body Harness</p>
+                      <div className="space-y-1">
+                        {[
+                          { key: "webbing", label: "Webbing", desc: "Kondisi jahitan baik (tidak lepas, tidak berserabut)" },
+                          { key: "dring",   label: "D-Ring",  desc: "Kondisi baik (tidak retak/bengkok/berkarat, dapat diputar bebas/fleksibel)" },
+                          { key: "gesper",  label: "Adjustment Buckle (Gesper)", desc: "Kondisi baik (tidak retak/bengkok/berkarat, dapat mengunci sempurna)" },
+                        ].map((item) => (
+                          <label key={item.key} className="flex items-start gap-3 cursor-pointer p-3 rounded-xl hover:bg-slate-50 transition-colors">
+                            <input
+                              type="checkbox"
+                              checked={(harness as any)[item.key]}
+                              onChange={(e) => setHarness((prev) => ({ ...prev, [item.key]: e.target.checked }))}
+                              className="w-5 h-5 rounded border-slate-300 text-orange-500 focus:ring-orange-400 shrink-0 mt-0.5"
+                            />
+                            <div>
+                              <span className="text-sm font-semibold text-slate-700">{item.label}</span>
+                              <p className="text-xs text-slate-500 mt-0.5">{item.desc}</p>
+                            </div>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Lanyard</p>
+                      <div className="space-y-1">
+                        {[
+                          { key: "absorber", label: "Absorber & Timbles", desc: "Kondisi baik (sarung penutup tidak rusak, terpasang tepat pada ujung mata sambungan)" },
+                          { key: "snapHook", label: "Snap Hook",          desc: "Kondisi baik (tidak retak/bengkok/berkarat, dapat terkunci dengan sempurna)" },
+                          { key: "rope",     label: "Rope Lanyard",       desc: "Kondisi baik (tidak berserabut, fiber tidak aus/terpotong)" },
+                        ].map((item) => (
+                          <label key={item.key} className="flex items-start gap-3 cursor-pointer p-3 rounded-xl hover:bg-slate-50 transition-colors">
+                            <input
+                              type="checkbox"
+                              checked={(harness as any)[item.key]}
+                              onChange={(e) => setHarness((prev) => ({ ...prev, [item.key]: e.target.checked }))}
+                              className="w-5 h-5 rounded border-slate-300 text-orange-500 focus:ring-orange-400 shrink-0 mt-0.5"
+                            />
+                            <div>
+                              <span className="text-sm font-semibold text-slate-700">{item.label}</span>
+                              <p className="text-xs text-slate-500 mt-0.5">{item.desc}</p>
+                            </div>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                // ── Belum giliran Admin K3 (SPV/Kontraktor, atau role lain sebelum Admin K3) ──
+                <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg border border-slate-200">
+                  <Lock className="w-5 h-5 text-slate-400 shrink-0" />
+                  <span className="text-sm text-slate-600">
+                    Pengecekan Helm, Body Harness &amp; Lanyard dilakukan dan disetujui oleh <strong>Admin K3</strong> pada tahap approval berikutnya.
+                  </span>
+                </div>
+              )}
             </Sec>
           </>
         )}
@@ -667,6 +991,16 @@ export default function ApprovalDetailPage({
                     placeholder="Jelaskan alasan penolakan secara spesifik..."
                     className="w-full px-3 py-2 border border-red-300 rounded-lg text-sm focus:ring-2 focus:ring-red-400 focus:border-transparent text-black resize-none"
                   />
+                </div>
+              )}
+
+              {/* Peringatan halus: Admin K3 belum mencentang seluruh checklist harness */}
+              {isAdminK3TurnForHarness && !showReject && Object.values(harness).some((v) => !v) && (
+                <div className="mb-5 flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2.5">
+                  <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                  <p className="text-xs text-amber-700">
+                    Belum semua item Helm, Body Harness &amp; Lanyard dicentang. Anda tetap bisa menyetujui, namun pastikan item yang tidak dicentang memang belum diperiksa atau kondisinya tidak baik.
+                  </p>
                 </div>
               )}
 

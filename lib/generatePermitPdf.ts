@@ -1006,9 +1006,10 @@ function buildHeightWork(doc: Doc, data: any) {
     checkGrid(doc, petugasList.map(p => ({ lbl: `${p.idx}. ${p.nama}`, val: p.sehat })), rx, rw);
   }
 
-  // Body Harness & Lanyard
-  sec(doc, "Cek Harness & Lanyard", rx, rw);
+  // Helm, Body Harness & Lanyard
+  sec(doc, "Cek Helm, Harness & Lanyard", rx, rw);
   checkGrid(doc, [
+    { lbl: "Helm kondisi baik",       val: data.helm_kondisi_baik },
     { lbl: "Webbing kondisi baik",    val: data.webbing_kondisi_baik },
     { lbl: "D-Ring kondisi baik",     val: data.dring_kondisi_baik },
     { lbl: "Gesper kondisi baik",     val: data.gesper_kondisi_baik },

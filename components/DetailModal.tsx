@@ -448,10 +448,12 @@ export default function DetailModal({ isOpen, onClose, formId, formType }: Detai
             </div>
           </div>
         </MS>
-        <MS title="Bagian 5: Pengecekan Body Harness & Lanyard">
+        <MS title="Bagian 5: Pengecekan Helm, Body Harness & Lanyard">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8">
             <div>
-              <h5 className="text-xs font-semibold text-slate-600 mb-2">Body Harness</h5>
+              <h5 className="text-xs font-semibold text-slate-600 mb-2">Helm</h5>
+              <BF label="Helm - Kondisi baik"    value={p.helm_kondisi_baik} />
+              <h5 className="text-xs font-semibold text-slate-600 mb-2 mt-3">Body Harness</h5>
               <BF label="Webbing - Kondisi baik" value={p.webbing_kondisi_baik} />
               <BF label="D-Ring - Kondisi baik"  value={p.dring_kondisi_baik} />
               <BF label="Gesper - Kondisi baik"  value={p.gesper_kondisi_baik} />

@@ -1,4 +1,7 @@
 // app/api/forms/height-work/[id]/route.ts
+// UPDATED: Tambah kolom helm_kondisi_baik ke PUT (edit & resubmit) —
+//          Bagian 5 sekarang juga punya checklist Helm, diisi Admin K3
+//          saat approval seperti item Body Harness/Lanyard lainnya.
 import { NextRequest, NextResponse } from 'next/server';
 import { query, queryOne } from '@/lib/db';
 import { verifyToken, COOKIE_NAME } from '@/lib/auth';
@@ -92,6 +95,7 @@ export async function PUT(
       beban_tidak_5kg, helm_sesuai_sop, rambu2_tersedia,
       webbing_kondisi_baik, dring_kondisi_baik, gesper_kondisi_baik,
       absorter_dan_timbes_kondisi_baik, snap_hook_kondisi_baik, rope_lanyard_kondisi_baik,
+      helm_kondisi_baik,
       spv_terkait, nama_kontraktor, sfo, mr_pga_mgr,
       status,
     } = body;
@@ -163,16 +167,17 @@ export async function PUT(
         absorter_dan_timbes_kondisi_baik = $51,
         snap_hook_kondisi_baik = $52,
         rope_lanyard_kondisi_baik = $53,
-        spv_terkait = $54,
-        nama_kontraktor = $55,
-        sfo = $56,
-        mr_pga_mgr = $57,
-        status = $58,
+        helm_kondisi_baik = $54,
+        spv_terkait = $55,
+        nama_kontraktor = $56,
+        sfo = $57,
+        mr_pga_mgr = $58,
+        status = $59,
         catatan_reject = NULL,
         approved_by = NULL,
         approved_at = NULL,
-        updated_at = $59
-       WHERE id_form = $60
+        updated_at = $60
+       WHERE id_form = $61
        RETURNING id_form, status`,
       [
         petugas_ketinggian,
@@ -218,6 +223,7 @@ export async function PUT(
         absorter_dan_timbes_kondisi_baik,
         snap_hook_kondisi_baik,
         rope_lanyard_kondisi_baik,
+        helm_kondisi_baik,
         spv_terkait,
         nama_kontraktor,
         sfo,

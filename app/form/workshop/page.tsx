@@ -16,7 +16,8 @@ interface FormData {
   tipePerusahaan: "internal" | "eksternal";
   noRegistrasi: string;
   namaKontraktor: string;
-  namaNIK: string;
+  namaPekerja: string;
+  nikPekerja: string;
   lokasi: string;
   tanggalPelaksanaan: string;
   waktuPukul: string;
@@ -85,7 +86,7 @@ const emptyWork = (): WorkDetail => ({ detail: "", mulai: "", selesai: "" });
 
 const defaultForm = (): FormData => ({
   tipePerusahaan: "internal",
-  noRegistrasi: "", namaKontraktor: "", namaNIK: "", lokasi: "", tanggalPelaksanaan: "", waktuPukul: "",
+  noRegistrasi: "", namaKontraktor: "", namaPekerja: "", nikPekerja: "", lokasi: "", tanggalPelaksanaan: "", waktuPukul: "",
   namaFireWatch: "", nikFireWatch: "",
   jenisPekerjaan: {
     preventive: false, tangki: false, panel: false,
@@ -159,6 +160,10 @@ export default function WorkshopPermitForm() {
     // Validate Fire Watch selection
     if (!formData.namaFireWatch || !formData.nikFireWatch) {
       setValidationError("Fire Watch wajib dipilih");
+      return;
+    }
+    if (!formData.namaPekerja.trim() || !formData.nikPekerja.trim()) {
+      setValidationError("Nama Pekerja dan NIK wajib diisi");
       return;
     }
 
@@ -310,9 +315,15 @@ export default function WorkshopPermitForm() {
               />
             </div>
 
-            <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-2">Nama Pekerja / NIK *</label>
-              <input type="text" value={formData.namaNIK} onChange={e => setFormData(p => ({ ...p, namaNIK: e.target.value }))} className={inputCls} placeholder="Nama atau NIK" />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">Nama Pekerja *</label>
+                <input type="text" value={formData.namaPekerja} onChange={e => setFormData(p => ({ ...p, namaPekerja: e.target.value }))} className={inputCls} placeholder="Nama pekerja" />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">NIK *</label>
+                <input type="text" value={formData.nikPekerja} onChange={e => setFormData(p => ({ ...p, nikPekerja: e.target.value }))} className={inputCls} placeholder="NIK pekerja" />
+              </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

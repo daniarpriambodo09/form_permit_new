@@ -610,9 +610,26 @@ export default function EditableForms({ formType, formData, onChange }: Editable
           </div>
         </div>
 
-        {/* Bagian 5: Pengecekan Body Harness */}
+        {/* Bagian 5: Pengecekan Helm & Body Harness */}
         <div className="border border-slate-200 rounded-lg p-4">
-          <h4 className="font-bold text-slate-800 mb-3 text-sm">Bagian 5: Pengecekan Body Harness</h4>
+          <h4 className="font-bold text-slate-800 mb-3 text-sm">Bagian 5: Pengecekan Helm, Body Harness & Lanyard</h4>
+
+          <h5 className="text-xs font-semibold text-slate-600 mb-2">Helm</h5>
+          <div className="space-y-2 mb-4">
+            {[
+              { key: "helm_kondisi_baik", label: "Helm - Kondisi baik" },
+            ].map(({ key, label }) => (
+              <label key={key} className="flex items-center gap-3 cursor-pointer p-2 hover:bg-slate-50 rounded">
+                <input
+                  type="checkbox"
+                  checked={localData[key] || false}
+                  onChange={(e) => handleToggle(key, e.target.checked)}
+                  className="w-4 h-4 text-orange-600 rounded border-slate-300"
+                />
+                <span className="text-sm text-slate-700">{label}</span>
+              </label>
+            ))}
+          </div>
 
           <h5 className="text-xs font-semibold text-slate-600 mb-2">Body Harness</h5>
           <div className="space-y-2 mb-4">

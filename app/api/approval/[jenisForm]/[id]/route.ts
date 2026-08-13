@@ -12,6 +12,17 @@
 //        dan setelah reject (ke pembuat form).
 //        Email dikirim secara fire-and-forget — tidak memblokir response.
 //
+// ADDED: Height-work — Pengecekan Helm, Body Harness & Lanyard (Bagian 5) TIDAK LAGI
+//        diisi oleh worker/administrator departemen di form pembuatan.
+//        Checklist ini sekarang diisi oleh role "admin_k3" pada saat approve,
+//        dikirim via body.harness_checklist. Kolom yang diupdate:
+//          helm_kondisi_baik,
+//          webbing_kondisi_baik, dring_kondisi_baik, gesper_kondisi_baik,
+//          absorter_dan_timbes_kondisi_baik, snap_hook_kondisi_baik,
+//          rope_lanyard_kondisi_baik
+//        Hanya berlaku untuk formType === 'height-work' && userRole === 'admin_k3'
+//        && action === 'approve'. Role lain tidak dapat mengubah kolom ini.
+//
 // WORKFLOW — stage dimulai dari 1:
 //   Hot-work & Workshop INTERNAL:  1=spv → 2=admin_k3 → 3=sfo → 4=smr
 //   Hot-work & Workshop EKSTERNAL: 1=kontraktor → 2=spv → 3=admin_k3 → 4=sfo → 5=smr
@@ -54,6 +65,17 @@ const FORM_CONFIG: Record<FormType, {
     pgaByCol:   'mr_pga_approved_by',
   },
 };
+
+// ── Kolom checklist Helm, Body Harness & Lanyard (height-work, diisi Admin K3) ──
+const HARNESS_CHECKLIST_COLUMNS = [
+  'helm_kondisi_baik',
+  'webbing_kondisi_baik',
+  'dring_kondisi_baik',
+  'gesper_kondisi_baik',
+  'absorter_dan_timbes_kondisi_baik',
+  'snap_hook_kondisi_baik',
+  'rope_lanyard_kondisi_baik',
+] as const;
 
 const TIPE_EXPR = `CASE
   WHEN tipe_perusahaan IN ('internal','eksternal') THEN tipe_perusahaan
@@ -334,6 +356,18 @@ export async function PATCH(
     if (userRole === 'spv' && (formType === 'hot-work' || formType === 'workshop')) {
       setClauses.push(`jabatan_pemberi_izin = $${paramIdx++}`); queryParams.push(user.jabatan || null);
       setClauses.push(`nik_pemberi_ijin     = $${paramIdx++}`); queryParams.push(String(user.userId) || null);
+    }
+
+    // ── Height-work: Admin K3 mengisi checklist Body Harness & Lanyard
+    //    (Bagian 5) bersamaan dengan approve-nya. Hanya role admin_k3
+    //    yang boleh menulis kolom-kolom ini; role lain diabaikan meski
+    //    body.harness_checklist ikut terkirim (mis. dari client lama).
+    if (formType === 'height-work' && userRole === 'admin_k3' && body.harness_checklist && typeof body.harness_checklist === 'object') {
+      const hc = body.harness_checklist as Record<string, any>;
+      for (const col of HARNESS_CHECKLIST_COLUMNS) {
+        setClauses.push(`${col} = $${paramIdx++}`);
+        queryParams.push(hc[col] === true);
+      }
     }
 
     if (isLastStage) {

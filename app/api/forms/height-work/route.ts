@@ -2,6 +2,8 @@
 // UPDATED: Tambah kolom perlu_jsa dan jsa_file_url untuk fitur Upload JSA.
 // FIX: Tambah kolom tipe_perusahaan ke INSERT agar alur approval tersimpan dengan benar.
 // ADDED: Email notification ke approver pertama saat form di-submit.
+// ADDED: Tambah kolom helm_kondisi_baik (Bagian 5 — checklist Helm, diisi
+//        Admin K3 saat approval, sama seperti webbing/dring/gesper/dst).
 
 import { NextRequest, NextResponse } from 'next/server';
 import { query, queryOne } from '@/lib/db';
@@ -124,6 +126,7 @@ export async function POST(req: NextRequest) {
         beban_tidak_5kg, helm_sesuai_sop, rambu2_tersedia,
         webbing_kondisi_baik, dring_kondisi_baik, gesper_kondisi_baik,
         absorter_dan_timbes_kondisi_baik, snap_hook_kondisi_baik, rope_lanyard_kondisi_baik,
+        helm_kondisi_baik,
         spv_terkait, nama_kontraktor, sfo, mr_pga_mgr,
         perlu_jsa, jsa_file_url,
         user_id
@@ -147,9 +150,10 @@ export async function POST(req: NextRequest) {
         $49, $50,
         $51, $52, $53, $54, $55, $56, $57, $58, $59, $60, $61,
         $62, $63, $64, $65, $66, $67,
-        $68, $69, $70, $71,
-        $72, $73,
-        $74
+        $68,
+        $69, $70, $71, $72,
+        $73, $74,
+        $75
       )`,
       [
         idForm, now, pelaksanaan, status,
@@ -195,6 +199,7 @@ export async function POST(req: NextRequest) {
         formData.lanyardAbsorber       ?? false,
         formData.lanyardSnapHook       ?? false,
         formData.lanyardRope           ?? false,
+        formData.helmKondisiBaik       ?? false,
         null, null, null, null,
         perluJsa, jsaFileUrl,
         userId,
