@@ -37,6 +37,7 @@ interface FormItem {
   admin_k3_approved?: boolean;
   sfo_approved?: boolean;
   mr_pga_approved?: boolean; // kolom DB tetap, bukan pga_approved
+  id_ijin_kerja?: string | null;
 }
 
 interface FormCounts {
@@ -469,7 +470,7 @@ export default function ApprovalPage() {
                       )}
                     </div>
 
-                    <Link href={`/approval/${form.jenis_form}/${form.id_form}`}
+                    <Link href={form.id_ijin_kerja ? `/approval/external/${form.id_ijin_kerja}` : `/approval/${form.jenis_form}/${form.id_form}`}
                       className="shrink-0 flex items-center gap-1.5 px-4 py-2.5
                                  bg-orange-600 hover:bg-orange-700 text-white
                                  rounded-lg text-sm font-semibold transition-colors">

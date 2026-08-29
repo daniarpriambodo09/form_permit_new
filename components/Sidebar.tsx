@@ -6,6 +6,10 @@
 // - Mobile (<lg): jadi drawer overlay, dipicu tombol hamburger fixed di pojok kiri atas.
 // - Auth: pola sama seperti halaman lain di app ini — baca cache sessionStorage dulu,
 //   lalu refresh dari /api/auth/me.
+// - Isi menu (grup + item) TIDAK didefinisikan di file ini — diambil dari
+//   getNavSections() di lib/nav-config.ts, supaya Sidebar & kartu "Akses
+//   Cepat" di /home selalu konsisten. Untuk menambah menu baru (misalnya
+//   "Kelola Departemen"), edit lib/nav-config.ts, bukan file ini.
 "use client";
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";

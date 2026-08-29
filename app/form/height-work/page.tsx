@@ -1,53 +1,18 @@
 // app/form/height-work/page.tsx
-// UPDATED: Standardisasi seluruh input waktu menjadi format 24 jam (HH:mm),
-// menggunakan komponen Time24Input (dropdown jam/menit) sehingga AM/PM
-// tidak akan pernah muncul di browser/device manapun.
-// Data waktu lama (jika ada yang tersimpan dengan AM/PM) tetap bisa dibaca
-// melalui normalizeTo24h(), dan saat form disimpan ulang akan otomatis
-// tersimpan dalam format 24 jam ("HH:mm").
-// UPDATED: Bagian 5 (Pengecekan Body Harness & Lanyard) DI-DISABLE.
-// Worker/administrator departemen TIDAK LAGI mengisi checklist ini —
-// pengecekan fisik dipindahkan ke tahap approval Admin K3
-// (lihat /approval/height-work/[id]). Checklist di bagian ini murni
-// referensi visual dan tidak dapat diinteraksikan. Nilai yang dikirim
-// tetap default false; nilai final akan ditimpa oleh Admin K3 saat approve.
-// UPDATED: Bagian 5 sekarang juga menyertakan checklist "Helm" (item baru,
-// disabled sama seperti item Body Harness/Lanyard lainnya), karena
-// sebelumnya belum ada checklist untuk helm. Nilai final juga diisi oleh
-// Admin K3 saat approval.
-//
-// UPDATED (Bagian 2 — Nama Petugas Ketinggian & Status Kesehatan):
-// - Tipe Petugas EKSTERNAL: TIDAK BERUBAH — tetap input nama manual +
-//   upload foto lisensi manual (LisensiUploadButton, seperti sebelumnya).
-// - Tipe Petugas INTERNAL: Bagian 2 sekarang jadi DROPDOWN pekerja yang
-//   diambil dari Master Lisence (GET /api/master-lisence/workers),
-//   difilter berdasarkan jenisKerja=height_work DAN departemen yang
-//   dipilih di Bagian 1 (namaDepartemen). Admin/pengawas tinggal pilih
-//   nama pekerja dari dropdown, centang berbadan sehat, dan lisence-nya
-//   otomatis terisi dari data master (bisa dilihat lewat tombol "Lihat
-//   Lisensi", tidak perlu upload manual lagi).
-// - Field yang dikirim ke backend (namaPetugas[], berbadanSehat[],
-//   fotoLisensi[]) TETAP SAMA BENTUKNYA di kedua mode, jadi tidak perlu
-//   perubahan apa pun di app/api/forms/height-work/route.ts.
-// UPDATED: Bagian 1 — "Nama Pengawas Departemen" diubah dari dropdown
-// (berdasarkan DEPT_SPV_MAP[].spv) menjadi input teks manual. Field
-// "Nama Departemen" tetap dropdown (masih memakai DEPT_SPV_MAP untuk
-// daftar departemen, dan tetap dipakai untuk memfilter dropdown pekerja
-// di Bagian 2). Tidak ada perubahan di backend — namaPengawasDepartemen
-// tetap dikirim & disimpan sebagai string biasa.
+
 "use client";
-import { useState, useRef, useCallback, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useRef, useCallback, useEffect, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
   AlertTriangle, Shield, ChevronRight, AlertCircle,
   CheckCircle, Loader2, Camera, Upload, X, ZoomIn, ImageIcon, Lock,
   Eye, FileText, CalendarClock,
 } from "lucide-react";
-import JsaUploadSection, {
-  type JsaFileInfo,
-  type JsaUploadStatus as JsaStatus,
-} from "@/components/JsaUploadSection";
+import JsaUploadSection, { type JsaFileInfo, type JsaUploadStatus as JsaStatus } from "@/components/JsaUploadSection";
+import LinkedJsaSection from "@/components/LinkedJsaSection";
+import { createEmptyJsa } from "@/components/JsaBuilderSection";
+import type { JsaData } from "@/components/JsaBuilderSection";
 import TimeInput24, { normalizeTo24h } from "@/components/Time24Input";
 
 type UploadStatus = "idle" | "uploading" | "success" | "error";
@@ -249,8 +214,11 @@ const DEPT_SPV_MAP: { dept: string; spv: string[] }[] = [
   { dept: "PGA", spv: ["ARIS CAHYONO", "AGUNG INDRAYANA"] },
 ];
 
-export default function HeightWorkFormPage() {
+function HeightWorkFormPageInner() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const idIjinKerja = searchParams.get("id_ijin_kerja");
+
   const [tipePerusahaan, setTipePerusahaan] = useState<"internal" | "eksternal">("internal");
   const [deskripsiPekerjaan, setDeskripsiPekerjaan] = useState("");
   const [lokasi, setLokasi] = useState("");
@@ -312,6 +280,15 @@ export default function HeightWorkFormPage() {
   const [jsaFile, setJsaFile] = useState<JsaFileInfo | null>(null);
   const [jsaUploadStatus, setJsaUploadStatus] = useState<JsaStatus>("idle");
   const [jsaUploadError, setJsaUploadError] = useState("");
+  const [jsaData, setJsaData] = useState<JsaData>(createEmptyJsa());
+
+  // ── Kunci tipePerusahaan ke eksternal jika form ini dibuka dari
+  // Ijin Kerja Eksternal (via ?id_ijin_kerja=...) ──────────────────────
+  useEffect(() => {
+    if (idIjinKerja) {
+      setTipePerusahaan("eksternal");
+    }
+  }, [idIjinKerja]);
 
   // ── Reset semua baris Bagian 2 (dipakai saat ganti tipe/departemen) ─────
   const resetPetugasRows = useCallback(() => {
@@ -321,6 +298,17 @@ export default function HeightWorkFormPage() {
     setUploadStatus(Array(10).fill("idle" as UploadStatus));
     setUploadError(Array(10).fill(""));
     setSelectedNik(Array(10).fill(null));
+  }, []);
+
+  const [departemenOptions, setDepartemenOptions] = useState<string[]>([]);
+  const [loadingDept, setLoadingDept] = useState(true);
+
+  useEffect(() => {
+    fetch("/form-permit/api/departemen?activeOnly=1", { credentials: "include" })
+      .then((r) => (r.ok ? r.json() : { data: [] }))
+      .then((d) => setDepartemenOptions((d.data || []).map((x: any) => x.nama_departemen)))
+      .catch(() => setDepartemenOptions([]))
+      .finally(() => setLoadingDept(false));
   }, []);
 
   // ── Fetch daftar pekerja dari Master Lisence saat Internal + departemen dipilih ──
@@ -439,6 +427,10 @@ export default function HeightWorkFormPage() {
     // ── JSA fields ──
     perluJsa,
     jsaFileUrl: jsaFile?.url ?? null,
+    ...(idIjinKerja ? { jsaData } : {}),
+    // ── Relasi Ijin Kerja Eksternal (kosong/null jika form ini dibuka
+    // langsung tanpa lewat halaman Ijin Kerja Eksternal) ────────────────
+    idIjinKerja,
   });
 
   const handleSaveDraft = async () => {
@@ -482,8 +474,8 @@ export default function HeightWorkFormPage() {
     }
 
     // ── Validasi JSA ──────────────────────────────────────────
-    if (perluJsa && (!jsaFile || jsaUploadStatus !== "success")) {
-      setError("File JSA wajib diupload sebelum mengajukan form");
+    if (idIjinKerja && perluJsa && (!jsaData.area.trim() || !jsaData.jenisPekerjaan.trim() || !jsaData.pic.trim() || !jsaData.petugas.some((name) => name.trim()))) {
+      setError("Area, Jenis Pekerjaan, PIC, dan minimal satu Petugas wajib diisi pada JSA");
       document.getElementById("bagian-jsa")?.scrollIntoView({ behavior: "smooth", block: "center" });
       return;
     }
@@ -567,6 +559,17 @@ export default function HeightWorkFormPage() {
             </div>
           )}
 
+          {/* Banner relasi ke Ijin Kerja Eksternal — hanya tampil jika form
+              ini dibuka lewat ?id_ijin_kerja=... */}
+          {idIjinKerja && (
+            <div className="bg-purple-50 border border-purple-200 rounded-lg p-4 flex items-start gap-3">
+              <Lock className="w-5 h-5 text-purple-600 shrink-0 mt-0.5" />
+              <p className="text-sm text-purple-800">
+                Form ini akan terhubung ke Ijin Kerja Eksternal <strong className="font-mono">{idIjinKerja}</strong>. Tipe petugas otomatis dikunci ke Eksternal.
+              </p>
+            </div>
+          )}
+
           {/* BAGIAN 1 */}
           <section className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
             <div className={sectionHead}>
@@ -580,13 +583,14 @@ export default function HeightWorkFormPage() {
                     { value: "internal", label: "Internal / Karyawan PT.JAI", desc: "Alur: SPV → Admin K3 → SFO → SMR" },
                     { value: "eksternal", label: "Eksternal / Subkontraktor", desc: "Alur: Kontraktor → SPV → Admin K3 → SFO → SMR" },
                   ].map((opt) => (
-                    <label key={opt.value} className={`flex flex-col gap-1 p-3 rounded-xl border-2 cursor-pointer transition-all ${tipePerusahaan === opt.value ? "border-orange-400 bg-orange-50" : "border-slate-200 hover:border-orange-200"}`}>
+                    <label key={opt.value} className={`flex flex-col gap-1 p-3 rounded-xl border-2 transition-all ${tipePerusahaan === opt.value ? "border-orange-400 bg-orange-50" : "border-slate-200 hover:border-orange-200"} ${idIjinKerja ? "cursor-not-allowed opacity-60" : "cursor-pointer"}`}>
                       <div className="flex items-center gap-2">
                         <input
                           type="radio"
                           name="tipePerusahaan"
                           value={opt.value}
                           checked={tipePerusahaan === opt.value}
+                          disabled={!!idIjinKerja}
                           onChange={() => {
                             const val = opt.value as "internal" | "eksternal";
                             setTipePerusahaan(val);
@@ -678,7 +682,11 @@ export default function HeightWorkFormPage() {
                       className={`${inputCls} ${!namaDepartemen ? "text-slate-400" : "text-slate-800"}`}
                     >
                       <option value="" disabled>— Pilih Departemen —</option>
-                      {DEPT_SPV_MAP.map((d) => (<option key={d.dept} value={d.dept}>{d.dept}</option>))}
+                      {loadingDept ? (
+                        <option value="" disabled>Memuat departemen…</option>
+                      ) : (
+                        departemenOptions.map((d) => (<option key={d} value={d}>{d}</option>))
+                      )}
                     </select>
                   </div>
 
@@ -1000,8 +1008,14 @@ export default function HeightWorkFormPage() {
           </section>
 
           {/* ── BAGIAN 6: UPLOAD JSA ── */}
-          <section id="bagian-jsa" className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-            <JsaUploadSection
+          <section id="bagian-jsa">
+            {idIjinKerja ? <LinkedJsaSection
+              idIjinKerja={idIjinKerja}
+              enabled={perluJsa}
+              setEnabled={setPerluJsa}
+              value={jsaData}
+              setValue={setJsaData}
+            /> : <JsaUploadSection
               perluJsa={perluJsa}
               setPerluJsa={setPerluJsa}
               jsaFile={jsaFile}
@@ -1012,7 +1026,7 @@ export default function HeightWorkFormPage() {
               setJsaUploadError={setJsaUploadError}
               sectionTitle="Bagian 6: Upload JSA"
               sectionStyle="height-work"
-            />
+            />}
           </section>
 
           {error && (
@@ -1040,5 +1054,19 @@ export default function HeightWorkFormPage() {
         <MasterLisenceViewModal worker={previewWorker} onClose={() => setPreviewWorker(null)} />
       )}
     </div>
+  );
+}
+
+export default function HeightWorkFormPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center text-slate-500 text-sm">
+          Memuat formulir...
+        </div>
+      }
+    >
+      <HeightWorkFormPageInner />
+    </Suspense>
   );
 }

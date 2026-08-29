@@ -1,21 +1,199 @@
-jai_permit_db=# \d
-                          List of relations
- Schema |                 Name                  |   Type   |  Owner
---------+---------------------------------------+----------+----------
- public | form_kerja_ketinggian                 | table    | postgres
- public | form_kerja_ketinggian_backup_20260618 | table    | postgres
- public | form_kerja_ketinggian_id_seq          | sequence | postgres
- public | form_kerja_panas                      | table    | postgres
- public | form_kerja_panas_backup_20260618      | table    | postgres
- public | form_kerja_panas_id_seq               | sequence | postgres
- public | form_kerja_workshop                   | table    | postgres
- public | form_kerja_workshop_backup_20260618   | table    | postgres
- public | form_kerja_workshop_id_seq            | sequence | postgres
- public | smtp_settings                         | table    | postgres
- public | smtp_settings_id_seq                  | sequence | postgres
- public | users                                 | table    | postgres
- public | users_id_seq                          | sequence | postgres
-(13 rows)
+jai_permit_db=# \dt
+                         List of relations
+ Schema |                 Name                  | Type  |  Owner
+--------+---------------------------------------+-------+----------
+ public | departemen                            | table | postgres
+ public | form_ijin_kerja                       | table | postgres
+ public | form_kerja_ketinggian                 | table | postgres
+ public | form_kerja_ketinggian_backup_20260618 | table | postgres
+ public | form_kerja_panas                      | table | postgres
+ public | form_kerja_panas_backup_20260618      | table | postgres
+ public | form_kerja_workshop                   | table | postgres
+ public | form_kerja_workshop_backup_20260618   | table | postgres
+ public | master_lisence                        | table | postgres
+ public | smtp_settings                         | table | postgres
+ public | users                                 | table | postgres
+(11 rows)
+
+
+jai_permit_db=# \d departemen
+                                         Table "public.departemen"
+     Column      |           Type           | Collation | Nullable |                Default
+-----------------+--------------------------+-----------+----------+----------------------------------------
+ id              | integer                  |           | not null | nextval('departemen_id_seq'::regclass)
+ nama_departemen | character varying(100)   |           | not null |
+ keterangan      | text                     |           |          |
+ is_active       | boolean                  |           | not null | true
+ created_at      | timestamp with time zone |           | not null | now()
+ updated_at      | timestamp with time zone |           | not null | now()
+Indexes:
+    "departemen_pkey" PRIMARY KEY, btree (id)
+    "departemen_nama_departemen_key" UNIQUE CONSTRAINT, btree (nama_departemen)
+    "idx_departemen_active" btree (is_active)
+    "idx_departemen_nama" btree (nama_departemen)
+
+
+jai_permit_db=# \d form_ijin_kerja
+                                                  Table "public.form_ijin_kerja"
+              Column              |           Type           | Collation | Nullable |                   Default
+----------------------------------+--------------------------+-----------+----------+---------------------------------------------
+ id                               | integer                  |           | not null | nextval('form_ijin_kerja_id_seq'::regclass)
+ id_form                          | character varying(20)    |           | not null |
+ tanggal                          | timestamp with time zone |           | not null | now()
+ tanggal_pelaksanaan              | timestamp with time zone |           |          |
+ status                           | character varying(20)    |           | not null | 'draft'::character varying
+ nama_kontraktor_pekerja          | character varying(255)   |           |          |
+ nama_pengawas_pic_subkont        | character varying(255)   |           |          |
+ jumlah_tenaga_kerja              | numeric                  |           |          |
+ tgl_mulai_kerja                  | timestamp with time zone |           |          |
+ tgl_akhir_kerja_rencana          | timestamp with time zone |           |          |
+ waktu_kerja                      | time without time zone   |           |          |
+ actual_tanggal_kerja             | timestamp with time zone |           |          |
+ spek_area_workshop               | boolean                  |           | not null | false
+ spek_ruang_tertutup              | boolean                  |           | not null | false
+ spek_ketinggian                  | boolean                  |           | not null | false
+ spek_tegangan_tinggi             | boolean                  |           | not null | false
+ spek_pemakaian_loto              | boolean                  |           | not null | false
+ spek_forklift                    | boolean                  |           | not null | false
+ spek_temperatur_tinggi           | boolean                  |           | not null | false
+ deskripsi_pekerjaan              | text                     |           |          |
+ spesifikasi_lainnya              | text                     |           |          |
+ alat_mesin_potong                | boolean                  |           | not null | false
+ alat_mesin_potong_kondisi        | character varying(10)    |           |          |
+ alat_mesin_las_gerinda           | boolean                  |           | not null | false
+ alat_mesin_las_gerinda_kondisi   | character varying(10)    |           |          |
+ alat_genset                      | boolean                  |           | not null | false
+ alat_genset_kondisi              | character varying(10)    |           |          |
+ alat_tabung_gas                  | boolean                  |           | not null | false
+ alat_tabung_gas_kondisi          | character varying(10)    |           |          |
+ alat_tangga_listrik_awp          | boolean                  |           | not null | false
+ alat_tangga_listrik_awp_kondisi  | character varying(10)    |           |          |
+ alat_forklift                    | boolean                  |           | not null | false
+ alat_forklift_kondisi            | character varying(10)    |           |          |
+ alat_lift_barang                 | boolean                  |           | not null | false
+ alat_lift_barang_kondisi         | character varying(10)    |           |          |
+ alat_lainnya                     | text                     |           |          |
+ alat_lainnya_kondisi             | character varying(10)    |           |          |
+ lokasi_pekerjaan                 | text                     |           |          |
+ lokasi_dalam_gedung              | boolean                  |           | not null | false
+ lokasi_luar_gedung               | boolean                  |           | not null | false
+ lokasi_luar_pagar_gedung         | boolean                  |           | not null | false
+ lokasi_di_atas_gedung            | boolean                  |           | not null | false
+ lokasi_lainnya                   | text                     |           |          |
+ pengawas_bagian                  | character varying(255)   |           |          |
+ pic_loto_station_loto            | character varying(255)   |           |          |
+ bahan_mudah_terbakar             | boolean                  |           | not null | false
+ bahan_mudah_meledak              | boolean                  |           | not null | false
+ bahan_kimia_beracun_iritan       | boolean                  |           | not null | false
+ bahan_lainnya                    | text                     |           |          |
+ dampak_ledakan_kebakaran         | boolean                  |           | not null | false
+ dampak_jatuh_ketinggian          | boolean                  |           | not null | false
+ dampak_kepala_tertimpa           | boolean                  |           | not null | false
+ dampak_kaki_tertimpa             | boolean                  |           | not null | false
+ dampak_tumpahan_oli_bbm_b3       | boolean                  |           | not null | false
+ dampak_tersengat_listrik         | boolean                  |           | not null | false
+ dampak_terjepit_mesin            | boolean                  |           | not null | false
+ dampak_tersayat_tertusuk         | boolean                  |           | not null | false
+ dampak_infeksi_pernafasan        | boolean                  |           | not null | false
+ dampak_iritasi_mata              | boolean                  |           | not null | false
+ dampak_radiasi_sinar_las         | boolean                  |           | not null | false
+ dampak_iritasi_kulit             | boolean                  |           | not null | false
+ dampak_kebisingan                | boolean                  |           | not null | false
+ dampak_keracunan_zat_kimia       | boolean                  |           | not null | false
+ dampak_lainnya                   | text                     |           |          |
+ apd_masker                       | boolean                  |           | not null | false
+ apd_masker_kimia                 | boolean                  |           | not null | false
+ apd_kacamata_biasa               | boolean                  |           | not null | false
+ apd_kacamata_las                 | boolean                  |           | not null | false
+ apd_ear_plug                     | boolean                  |           | not null | false
+ apd_gloves                       | boolean                  |           | not null | false
+ apd_full_body_harness            | boolean                  |           | not null | false
+ apd_sarung_tangan_bintil         | boolean                  |           | not null | false
+ apd_sarung_tangan_listrik        | boolean                  |           | not null | false
+ apd_sarung_tangan_kulit          | boolean                  |           | not null | false
+ apd_helm                         | boolean                  |           | not null | false
+ apd_safety_shoes                 | boolean                  |           | not null | false
+ apd_sepatu_karet                 | boolean                  |           | not null | false
+ apd_topi_kerja                   | boolean                  |           | not null | false
+ apd_lainnya                      | text                     |           |          |
+ license_sertifikasi              | text                     |           |          |
+ apar_dry_powder                  | boolean                  |           | not null | false
+ apar_gas_cair                    | boolean                  |           | not null | false
+ apar_tidak_perlu                 | boolean                  |           | not null | false
+ apar_lainnya                     | text                     |           |          |
+ limbah_kontraktor                | boolean                  |           | not null | false
+ limbah_pt_jai                    | boolean                  |           | not null | false
+ limbah_lokasi_pt                 | character varying(255)   |           |          |
+ limbah_luar_jai                  | boolean                  |           | not null | false
+ izin_kerja_dari                  | time without time zone   |           |          |
+ izin_kerja_sampai                | time without time zone   |           |          |
+ kontraktor_pj                    | character varying(255)   |           |          |
+ spv_terkait_pj                   | character varying(255)   |           |          |
+ current_stage                    | integer                  |           |          | 1
+ security_approved                | boolean                  |           | not null | false
+ security_approved_by             | character varying(255)   |           |          |
+ security_approved_at             | timestamp with time zone |           |          |
+ security_nik                     | character varying(100)   |           |          |
+ sfo_approved                     | boolean                  |           | not null | false
+ sfo_approved_by                  | character varying(255)   |           |          |
+ sfo_approved_at                  | timestamp with time zone |           |          |
+ sfo_nik                          | character varying(100)   |           |          |
+ pga_approved                     | boolean                  |           | not null | false
+ pga_approved_by                  | character varying(255)   |           |          |
+ pga_approved_at                  | timestamp with time zone |           |          |
+ pga_nik                          | character varying(100)   |           |          |
+ handover_pengawas_lama           | character varying(255)   |           |          |
+ handover_pengawas_baru           | character varying(255)   |           |          |
+ handover_tanggal                 | timestamp with time zone |           |          |
+ handover_jam                     | character varying(20)    |           |          |
+ pernyataan_diperiksa             | boolean                  |           | not null | false
+ pengawas_pekerjaan_user          | character varying(255)   |           |          |
+ eval_area_bersih_rapi            | boolean                  |           |          |
+ eval_limbah_ditangani_baik       | boolean                  |           |          |
+ eval_instalasi_listrik_aman      | boolean                  |           |          |
+ eval_tdk_ada_kerusakan_property  | boolean                  |           |          |
+ eval_ada_tumpahan_kimia_bbm      | boolean                  |           |          |
+ eval_tdk_ada_kehilangan_property | boolean                  |           |          |
+ evaluasi_status                  | character varying(20)    |           |          |
+ evaluasi_submitted_by            | character varying(255)   |           |          |
+ evaluasi_submitted_at            | timestamp with time zone |           |          |
+ pengesahan_current_stage         | integer                  |           |          |
+ pengesahan_pengawas_approved     | boolean                  |           | not null | false
+ pengesahan_pengawas_approved_by  | character varying(255)   |           |          |
+ pengesahan_pengawas_approved_at  | timestamp with time zone |           |          |
+ pengesahan_security_approved     | boolean                  |           | not null | false
+ pengesahan_security_approved_by  | character varying(255)   |           |          |
+ pengesahan_security_approved_at  | timestamp with time zone |           |          |
+ pengesahan_sfo_approved          | boolean                  |           | not null | false
+ pengesahan_sfo_approved_by       | character varying(255)   |           |          |
+ pengesahan_sfo_approved_at       | timestamp with time zone |           |          |
+ pengesahan_status                | character varying(20)    |           |          |
+ created_at                       | timestamp with time zone |           | not null | now()
+ updated_at                       | timestamp with time zone |           | not null | now()
+ edit_token                       | character varying(20)    |           |          |
+ catatan_reject                   | text                     |           |          |
+ approved_by                      | character varying(255)   |           |          |
+ approved_at                      | timestamp with time zone |           |          |
+ user_id                          | integer                  |           |          |
+ perlu_jsa                        | boolean                  |           |          | false
+ jsa_file_url                     | text                     |           |          |
+ license_files                    | jsonb                    |           |          | '[]'::jsonb
+Indexes:
+    "form_ijin_kerja_pkey" PRIMARY KEY, btree (id)
+    "form_ijin_kerja_edit_token_key" UNIQUE CONSTRAINT, btree (edit_token)
+    "form_ijin_kerja_id_form_key" UNIQUE CONSTRAINT, btree (id_form)
+    "idx_ijk_edit_token" btree (edit_token)
+    "idx_ijk_status" btree (status)
+    "idx_ijk_tanggal" btree (tanggal DESC)
+    "idx_ijk_user_id" btree (user_id)
+Foreign-key constraints:
+    "form_ijin_kerja_user_id_fkey" FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
+Referenced by:
+    TABLE "form_kerja_ketinggian" CONSTRAINT "form_kerja_ketinggian_id_ijin_kerja_fkey" FOREIGN KEY (id_ijin_kerja) REFERENCES form_ijin_kerja(id_form) ON DELETE SET NULL DEFERRABLE INITIALLY DEFERRED
+    TABLE "form_kerja_panas" CONSTRAINT "form_kerja_panas_id_ijin_kerja_fkey" FOREIGN KEY (id_ijin_kerja) REFERENCES form_ijin_kerja(id_form) ON DELETE SET NULL DEFERRABLE INITIALLY DEFERRED
+    TABLE "form_kerja_workshop" CONSTRAINT "form_kerja_workshop_id_ijin_kerja_fkey" FOREIGN KEY (id_ijin_kerja) REFERENCES form_ijin_kerja(id_form) ON DELETE SET NULL DEFERRABLE INITIALLY DEFERRED
+Triggers:
+    trg_ijk_updated BEFORE UPDATE ON form_ijin_kerja FOR EACH ROW EXECUTE FUNCTION update_updated_at()
 
 
 jai_permit_db=# \d form_kerja_ketinggian
@@ -124,6 +302,8 @@ jai_permit_db=# \d form_kerja_ketinggian
  admin_k3_nik                                  | character varying(100)   |           |          |
  sfo_nik                                       | character varying(100)   |           |          |
  mr_pga_nik                                    | character varying(100)   |           |          |
+ helm_kondisi_baik                             | boolean                  |           | not null | false
+ id_ijin_kerja                                 | character varying(20)    |           |          |
 Indexes:
     "form_kerja_ketinggian_pkey" PRIMARY KEY, btree (id)
     "form_kerja_ketinggian_edit_token_key" UNIQUE CONSTRAINT, btree (edit_token)
@@ -132,21 +312,14 @@ Indexes:
     "idx_hew_status" btree (status)
     "idx_hew_user_id" btree (user_id)
     "idx_ketinggian_admin_k3" btree (admin_k3_approved)
+    "idx_ketinggian_id_ijin_kerja" btree (id_ijin_kerja)
     "idx_ketinggian_status" btree (status)
     "idx_ketinggian_tanggal" btree (tanggal DESC)
 Foreign-key constraints:
+    "form_kerja_ketinggian_id_ijin_kerja_fkey" FOREIGN KEY (id_ijin_kerja) REFERENCES form_ijin_kerja(id_form) ON DELETE SET NULL DEFERRABLE INITIALLY DEFERRED
     "form_kerja_ketinggian_user_id_fkey" FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
 Triggers:
     trg_ketinggian_updated BEFORE UPDATE ON form_kerja_ketinggian FOR EACH ROW EXECUTE FUNCTION update_updated_at()
-
-
-jai_permit_db=#
-jai_permit_db=# \d form_kerja_ketinggian_id_seq
-            Sequence "public.form_kerja_ketinggian_id_seq"
-  Type   | Start | Minimum |  Maximum   | Increment | Cycles? | Cache
----------+-------+---------+------------+-----------+---------+-------
- integer |     1 |       1 | 2147483647 |         1 | no      |     1
-Owned by: public.form_kerja_ketinggian.id
 
 
 jai_permit_db=# \d form_kerja_panas
@@ -256,30 +429,24 @@ jai_permit_db=# \d form_kerja_panas
  admin_k3_nik                                  | character varying(100)   |           |          |
  sfo_nik                                       | character varying(100)   |           |          |
  mr_pga_nik                                    | character varying(100)   |           |          |
+ id_ijin_kerja                                 | character varying(20)    |           |          |
 Indexes:
     "form_kerja_panas_pkey" PRIMARY KEY, btree (id)
     "form_kerja_panas_edit_token_key" UNIQUE CONSTRAINT, btree (edit_token)
     "form_kerja_panas_id_form_key" UNIQUE CONSTRAINT, btree (id_form)
     "idx_panas_edit_token" btree (edit_token)
+    "idx_panas_id_ijin_kerja" btree (id_ijin_kerja)
     "idx_panas_status" btree (status)
     "idx_panas_tanggal" btree (tanggal DESC)
     "idx_panas_tipe" btree (tipe_perusahaan)
     "idx_panas_user_id" btree (user_id)
 Foreign-key constraints:
+    "form_kerja_panas_id_ijin_kerja_fkey" FOREIGN KEY (id_ijin_kerja) REFERENCES form_ijin_kerja(id_form) ON DELETE SET NULL DEFERRABLE INITIALLY DEFERRED
     "form_kerja_panas_user_id_fkey" FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
 Triggers:
     trg_panas_updated BEFORE UPDATE ON form_kerja_panas FOR EACH ROW EXECUTE FUNCTION update_updated_at()
 
 
-jai_permit_db=# \d form_kerja_panas_id_seq
-              Sequence "public.form_kerja_panas_id_seq"
-  Type   | Start | Minimum |  Maximum   | Increment | Cycles? | Cache
----------+-------+---------+------------+-----------+---------+-------
- integer |     1 |       1 | 2147483647 |         1 | no      |     1
-Owned by: public.form_kerja_panas.id
-
-
-jai_permit_db=#
 jai_permit_db=# \d form_kerja_workshop
                                                         Table "public.form_kerja_workshop"
                     Column                     |           Type           | Collation | Nullable |                     Default
@@ -386,101 +553,26 @@ jai_permit_db=# \d form_kerja_workshop
  admin_k3_nik                                  | character varying(100)   |           |          |
  sfo_nik                                       | character varying(100)   |           |          |
  mr_pga_nik                                    | character varying(100)   |           |          |
+ nik_pekerja                                   | character varying(100)   |           |          |
+ id_ijin_kerja                                 | character varying(20)    |           |          |
 Indexes:
     "form_kerja_workshop_pkey" PRIMARY KEY, btree (id)
     "form_kerja_workshop_edit_token_key" UNIQUE CONSTRAINT, btree (edit_token)
     "form_kerja_workshop_id_form_key" UNIQUE CONSTRAINT, btree (id_form)
     "idx_workshop_edit_token" btree (edit_token)
+    "idx_workshop_id_ijin_kerja" btree (id_ijin_kerja)
     "idx_workshop_status" btree (status)
     "idx_workshop_tanggal" btree (tanggal DESC)
     "idx_workshop_tipe" btree (tipe_perusahaan)
     "idx_workshop_user_id" btree (user_id)
 Foreign-key constraints:
+    "form_kerja_workshop_id_ijin_kerja_fkey" FOREIGN KEY (id_ijin_kerja) REFERENCES form_ijin_kerja(id_form) ON DELETE SET NULL DEFERRABLE INITIALLY DEFERRED
     "form_kerja_workshop_user_id_fkey" FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
 Triggers:
     trg_workshop_updated BEFORE UPDATE ON form_kerja_workshop FOR EACH ROW EXECUTE FUNCTION update_updated_at()
 
 
-jai_permit_db=# \d form_kerja_workshop_id_seq
-             Sequence "public.form_kerja_workshop_id_seq"
-  Type   | Start | Minimum |  Maximum   | Increment | Cycles? | Cache
----------+-------+---------+------------+-----------+---------+-------
- integer |     1 |       1 | 2147483647 |         1 | no      |     1
-Owned by: public.form_kerja_workshop.id
-
-
 jai_permit_db=#
-jai_permit_db=# \d smtp_settings
-                                        Table "public.smtp_settings"
-    Column     |           Type           | Collation | Nullable |                  Default
----------------+--------------------------+-----------+----------+-------------------------------------------
- id            | integer                  |           | not null | nextval('smtp_settings_id_seq'::regclass)
- smtp_host     | character varying(255)   |           | not null |
- smtp_port     | integer                  |           | not null | 25
- smtp_username | character varying(255)   |           |          |
- smtp_password | character varying(255)   |           |          |
- email_sender  | character varying(255)   |           | not null |
- use_tls       | boolean                  |           | not null | false
- use_ssl       | boolean                  |           | not null | false
- app_url       | character varying(500)   |           | not null |
- is_active     | boolean                  |           | not null | true
- created_at    | timestamp with time zone |           | not null | CURRENT_TIMESTAMP
- updated_at    | timestamp with time zone |           | not null | CURRENT_TIMESTAMP
-Indexes:
-    "smtp_settings_pkey" PRIMARY KEY, btree (id)
-    "smtp_settings_one_active" UNIQUE, btree (is_active) WHERE is_active = true
-Triggers:
-    trg_smtp_settings_updated_at BEFORE UPDATE ON smtp_settings FOR EACH ROW EXECUTE FUNCTION update_smtp_settings_updated_at()
-
-
-jai_permit_db=# \d smtp_settings_id_seq
-                Sequence "public.smtp_settings_id_seq"
-  Type   | Start | Minimum |  Maximum   | Increment | Cycles? | Cache
----------+-------+---------+------------+-----------+---------+-------
- integer |     1 |       1 | 2147483647 |         1 | no      |     1
-Owned by: public.smtp_settings.id
-
-
-jai_permit_db=# \d users
-                                           Table "public.users"
-       Column       |           Type           | Collation | Nullable |              Default
---------------------+--------------------------+-----------+----------+-----------------------------------
- id                 | integer                  |           | not null | nextval('users_id_seq'::regclass)
- username           | character varying(100)   |           | not null |
- password           | character varying(255)   |           | not null |
- nama               | character varying(255)   |           | not null |
- jabatan            | character varying(100)   |           |          |
- role               | character varying(50)    |           | not null | 'approver'::character varying
- is_active          | boolean                  |           | not null | true
- created_at         | timestamp with time zone |           | not null | now()
- updated_at         | timestamp with time zone |           | not null | now()
- email              | character varying(255)   |           |          |
- perusahaan         | character varying(255)   |           |          |
- no_telp            | character varying(50)    |           |          |
- nik                | character varying(50)    |           |          |
- departmen          | character varying(255)   |           |          | 'Unknown'::character varying
- password_encrypted | text                     |           |          |
-Indexes:
-    "users_pkey" PRIMARY KEY, btree (id)
-    "users_username_key" UNIQUE CONSTRAINT, btree (username)
-Referenced by:
-    TABLE "form_kerja_ketinggian" CONSTRAINT "form_kerja_ketinggian_user_id_fkey" FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
-    TABLE "form_kerja_panas" CONSTRAINT "form_kerja_panas_user_id_fkey" FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
-    TABLE "form_kerja_workshop" CONSTRAINT "form_kerja_workshop_user_id_fkey" FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
-Triggers:
-    set_users_updated_at BEFORE UPDATE ON users FOR EACH ROW EXECUTE FUNCTION update_updated_at_column()
-
-
-jai_permit_db=# \d users_id_seq
-                    Sequence "public.users_id_seq"
-  Type   | Start | Minimum |  Maximum   | Increment | Cycles? | Cache
----------+-------+---------+------------+-----------+---------+-------
- integer |     1 |       1 | 2147483647 |         1 | no      |     1
-Owned by: public.users.id
-
-
-jai_permit_db=#
-
 jai_permit_db=# \d master_lisence
                                        Table "public.master_lisence"
    Column    |           Type           | Collation | Nullable |                  Default
@@ -515,6 +607,62 @@ Foreign-key constraints:
     "master_lisence_updated_by_fkey" FOREIGN KEY (updated_by) REFERENCES users(id) ON DELETE SET NULL
 Triggers:
     trg_master_lisence_updated BEFORE UPDATE ON master_lisence FOR EACH ROW EXECUTE FUNCTION update_updated_at()
+
+
+jai_permit_db=# \d smtp_settings
+                                        Table "public.smtp_settings"
+    Column     |           Type           | Collation | Nullable |                  Default
+---------------+--------------------------+-----------+----------+-------------------------------------------
+ id            | integer                  |           | not null | nextval('smtp_settings_id_seq'::regclass)
+ smtp_host     | character varying(255)   |           | not null |
+ smtp_port     | integer                  |           | not null | 25
+ smtp_username | character varying(255)   |           |          |
+ smtp_password | character varying(255)   |           |          |
+ email_sender  | character varying(255)   |           | not null |
+ use_tls       | boolean                  |           | not null | false
+ use_ssl       | boolean                  |           | not null | false
+ app_url       | character varying(500)   |           | not null |
+ is_active     | boolean                  |           | not null | true
+ created_at    | timestamp with time zone |           | not null | CURRENT_TIMESTAMP
+ updated_at    | timestamp with time zone |           | not null | CURRENT_TIMESTAMP
+Indexes:
+    "smtp_settings_pkey" PRIMARY KEY, btree (id)
+    "smtp_settings_one_active" UNIQUE, btree (is_active) WHERE is_active = true
+Triggers:
+    trg_smtp_settings_updated_at BEFORE UPDATE ON smtp_settings FOR EACH ROW EXECUTE FUNCTION update_smtp_settings_updated_at()
+
+
+jai_permit_db=# \d users
+                                           Table "public.users"
+       Column       |           Type           | Collation | Nullable |              Default
+--------------------+--------------------------+-----------+----------+-----------------------------------
+ id                 | integer                  |           | not null | nextval('users_id_seq'::regclass)
+ username           | character varying(100)   |           | not null |
+ password           | character varying(255)   |           | not null |
+ nama               | character varying(255)   |           | not null |
+ jabatan            | character varying(100)   |           |          |
+ role               | character varying(50)    |           | not null | 'approver'::character varying
+ is_active          | boolean                  |           | not null | true
+ created_at         | timestamp with time zone |           | not null | now()
+ updated_at         | timestamp with time zone |           | not null | now()
+ email              | character varying(255)   |           |          |
+ perusahaan         | character varying(255)   |           |          |
+ no_telp            | character varying(50)    |           |          |
+ nik                | character varying(50)    |           |          |
+ departmen          | character varying(255)   |           |          | 'Unknown'::character varying
+ password_encrypted | text                     |           |          |
+Indexes:
+    "users_pkey" PRIMARY KEY, btree (id)
+    "users_username_key" UNIQUE CONSTRAINT, btree (username)
+Referenced by:
+    TABLE "form_ijin_kerja" CONSTRAINT "form_ijin_kerja_user_id_fkey" FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
+    TABLE "form_kerja_ketinggian" CONSTRAINT "form_kerja_ketinggian_user_id_fkey" FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
+    TABLE "form_kerja_panas" CONSTRAINT "form_kerja_panas_user_id_fkey" FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
+    TABLE "form_kerja_workshop" CONSTRAINT "form_kerja_workshop_user_id_fkey" FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
+    TABLE "master_lisence" CONSTRAINT "master_lisence_created_by_fkey" FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
+    TABLE "master_lisence" CONSTRAINT "master_lisence_updated_by_fkey" FOREIGN KEY (updated_by) REFERENCES users(id) ON DELETE SET NULL
+Triggers:
+    set_users_updated_at BEFORE UPDATE ON users FOR EACH ROW EXECUTE FUNCTION update_updated_at_column()
 
 
 jai_permit_db=#

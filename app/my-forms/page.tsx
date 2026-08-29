@@ -44,6 +44,9 @@ interface FormItem {
   // Kolom approval baru
   admin_k3_approved?: boolean;
   mr_pga_approved?: boolean;
+  security_approved?: boolean;
+  job_forms_count?: number;
+  id_ijin_kerja?: string;
 }
 
 // ── Helpers ───────────────────────────────────────────────────
@@ -55,9 +58,10 @@ const formatDate = (d?: string) => {
 };
 
 const jenisLabel: Record<string, string> = {
-  "hot-work":    "Hot Work Permit",
-  "workshop":    "Workshop Permit",
-  "height-work": "Kerja Ketinggian",
+  "hot-work":        "Hot Work Permit",
+  "workshop":        "Workshop Permit",
+  "height-work":     "Kerja Ketinggian",
+  "general-permit":  "Ijin Kerja Eksternal",
 };
 
 const statusConfig: Record<string, { label: string; icon: any; color: string; bg: string }> = {
@@ -69,6 +73,14 @@ const statusConfig: Record<string, { label: string; icon: any; color: string; bg
 
 const getApprovalStages = (form: FormItem): { key: keyof FormItem; label: string }[] => {
   const isEksternal = form.tipe_perusahaan === "eksternal";
+
+  if (form.jenis_form === "general-permit") {
+    return [
+      { key: "security_approved", label: "Security" },
+      { key: "sfo_approved",      label: "SFO" },
+      { key: "pga_approved",      label: "PGA Manager" },
+    ];
+  }
 
   if (form.jenis_form === "height-work") {
     if (isEksternal) {
@@ -147,6 +159,19 @@ const renderApprovalProgress = (form: FormItem) => {
           }
         </p>
       )}
+      {form.jenis_form === "general-permit" && (
+        <p className="text-[10px] text-slate-400 mt-1">Alur: Security → SFO → PGA Manager</p>
+      )}
+      {form.id_ijin_kerja && (
+        <p className="text-[10px] text-purple-600 font-medium mt-1">
+          🔗 Bagian dari Ijin Kerja Eksternal {form.id_ijin_kerja}
+        </p>
+      )}
+      {form.jenis_form === "general-permit" && typeof form.job_forms_count === "number" && (
+        <p className="text-[10px] text-purple-600 font-medium mt-1">
+          {form.job_forms_count} form jenis kerja terkait
+        </p>
+      )}
     </div>
   );
 };
@@ -201,9 +226,18 @@ export default function MyFormsPage() {
   const [editModal, setEditModal]       = useState({ isOpen: false, formId: "", formType: "" as any });
   const [cancelModal, setCancelModal]   = useState({
     isOpen: false, formId: "",
-    formType: "" as "hot-work" | "height-work" | "workshop",
+    formType: "" as "hot-work" | "height-work" | "workshop" | "general-permit",
   });
   const [cancelling, setCancelling] = useState(false);
+
+  useEffect(() => {
+    const handler = (e: any) => {
+      const { jenis, idForm } = e.detail;
+      setDetailModal({ isOpen: true, formId: idForm, formType: jenis });
+    };
+    window.addEventListener("open-form-detail", handler);
+    return () => window.removeEventListener("open-form-detail", handler);
+  }, []);
 
   useEffect(() => {
     setUserName(sessionStorage.getItem("user_nama") || "");

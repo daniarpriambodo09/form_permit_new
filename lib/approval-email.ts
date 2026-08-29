@@ -14,6 +14,7 @@ import {
 import {
   sendApprovalNotification,
   sendRejectionNotification,
+  sendExternalApprovalNotification,
 } from '@/lib/email';
 
 // ── Tipe data ────────────────────────────────────────────────
@@ -266,5 +267,31 @@ export async function notifyFormRejected(params: {
   } catch (err) {
     console.error(`[EMAIL] Failed to send rejection notification for ${idForm}:`, err);
     // Tidak melempar error agar tidak mengganggu response reject
+  }
+}
+
+export async function notifyExternalPermit(params: {
+  idForm: string;
+  userId: number | null;
+  namaPemohon: string;
+  tanggal: string;
+  attachmentCount: number;
+}): Promise<void> {
+  try {
+    const makerDepartmen = await getMakerDepartmen(params.userId);
+    const approvers = await getApproverEmails('firewatch', makerDepartmen);
+    for (const approver of approvers) {
+      if (!approver.email) continue;
+      await sendExternalApprovalNotification({
+        idForm: params.idForm,
+        namaPemohon: params.namaPemohon,
+        tanggal: formatTanggal(params.tanggal),
+        approverName: approver.nama,
+        approverEmail: approver.email,
+        attachmentCount: params.attachmentCount,
+      });
+    }
+  } catch (err) {
+    console.error(`[EMAIL] Failed to send external permit notification for ${params.idForm}:`, err);
   }
 }

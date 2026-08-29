@@ -1,4 +1,8 @@
 // app/api/forms/general-permit/[id]/route.ts
+// UPDATED: Tambah kolom perlu_jsa dan jsa_file_url ke PUT (edit & resubmit),
+// mengikuti penambahan Bagian 4: Upload JSA di halaman
+// /form/ijin-kerja-eksternal. license_sertifikasi tidak berubah strukturnya
+// (masih text), hanya isinya sekarang URL file lisensi.
 import { NextRequest, NextResponse } from 'next/server';
 import { query, queryOne } from '@/lib/db';
 import { verifyToken, COOKIE_NAME } from '@/lib/auth';
@@ -95,6 +99,30 @@ export async function PUT(
     const now = new Date().toISOString();
     const toIso = (d: string | null | undefined) => (d ? new Date(d).toISOString() : null);
 
+    // ── JSA fields (Bagian 4) ─────────────────────────────────────────
+    const perluJsa   = f.perluJsa === true;
+    const jsaFileUrl = perluJsa ? (f.jsaFileUrl || null) : null;
+
+    // ── Lisensi/Sertifikasi files (Bagian 9) — wajib, bisa banyak file ──
+    const licenseFiles = Array.isArray(f.licenseFiles)
+      ? f.licenseFiles.filter((x: any) => x && typeof x.url === 'string')
+      : [];
+    const workerCountRaw = f.jumlahTenagaKerja;
+    const hasWorkerCount = workerCountRaw !== undefined && workerCountRaw !== null && workerCountRaw !== '';
+    const workerCount = Number(workerCountRaw);
+    if (hasWorkerCount && (!Number.isInteger(workerCount) || workerCount < 0)) {
+      return NextResponse.json(
+        { error: 'Jumlah tenaga kerja harus berupa bilangan bulat minimal 0.' },
+        { status: 400 }
+      );
+    }
+    if (newStatus === 'submitted' && (!hasWorkerCount || licenseFiles.length !== workerCount)) {
+      return NextResponse.json(
+        { error: `Jumlah file lisensi harus tepat ${workerCount}. Saat ini ${licenseFiles.length} file.` },
+        { status: 400 }
+      );
+    }
+
     // Update penuh — set ulang seluruh field Bagian 1-11 & 14, reset status
     // approval (sama pola dengan height-work: catatan_reject/approved_by/at
     // dan current_stage dikembalikan ke awal saat resubmit).
@@ -135,7 +163,8 @@ export async function PUT(
         izin_kerja_dari = $84, izin_kerja_sampai = $85,
         kontraktor_pj = $86, spv_terkait_pj = $87,
         pernyataan_diperiksa = $88, pengawas_pekerjaan_user = $89,
-        status = $90,
+        perlu_jsa = $90, jsa_file_url = $91, license_files = $92,
+        status = $93,
         current_stage = 1,
         security_approved = false, security_approved_by = NULL, security_approved_at = NULL,
         sfo_approved = false, sfo_approved_by = NULL, sfo_approved_at = NULL,
@@ -143,8 +172,8 @@ export async function PUT(
         catatan_reject = NULL,
         approved_by = NULL,
         approved_at = NULL,
-        updated_at = $91
-       WHERE id_form = $92
+        updated_at = $94
+       WHERE id_form = $95
        RETURNING id_form, status`,
       [
         f.namaKontraktorPekerja || null, f.namaPengawasPicSubkont || null,
@@ -185,11 +214,22 @@ export async function PUT(
         f.izinKerjaDari || null, f.izinKerjaSampai || null,
         f.kontraktorPj || null, f.spvTerkaitPj || null,
         f.pernyataanDiperiksa ?? false, f.pengawasPekerjaanUser || null,
+        perluJsa, jsaFileUrl, JSON.stringify(licenseFiles),
         newStatus,
         now,
         id,
       ]
     );
+
+    if (f.tglMulaiKerja !== undefined || f.tglAkhirKerjaRencana !== undefined) {
+      await query(
+        `UPDATE form_ijin_kerja
+            SET izin_kerja_tanggal_dari = $1,
+                izin_kerja_tanggal_sampai = $2
+          WHERE id_form = $3`,
+        [f.tglMulaiKerja || null, f.tglAkhirKerjaRencana || null, id]
+      );
+    }
 
     return NextResponse.json({
       success: true,

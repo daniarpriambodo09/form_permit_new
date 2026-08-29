@@ -1,18 +1,31 @@
 // app/api/forms/general-permit/route.ts
+// UPDATED: Tambah kolom perlu_jsa dan jsa_file_url — halaman
+// /form/ijin-kerja-eksternal sekarang punya Bagian 4: Upload JSA (reuse
+// JsaUploadSection). license_sertifikasi TIDAK butuh migration baru —
+// kolom itu sudah ada, sekarang isinya URL file lisensi (bukan lagi teks
+// deskripsi), diisi dari komponen upload di frontend.
 
 import { NextRequest, NextResponse } from 'next/server';
 import { query, queryOne } from '@/lib/db';
 import { generateEditToken, verifyToken, COOKIE_NAME } from '@/lib/auth';
+import { notifyExternalPermit } from '@/lib/approval-email';
 
 async function generateId(): Promise<string> {
-  const row = await queryOne<{ id_form: string }>(
-    `SELECT id_form FROM form_ijin_kerja ORDER BY id_form DESC LIMIT 1`
+  const row = await queryOne<{ next_number: number }>(
+    `SELECT COALESCE(MAX(SUBSTRING(id_form FROM 5)::integer), 0) + 1 AS next_number
+     FROM form_ijin_kerja
+     WHERE id_form ~ '^IJK-[0-9]+$'`
   );
-  let next = 1;
-  if (row) {
-    const num = parseInt(row.id_form.replace('IJK-', ''), 10);
-    if (!isNaN(num)) next = num + 1;
+  let next = Number(row?.next_number) || 1;
+
+  // Find the first unused number in case historical data has gaps.
+  while (await queryOne<{ id_form: string }>(
+    `SELECT id_form FROM form_ijin_kerja WHERE id_form = $1`,
+    [`IJK-${String(next).padStart(4, '0')}`]
+  )) {
+    next += 1;
   }
+
   return `IJK-${String(next).padStart(4, '0')}`;
 }
 
@@ -43,7 +56,8 @@ export async function GET(req: NextRequest) {
       ? '*'
       : `id_form, tanggal, tanggal_pelaksanaan, status,
          nama_kontraktor_pekerja, lokasi_pekerjaan, tgl_mulai_kerja,
-         current_stage, security_approved, sfo_approved, pga_approved`;
+         current_stage, security_approved, sfo_approved, pga_approved,
+         perlu_jsa, jsa_file_url`;
 
     let sql = `SELECT ${selectCols} FROM form_ijin_kerja`;
     const params: any[] = [];
@@ -83,6 +97,55 @@ export async function POST(req: NextRequest) {
 
     const toIso = (d: string | null | undefined) => (d ? new Date(d).toISOString() : null);
 
+    // ── JSA fields (Bagian 4) ─────────────────────────────────────────
+    const perluJsa   = f.perluJsa === true;
+    const jsaFileUrl = perluJsa ? (f.jsaFileUrl || null) : null;
+    const jsaData = perluJsa && f.jsaData && typeof f.jsaData === 'object'
+      ? {
+          area: typeof f.jsaData.area === 'string' ? f.jsaData.area : '',
+          jenisPekerjaan: typeof f.jsaData.jenisPekerjaan === 'string' ? f.jsaData.jenisPekerjaan : '',
+          sectDept: typeof f.jsaData.sectDept === 'string' ? f.jsaData.sectDept : '',
+          pic: typeof f.jsaData.pic === 'string' ? f.jsaData.pic : '',
+          petugas: Array.isArray(f.jsaData.petugas) ? f.jsaData.petugas.slice(0, 10) : [],
+          rows: Array.isArray(f.jsaData.rows) ? f.jsaData.rows : [],
+          approval: {
+            currentStage: 1,
+            status: 'submitted',
+            catatanReject: null,
+            firewatch: { approved: false, approvedBy: null, approvedNik: null, approvedAt: null },
+            spv: { approved: false, approvedBy: null, approvedNik: null, approvedAt: null },
+            sfo: { approved: false, approvedBy: null, approvedNik: null, approvedAt: null },
+          },
+        }
+      : null;
+
+    if (isSubmit && perluJsa && (!jsaData || !String(jsaData.area || '').trim() || !String(jsaData.jenisPekerjaan || '').trim() || !String(jsaData.pic || '').trim() || !jsaData.petugas.some((name: unknown) => typeof name === 'string' && name.trim()))) {
+      return NextResponse.json(
+        { error: 'Area, Jenis Pekerjaan, PIC, dan minimal satu Petugas pada JSA wajib diisi.' },
+        { status: 400 }
+      );
+    }
+
+    // ── Lisensi/Sertifikasi files (Bagian 9) — wajib, bisa banyak file ──
+    const licenseFiles = Array.isArray(f.licenseFiles)
+      ? f.licenseFiles.filter((x: any) => x && typeof x.url === 'string')
+      : [];
+    const workerCountRaw = f.jumlahTenagaKerja;
+    const hasWorkerCount = workerCountRaw !== undefined && workerCountRaw !== null && workerCountRaw !== '';
+    const workerCount = Number(workerCountRaw);
+    if (hasWorkerCount && (!Number.isInteger(workerCount) || workerCount < 0)) {
+      return NextResponse.json(
+        { error: 'Jumlah tenaga kerja harus berupa bilangan bulat minimal 0.' },
+        { status: 400 }
+      );
+    }
+    if (isSubmit && (!hasWorkerCount || (workerCount > 0 && licenseFiles.length < 1) || licenseFiles.length > workerCount)) {
+      return NextResponse.json(
+        { error: `Jumlah file lisensi harus minimal 1 dan maksimal ${workerCount}. Saat ini ${licenseFiles.length} file.` },
+        { status: 400 }
+      );
+    }
+
     await query(
       `INSERT INTO form_ijin_kerja (
         id_form, tanggal, tanggal_pelaksanaan, status,
@@ -118,7 +181,8 @@ export async function POST(req: NextRequest) {
         izin_kerja_dari, izin_kerja_sampai,
         kontraktor_pj, spv_terkait_pj,
         pernyataan_diperiksa, pengawas_pekerjaan_user,
-        edit_token, user_id
+        edit_token, user_id, perlu_jsa, jsa_file_url, license_files,
+        izin_kerja_tanggal_dari, izin_kerja_tanggal_sampai
       ) VALUES (
         $1,$2,$3,$4,
         $5,$6,$7,
@@ -153,7 +217,7 @@ export async function POST(req: NextRequest) {
         $88,$89,
         $90,$91,
         $92,$93,
-        $94,$95
+        $94,$95,$96,$97,$98,$99,$100
       )`,
       [
         idForm, now, toIso(f.tglMulaiKerja), status,
@@ -218,6 +282,8 @@ export async function POST(req: NextRequest) {
         f.apd?.sepatuKaret           ?? false,
         f.apd?.topiKerja             ?? false,
         f.apdLainnya || null,
+        // license_sertifikasi sekarang menyimpan URL file lisensi hasil
+        // upload (Bagian 9), bukan lagi teks deskripsi bebas.
         f.licenseSertifikasi || null,
         f.apar?.dryPowder   ?? false,
         f.apar?.gasCair     ?? false,
@@ -230,9 +296,27 @@ export async function POST(req: NextRequest) {
         f.izinKerjaDari    || null, f.izinKerjaSampai || null,
         f.kontraktorPj || null, f.spvTerkaitPj || null,
         f.pernyataanDiperiksa ?? false, f.pengawasPekerjaanUser || null,
-        editToken, userId,
+        editToken, userId, perluJsa, jsaFileUrl, JSON.stringify(licenseFiles),
+        f.tglMulaiKerja || null, f.tglAkhirKerjaRencana || null,
       ]
     );
+
+    if (jsaData) {
+      await query(
+        `UPDATE form_ijin_kerja SET jsa_data = $1 WHERE id_form = $2`,
+        [JSON.stringify(jsaData), idForm]
+      );
+    }
+
+    if (status === 'submitted' && userId) {
+      notifyExternalPermit({
+        idForm,
+        userId,
+        namaPemohon: f.namaKontraktorPekerja || 'Pemohon',
+        tanggal: now,
+        attachmentCount: jsaData ? 1 : 0,
+      }).catch((error) => console.error(`[EMAIL] External permit notification failed for ${idForm}:`, error));
+    }
 
     return NextResponse.json({ success: true, id_form: idForm, status, edit_token: editToken }, { status: 201 });
   } catch (err: any) {

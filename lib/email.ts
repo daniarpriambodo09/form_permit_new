@@ -225,3 +225,34 @@ Terima kasih.`;
     text:    body,
   });
 }
+
+export interface ExternalApprovalEmailData {
+  idForm: string;
+  namaPemohon: string;
+  tanggal: string;
+  approverName: string;
+  approverEmail: string;
+  attachmentCount: number;
+}
+
+export async function sendExternalApprovalNotification(data: ExternalApprovalEmailData): Promise<void> {
+  const cfg = await getSmtpConfig();
+  const subject = `[PERMIT] Approval Ijin Kerja Eksternal - ${data.idForm}`;
+  const body = `Halo Bapak/Ibu ${data.approverName},
+
+Terdapat pengajuan Ijin Kerja Eksternal yang memerlukan review.
+
+ID Form    : ${data.idForm}
+Pemohon    : ${data.namaPemohon}
+Tanggal    : ${data.tanggal}
+Lampiran   : ${data.attachmentCount} jenis pekerjaan/JSA yang tersedia di sistem
+
+Buka halaman approval gabungan:
+${cfg.appUrl}/approval/external/${data.idForm}
+
+Seluruh form induk, JSA, dan lampiran jenis pekerjaan dapat direview dari satu halaman.
+
+Terima kasih.`;
+
+  await sendEmail({ to: data.approverEmail, subject, text: body });
+}

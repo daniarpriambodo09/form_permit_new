@@ -1,4 +1,7 @@
 // components/EditModal.tsx
+// UPDATED: formType diperluas menyertakan "general-permit" (Ijin Kerja
+// Eksternal), supaya general-permit juga bisa diedit lewat modal ini
+// dengan pola yang sama seperti hot-work/height-work/workshop.
 "use client";
 
 import { useState, useEffect } from "react";
@@ -9,7 +12,7 @@ interface EditModalProps {
   isOpen: boolean;
   onClose: () => void;
   formId: string;
-  formType: "hot-work" | "height-work" | "workshop";
+  formType: "hot-work" | "height-work" | "workshop" | "general-permit";
   onSuccess?: () => void;
 }
 

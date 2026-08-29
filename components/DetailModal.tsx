@@ -1,5 +1,12 @@
 // components/DetailModal.tsx
 // UPDATED: Tambah tombol "Download PDF" yang memanggil generatePermitPdf().
+// UPDATED: Tambah branch formType === "general-permit" (Ijin Kerja
+// Eksternal) — menampilkan detail Bagian 1-11/14, approval grid
+// Security/SFO/PGA, dan section "Form Jenis Pekerjaan Terkait" yang
+// status-aware: kalau job-form untuk suatu jenis SUDAH ada (draft/
+// submitted/approved/rejected), tampilkan status + aksi (Lihat Detail,
+// dan Edit/Perbaiki khusus draft/rejected) — BUKAN link "+ Tambah" lagi,
+// supaya tidak bisa submit duplikat untuk jenis yang sama.
 "use client";
 import { useState, useEffect, useCallback } from "react";
 import { X, Loader2, AlertCircle, ZoomIn, FileText, Eye, Download } from "lucide-react";
@@ -9,7 +16,7 @@ interface DetailModalProps {
   isOpen: boolean;
   onClose: () => void;
   formId: string;
-  formType: "hot-work" | "height-work" | "workshop";
+  formType: "hot-work" | "height-work" | "workshop" | "general-permit";
 }
 
 const formatDate = (d?: string) => {
@@ -169,6 +176,136 @@ function ApprovalGrid({
         approvedNik={p.mr_pga_nik} approvedAt={p.mr_pga_approved_at}
         fallbackName={p.mr_pga_mgr}
       />
+    </div>
+  );
+}
+
+// ── Approval grid khusus general-permit (Security / SFO / PGA Manager) ──
+function GeneralPermitApprovalGrid({ p }: { p: any }) {
+  const common = { formId: p.id_form, formType: "general-permit" };
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <ApprovalQRCard {...common}
+        label="Security" role="security"
+        approved={p.security_approved} approvedBy={p.security_approved_by}
+        approvedAt={p.security_approved_at}
+      />
+      <ApprovalQRCard {...common}
+        label="SFO" role="sfo"
+        approved={p.sfo_approved} approvedBy={p.sfo_approved_by}
+        approvedAt={p.sfo_approved_at}
+      />
+      <ApprovalQRCard {...common}
+        label="PGA Manager" role="pga"
+        approved={p.pga_approved} approvedBy={p.pga_approved_by}
+        approvedAt={p.pga_approved_at}
+      />
+    </div>
+  );
+}
+
+// ── Job-forms terkait (khusus general-permit) ──────────────────
+type LinkedJobForm = { id_form: string; status: string; tanggal: string; jenis: string } | null;
+interface LinkedJobForms { hotWork: LinkedJobForm; heightWork: LinkedJobForm; workshop: LinkedJobForm }
+
+const JOB_TYPE_META: Record<string, { label: string; shortLabel: string; icon: string; addHref: (id: string) => string }> = {
+  hotWork:    { label: "Ijin Kerja Panas (Hot Work)",         shortLabel: "Hot Work",     icon: "🔥", addHref: (id) => `/form-permit/form/hot-work?id_ijin_kerja=${id}` },
+  heightWork: { label: "Ijin Kerja Ketinggian (Height Work)", shortLabel: "Height Work",  icon: "⚠️", addHref: (id) => `/form-permit/form/height-work?id_ijin_kerja=${id}` },
+  workshop:   { label: "Ijin Kerja Workshop",                 shortLabel: "Workshop",     icon: "🔧", addHref: (id) => `/form-permit/form/workshop?id_ijin_kerja=${id}` },
+};
+
+const STATUS_META: Record<string, { label: string; cls: string }> = {
+  draft:     { label: "Draft",     cls: "bg-slate-100 text-slate-600" },
+  submitted: { label: "Diajukan",  cls: "bg-blue-100 text-blue-700" },
+  approved:  { label: "Disetujui", cls: "bg-green-100 text-green-700" },
+  rejected:  { label: "Ditolak",   cls: "bg-red-100 text-red-700" },
+};
+
+function LinkedJobFormsSection({ generalPermitId, onOpenDetail, onOpenEdit }: {
+  generalPermitId: string;
+  onOpenDetail: (jenis: string, idForm: string) => void;
+  onOpenEdit: (jenis: string, idForm: string) => void;
+}) {
+  const [jobForms, setJobForms] = useState<LinkedJobForms | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    setLoading(true);
+    fetch(`/form-permit/api/forms/general-permit/${generalPermitId}/job-forms`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((json) => setJobForms(json?.data ?? null))
+      .catch(() => setJobForms(null))
+      .finally(() => setLoading(false));
+  }, [generalPermitId]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-6 text-slate-400 text-sm gap-2">
+        <Loader2 className="w-4 h-4 animate-spin" /> Memuat form terkait...
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-2">
+      {(["hotWork", "heightWork", "workshop"] as const).map((key) => {
+        const meta = JOB_TYPE_META[key];
+        const jf = jobForms?.[key];
+
+        // ── Sudah ada form untuk jenis ini: TIDAK BISA tambah lagi ──
+        if (jf) {
+          const statusMeta = STATUS_META[jf.status] || STATUS_META.submitted;
+          const canEdit = jf.status === "draft" || jf.status === "rejected";
+          return (
+            <div key={key} className="p-3 bg-white border border-slate-200 rounded-lg">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <span className="shrink-0">{meta.icon}</span>
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-slate-800">
+                      Form {meta.shortLabel} sudah diajukan
+                    </p>
+                    <p className="text-xs text-slate-400 font-mono truncate">{jf.id_form}</p>
+                  </div>
+                </div>
+                <span className={`text-xs font-semibold px-2 py-0.5 rounded-full shrink-0 ${statusMeta.cls}`}>
+                  {statusMeta.label}
+                </span>
+              </div>
+              {jf.status === "rejected" && (
+                <p className="text-xs text-red-600 mt-2">Form ini ditolak — perbaiki dan kirim ulang, bukan buat baru.</p>
+              )}
+              <div className="flex items-center gap-2 mt-3 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => onOpenDetail(jf.jenis, jf.id_form)}
+                  className="text-xs font-medium px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors"
+                >
+                  Lihat Detail
+                </button>
+                {canEdit && (
+                  <button
+                    type="button"
+                    onClick={() => onOpenEdit(jf.jenis, jf.id_form)}
+                    className="text-xs font-medium px-3 py-1.5 rounded-lg border border-orange-200 text-orange-600 hover:bg-orange-50 transition-colors"
+                  >
+                    {jf.status === "rejected" ? "Perbaiki" : "Edit"}
+                  </button>
+                )}
+              </div>
+            </div>
+          );
+        }
+
+        // ── Belum ada form untuk jenis ini: boleh tambah ──
+        return (
+          <a key={key} href={meta.addHref(generalPermitId)}
+            className="w-full flex items-center gap-2.5 p-3 border-2 border-dashed border-slate-200 rounded-lg hover:border-orange-400 hover:bg-orange-50 transition-colors">
+            <span className="text-orange-500 font-bold text-lg leading-none">+</span>
+            <span className="text-sm font-medium text-slate-600">Tambah {meta.label}</span>
+          </a>
+        );
+      })}
     </div>
   );
 }
@@ -609,11 +746,76 @@ export default function DetailModal({ isOpen, onClose, formId, formType }: Detai
     );
   };
 
+  // ── GENERAL PERMIT (IJIN KERJA EKSTERNAL) ──────────────────────
+  const renderGeneralPermit = () => {
+    if (!data) return null;
+    const p = data;
+    return (
+      <>
+        <MS title="Bagian 1: Informasi Kontraktor/Pekerja">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <F label="ID Form"                    value={p.id_form} />
+            <F label="Tanggal Pembuatan"           value={formatDate(p.tanggal)} />
+            <F label="Status"                      value={p.status} />
+            <F label="Nama Kontraktor/Pekerja"     value={p.nama_kontraktor_pekerja} />
+            <F label="Nama Pengawas/PIC Subkont"   value={p.nama_pengawas_pic_subkont} />
+            <F label="Jumlah Tenaga Kerja"         value={p.jumlah_tenaga_kerja} />
+            <F label="Tanggal Mulai Kerja"         value={formatDate(p.tgl_mulai_kerja)} />
+            <F label="Tanggal Akhir Kerja"         value={formatDate(p.tgl_akhir_kerja_rencana)} />
+            <F label="Waktu Kerja"                 value={formatTime(p.waktu_kerja)} />
+          </div>
+        </MS>
+        <MS title="Bagian 2 & 4: Spesifikasi & Lokasi Pekerjaan">
+          <F label="Deskripsi Pekerjaan" value={p.deskripsi_pekerjaan} />
+          <F label="Lokasi Pekerjaan"    value={p.lokasi_pekerjaan} />
+        </MS>
+        <MS title="Bagian 11: Penanggung Jawab">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <F label="Kontraktor PJ"  value={p.kontraktor_pj} />
+            <F label="SPV Terkait PJ" value={p.spv_terkait_pj} />
+          </div>
+        </MS>
+        <MS title="Bagian 12: Form Jenis Pekerjaan Terkait">
+          <LinkedJobFormsSection
+            generalPermitId={p.id_form}
+            onOpenDetail={(jenis, idForm) => {
+              window.dispatchEvent(new CustomEvent("open-form-detail", { detail: { jenis, idForm } }));
+            }}
+            onOpenEdit={(jenis, idForm) => {
+              window.dispatchEvent(new CustomEvent("open-form-edit", { detail: { jenis, idForm } }));
+            }}
+          />
+        </MS>
+        <MS title="Bagian 13: Persetujuan & Verifikasi QR">
+          <GeneralPermitApprovalGrid p={p} />
+        </MS>
+        {p.catatan_reject && <MS title="Catatan Penolakan"><p className="text-sm text-red-600">{p.catatan_reject}</p></MS>}
+        {p.status === "rejected" && (
+          <MS title="Informasi Penolakan">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <F label="Ditolak Oleh"      value={p.approved_by} />
+              <F label="Tanggal Penolakan" value={formatDate(p.approved_at)} />
+            </div>
+          </MS>
+        )}
+        {p.status === "approved" && (
+          <MS title="Informasi Approval">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <F label="Disetujui Oleh"   value={p.approved_by} />
+              <F label="Tanggal Approval" value={formatDate(p.approved_at)} />
+            </div>
+          </MS>
+        )}
+      </>
+    );
+  };
+
   if (!isOpen) return null;
 
   const renderContent = () => {
-    if (formType === "hot-work")    return renderHotWork();
-    if (formType === "height-work") return renderHeightWork();
+    if (formType === "hot-work")       return renderHotWork();
+    if (formType === "height-work")    return renderHeightWork();
+    if (formType === "general-permit") return renderGeneralPermit();
     return renderWorkshop();
   };
 
@@ -628,7 +830,7 @@ export default function DetailModal({ isOpen, onClose, formId, formType }: Detai
             {data && <p className="text-xs text-slate-400 mt-0.5 font-mono">{data.id_form}</p>}
           </div>
           <div className="flex items-center gap-3">
-            {data && !loading && (
+            {data && !loading && formType !== "general-permit" && (
               <DownloadPdfButton data={data} formType={formType} />
             )}
             <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-lg transition-colors">

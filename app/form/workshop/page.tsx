@@ -1,14 +1,15 @@
 // app/form/workshop/page.tsx
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import Link from "next/link";
 import { ChevronDown, ChevronUp, Home, Flame, Save, Send, AlertCircle, Lock } from "lucide-react";
 import { getFireWatchByDept } from "@/lib/firewatch";
-import JsaUploadSection, {
-  type JsaFileInfo,
-  type JsaUploadStatus as JsaStatus,
-} from "@/components/JsaUploadSection";
+import JsaUploadSection, { type JsaFileInfo, type JsaUploadStatus as JsaStatus } from "@/components/JsaUploadSection";
+import LinkedJsaSection from "@/components/LinkedJsaSection";
+import { createEmptyJsa } from "@/components/JsaBuilderSection";
+import type { JsaData } from "@/components/JsaBuilderSection";
 import TimeInput24, { normalizeTo24h } from "@/components/Time24Input";
+import { useSearchParams } from "next/navigation";
 
 type WorkDetail = { detail: string; mulai: string; selesai: string };
 
@@ -111,7 +112,7 @@ const getApproverLabels = (isInternal: boolean) => isInternal
   ? ["SPV / Pemberi Izin", "Admin K3", "SFO", "SMR / PGA SMGR"]
   : ["Kontraktor", "SPV / Pemberi Izin", "Admin K3", "SFO", "SMR / PGA SMGR"];
 
-export default function WorkshopPermitForm() {
+function WorkshopPermitFormInner() {
   const [formData, setFormData] = useState<FormData>(defaultForm);
   const [submitting, setSubmitting] = useState(false);
   const [expanded, setExpanded] = useState({ bagian1: true, bagian2: true, bagian3: true, bagian4: true });
@@ -124,6 +125,16 @@ export default function WorkshopPermitForm() {
   const [jsaFile, setJsaFile] = useState<JsaFileInfo | null>(null);
   const [jsaUploadStatus, setJsaUploadStatus] = useState<JsaStatus>("idle");
   const [jsaUploadError, setJsaUploadError] = useState("");
+  const [jsaData, setJsaData] = useState<JsaData>(createEmptyJsa());
+
+  const searchParams = useSearchParams();
+  const idIjinKerja = searchParams.get("id_ijin_kerja");
+
+  useEffect(() => {
+    if (idIjinKerja) {
+      setFormData((p) => ({ ...p, tipePerusahaan: "eksternal" }));
+    }
+  }, [idIjinKerja]);
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -168,8 +179,8 @@ export default function WorkshopPermitForm() {
     }
 
     // ── Validasi JSA ──────────────────────────────────────────
-    if (perluJsa && (!jsaFile || jsaUploadStatus !== "success")) {
-      setValidationError("File JSA wajib diupload sebelum mengajukan form");
+    if (idIjinKerja && perluJsa && (!jsaData.area.trim() || !jsaData.jenisPekerjaan.trim() || !jsaData.pic.trim() || !jsaData.petugas.some((name) => name.trim()))) {
+      setValidationError("Area, Jenis Pekerjaan, PIC, dan minimal satu Petugas pada JSA wajib diisi");
       return;
     }
 
@@ -201,6 +212,8 @@ export default function WorkshopPermitForm() {
           isSubmit,
           perluJsa,
           jsaFileUrl: jsaFile?.url ?? null,
+          ...(idIjinKerja ? { jsaData } : {}),
+          idIjinKerja,
         }),
       });
       const data = await res.json();
@@ -265,6 +278,15 @@ export default function WorkshopPermitForm() {
           <p className="text-sm text-amber-800">Pastikan semua bagian diisi dengan lengkap dan mendapat persetujuan sebelum pekerjaan dimulai.</p>
         </div>
 
+        {idIjinKerja && (
+          <div className="bg-purple-50 border border-purple-200 rounded-lg p-4 mb-6 flex items-start gap-3">
+            <Lock className="w-5 h-5 text-purple-600 shrink-0 mt-0.5" />
+            <p className="text-sm text-purple-800">
+              Form ini akan terhubung ke Ijin Kerja Eksternal <strong className="font-mono">{idIjinKerja}</strong>.
+            </p>
+          </div>
+        )}
+
         {/* ── BAGIAN 1 ── */}
         <Section title="BAGIAN 1: INFORMASI REGISTRASI & IDENTITAS PEKERJAAN"
           section="bagian1" description="Data registrasi, kontraktor, pekerja, lokasi, dan jadwal"
@@ -283,6 +305,7 @@ export default function WorkshopPermitForm() {
                       <input type="radio" name="tipePerusahaan" value={opt.value}
                         checked={formData.tipePerusahaan === opt.value}
                         onChange={() => setFormData(p => ({ ...p, tipePerusahaan: opt.value as any }))}
+                        disabled={!!idIjinKerja}
                         className="text-orange-500" />
                       <span className="text-sm font-semibold text-slate-800">{opt.label}</span>
                     </div>
@@ -575,7 +598,13 @@ export default function WorkshopPermitForm() {
         </Section>
 
         {/* ── BAGIAN 5: UPLOAD JSA ── */}
-        <JsaUploadSection
+        {idIjinKerja ? <LinkedJsaSection
+          idIjinKerja={idIjinKerja}
+          enabled={perluJsa}
+          setEnabled={setPerluJsa}
+          value={jsaData}
+          setValue={setJsaData}
+        /> : <JsaUploadSection
           perluJsa={perluJsa}
           setPerluJsa={setPerluJsa}
           jsaFile={jsaFile}
@@ -586,7 +615,7 @@ export default function WorkshopPermitForm() {
           setJsaUploadError={setJsaUploadError}
           sectionTitle="BAGIAN 5: UPLOAD JSA"
           sectionStyle="workshop"
-        />
+        />}
 
         {/* Action buttons */}
         <div className="flex justify-between items-center gap-4 bg-white p-6 rounded-xl shadow-md sticky bottom-4 border border-slate-200">
@@ -599,5 +628,19 @@ export default function WorkshopPermitForm() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function WorkshopPermitForm() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center text-slate-500 text-sm">
+          Memuat formulir...
+        </div>
+      }
+    >
+      <WorkshopPermitFormInner />
+    </Suspense>
   );
 }

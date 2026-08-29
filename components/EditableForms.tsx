@@ -1,10 +1,13 @@
 // components/EditableForms.tsx
+// UPDATED: Tambah branch formType === "general-permit" (Ijin Kerja
+// Eksternal) supaya bisa diedit lewat EditModal dengan pola yang sama
+// seperti hot-work/height-work/workshop.
 "use client";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { Camera, Upload, X, ZoomIn, CheckCircle, AlertCircle, Loader2, ImageIcon } from "lucide-react";
 
 interface EditableFormsProps {
-  formType: "hot-work" | "height-work" | "workshop";
+  formType: "hot-work" | "height-work" | "workshop" | "general-permit";
   formData: any;
   onChange: (data: any) => void;
 }
@@ -697,6 +700,82 @@ export default function EditableForms({ formType, formData, onChange }: Editable
               <label className="block text-xs font-medium text-slate-600 mb-1">MR / PGA MGR</label>
               <input type="text" value={localData.mr_pga_mgr || ""} disabled className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm text-slate-500 bg-slate-100 cursor-not-allowed" />
             </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ── GENERAL PERMIT (IJIN KERJA EKSTERNAL) FORM ─────────
+  if (formType === "general-permit") {
+    return (
+      <div className="space-y-4">
+        <div className="border border-slate-200 rounded-lg p-4">
+          <h4 className="font-bold text-slate-800 mb-3 text-sm">Bagian 1: Informasi Kontraktor/Pekerja</h4>
+
+          <div className="mt-1">
+            <label className="block text-xs font-medium text-slate-600 mb-1">Nama Kontraktor/Pekerja</label>
+            <input type="text" value={localData.nama_kontraktor_pekerja || ""} onChange={(e) => handleLocalChange("nama_kontraktor_pekerja", e.target.value)} onBlur={(e) => handleBlur("nama_kontraktor_pekerja", e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm text-black" />
+          </div>
+
+          <div className="mt-3">
+            <label className="block text-xs font-medium text-slate-600 mb-1">Nama Pengawas/PIC Subkont</label>
+            <input type="text" value={localData.nama_pengawas_pic_subkont || ""} onChange={(e) => handleLocalChange("nama_pengawas_pic_subkont", e.target.value)} onBlur={(e) => handleBlur("nama_pengawas_pic_subkont", e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm text-black" />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3 mt-3">
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">Jumlah Tenaga Kerja</label>
+              <input type="number" value={localData.jumlah_tenaga_kerja || ""} onChange={(e) => handleLocalChange("jumlah_tenaga_kerja", e.target.value)} onBlur={(e) => handleBlur("jumlah_tenaga_kerja", e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm text-black" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">Waktu Kerja</label>
+              <input type="time" value={localData.waktu_kerja || ""} onChange={(e) => handleLocalChange("waktu_kerja", e.target.value)} onBlur={(e) => handleBlur("waktu_kerja", e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm text-black" />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3 mt-3">
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">Tanggal Mulai Kerja</label>
+              <input type="date" value={localData.tgl_mulai_kerja ? new Date(localData.tgl_mulai_kerja).toISOString().split("T")[0] : ""} onChange={(e) => handleLocalChange("tgl_mulai_kerja", e.target.value)} onBlur={(e) => handleBlur("tgl_mulai_kerja", e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm text-black" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">Tanggal Akhir Kerja (Rencana)</label>
+              <input type="date" value={localData.tgl_akhir_kerja_rencana ? new Date(localData.tgl_akhir_kerja_rencana).toISOString().split("T")[0] : ""} onChange={(e) => handleLocalChange("tgl_akhir_kerja_rencana", e.target.value)} onBlur={(e) => handleBlur("tgl_akhir_kerja_rencana", e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm text-black" />
+            </div>
+          </div>
+        </div>
+
+        <div className="border border-slate-200 rounded-lg p-4">
+          <h4 className="font-bold text-slate-800 mb-3 text-sm">Bagian 2/4: Deskripsi & Lokasi Pekerjaan</h4>
+          <div className="mb-3">
+            <label className="block text-xs font-medium text-slate-600 mb-1">Deskripsi Pekerjaan</label>
+            <textarea value={localData.deskripsi_pekerjaan || ""} onChange={(e) => handleLocalChange("deskripsi_pekerjaan", e.target.value)} onBlur={(e) => handleBlur("deskripsi_pekerjaan", e.target.value)} rows={3} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm text-black" />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-slate-600 mb-1">Lokasi Pekerjaan</label>
+            <textarea value={localData.lokasi_pekerjaan || ""} onChange={(e) => handleLocalChange("lokasi_pekerjaan", e.target.value)} onBlur={(e) => handleBlur("lokasi_pekerjaan", e.target.value)} rows={2} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm text-black" />
+          </div>
+        </div>
+
+        <div className="border border-slate-200 rounded-lg p-4">
+          <h4 className="font-bold text-slate-800 mb-3 text-sm">Bagian 11: Penanggung Jawab</h4>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">Kontraktor PJ</label>
+              <input type="text" value={localData.kontraktor_pj || ""} onChange={(e) => handleLocalChange("kontraktor_pj", e.target.value)} onBlur={(e) => handleBlur("kontraktor_pj", e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm text-black" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">SPV Terkait PJ</label>
+              <input type="text" value={localData.spv_terkait_pj || ""} onChange={(e) => handleLocalChange("spv_terkait_pj", e.target.value)} onBlur={(e) => handleBlur("spv_terkait_pj", e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm text-black" />
+            </div>
+          </div>
+        </div>
+
+        <div className="border border-slate-200 rounded-lg p-4">
+          <h4 className="font-bold text-slate-800 mb-3 text-sm">Bagian 13: Persetujuan — DISABLED</h4>
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
+            <p className="text-xs text-blue-700"><strong>Info:</strong> Field persetujuan hanya dapat diisi oleh approver (Security/SFO/PGA).</p>
           </div>
         </div>
       </div>

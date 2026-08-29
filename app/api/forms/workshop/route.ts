@@ -2,6 +2,12 @@
 // UPDATED: Tambah kolom perlu_jsa dan jsa_file_url untuk fitur Upload JSA.
 // REFACTOR: current_stage dimulai dari 1 (bukan 0).
 // ADDED: Email notification ke approver pertama saat form di-submit.
+// ADDED (Ijin Kerja Eksternal): Menerima idIjinKerja dari body. Jika ada:
+//   - tipePerusahaan dipaksa 'eksternal'
+//   - divalidasi bahwa form_ijin_kerja tsb ada & milik user yang sama
+//   - divalidasi belum ada Workshop lain yang terhubung ke id_ijin_kerja
+//     yang sama (maksimal 1 form per jenis kerja per Ijin Kerja Eksternal)
+//   - id_ijin_kerja disimpan ke kolom baru form_kerja_workshop.id_ijin_kerja
 
 import { NextRequest, NextResponse } from 'next/server';
 import { query, queryOne } from '@/lib/db';
@@ -48,7 +54,7 @@ export async function GET(req: NextRequest) {
       : `id_form, tanggal, tanggal_pelaksanaan, status,
          no_registrasi, nama_kontraktor_nik, nama_pekerja_nik, nik_pekerja,
          lokasi_pekerjaan, waktu_pukul, tipe_perusahaan, spv_terkait,
-         perlu_jsa, jsa_file_url`;
+         perlu_jsa, jsa_file_url, id_ijin_kerja`;
 
     let sql = `SELECT ${selectCols} FROM form_kerja_workshop`;
     const params: any[] = [];
@@ -77,8 +83,34 @@ export async function POST(req: NextRequest) {
     const idForm = await generateId();
     const now    = new Date().toISOString();
 
-    const tipePerusahaan: 'internal' | 'eksternal' =
+    // ── Relasi Ijin Kerja Eksternal (opsional) ───────────────────────────
+    const idIjinKerja: string | null = f.idIjinKerja || null;
+    let tipePerusahaan: 'internal' | 'eksternal' =
       f.tipePerusahaan === 'eksternal' ? 'eksternal' : 'internal';
+
+    if (idIjinKerja) {
+      tipePerusahaan = 'eksternal';
+      const gp = await queryOne<{ id_form: string; user_id: number }>(
+        `SELECT id_form, user_id FROM form_ijin_kerja WHERE id_form = $1`,
+        [idIjinKerja]
+      );
+      if (!gp) {
+        return NextResponse.json({ error: 'Ijin Kerja Eksternal tidak ditemukan' }, { status: 404 });
+      }
+      if (userId && gp.user_id !== parseInt(userId)) {
+        return NextResponse.json({ error: 'Ijin Kerja Eksternal ini bukan milik Anda' }, { status: 403 });
+      }
+      const existing = await queryOne(
+        `SELECT id_form FROM form_kerja_workshop WHERE id_ijin_kerja = $1`,
+        [idIjinKerja]
+      );
+      if (existing) {
+        return NextResponse.json(
+          { error: `Ijin Kerja Workshop untuk ${idIjinKerja} sudah pernah dibuat (${existing.id_form}). Maksimal 1 form per jenis kerja.` },
+          { status: 409 }
+        );
+      }
+    }
 
     const startStage = 1;
     const status = isSubmit ? 'submitted' : 'draft';
@@ -89,6 +121,10 @@ export async function POST(req: NextRequest) {
 
     const perluJsa   = f.perluJsa === true;
     const jsaFileUrl = perluJsa ? (f.jsaFileUrl || null) : null;
+    const linkedJsaData = idIjinKerja && f.jsaData && typeof f.jsaData === 'object' ? f.jsaData : null;
+    if (idIjinKerja && isSubmit && perluJsa && (!linkedJsaData || !String(linkedJsaData.area || '').trim() || !String(linkedJsaData.jenisPekerjaan || '').trim() || !String(linkedJsaData.pic || '').trim() || !Array.isArray(linkedJsaData.petugas) || !linkedJsaData.petugas.some((name: unknown) => typeof name === 'string' && name.trim()))) {
+      return NextResponse.json({ error: 'JSA terhubung harus memiliki Area, Jenis Pekerjaan, PIC, dan minimal satu Petugas.' }, { status: 400 });
+    }
 
     await query(
       `INSERT INTO form_kerja_workshop (
@@ -117,7 +153,7 @@ export async function POST(req: NextRequest) {
         permintaan_tambahan,
         spv_terkait, kontraktor, sfo, pga,
         perlu_jsa, jsa_file_url,
-        user_id
+        user_id, id_ijin_kerja
       ) VALUES (
         $1,$2,$3,$4,$5,$6,
         $7,$8,$9,$10,$11,
@@ -132,7 +168,7 @@ export async function POST(req: NextRequest) {
         $58,
         $59,$60,$61,$62,
         $63,$64,
-        $65,$66
+        $65,$66,$67
       )`,
       [
         idForm, now,
@@ -185,12 +221,16 @@ export async function POST(req: NextRequest) {
         f.pencegahan?.permintaan_tambahan || null,
         null, null, null, null,
         perluJsa, jsaFileUrl,
-        userId ?? null,
+        userId ?? null, idIjinKerja,
       ]
     );
 
+    if (linkedJsaData) {
+      await query(`UPDATE form_ijin_kerja SET jsa_data = $1 WHERE id_form = $2`, [JSON.stringify(linkedJsaData), idIjinKerja]);
+    }
+
     // ── Email: kirim ke approver pertama jika status submitted (fire-and-forget) ──
-    if (status === 'submitted' && userId) {
+    if (status === 'submitted' && userId && !idIjinKerja) {
       notifyFirstApprover({
         formType:       'workshop',
         idForm,

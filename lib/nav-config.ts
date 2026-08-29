@@ -3,7 +3,7 @@
 // Dipakai oleh components/Sidebar.tsx (menu utama) dan app/home/page.tsx
 // (kartu "Akses Cepat"), supaya label, href, dan ikon antar keduanya
 // selalu konsisten dan tidak perlu diubah di dua tempat berbeda.
-import type { LucideIcon } from "lucide-react";
+import { LucideIcon, Building2 } from "lucide-react";
 import {
   Home,
   BarChart3,
@@ -68,6 +68,7 @@ export function getNavSections(role: UserRole): NavSection[] {
         items: [
           { label: "Kelola Akun Users", href: "/admin-users", icon: Users },
           { label: "Master Lisence", href: "/master-lisence", icon: BadgeCheck },
+          { label: "Kelola Departemen", href: "/kelola-departemen", icon: Building2 }, // ← baru
           { label: "Daftar File Form", href: "/form-files", icon: FileText },
           { label: "Pengaturan SMTP", href: "/smtp-settings", icon: Mail },
         ],

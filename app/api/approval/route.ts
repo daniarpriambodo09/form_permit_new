@@ -65,6 +65,7 @@ function buildSelectQuery(
            f.sfo_approved, f.sfo_approved_by,
            f.${pgaColumn} AS mr_pga_approved,
            f.${pgaColumn}_by AS mr_pga_approved_by,
+           f.id_ijin_kerja,
            (${TIPE_EXPR.replace(/tipe_perusahaan/g, 'f.tipe_perusahaan').replace(/petugas_ketinggian/g, 'f.petugas_ketinggian')}) AS tipe_perusahaan,
            '${formType}' AS jenis_form
          FROM ${table} f
@@ -88,6 +89,7 @@ function buildSelectQuery(
          f.sfo_approved, f.sfo_approved_by,
          f.${pgaColumn} AS mr_pga_approved,
          f.${pgaColumn}_by AS mr_pga_approved_by,
+         f.id_ijin_kerja,
          (${TIPE_EXPR_FW.replace(/tipe_perusahaan/g, 'f.tipe_perusahaan')}) AS tipe_perusahaan,
          '${formType}' AS jenis_form
        FROM ${table} f
@@ -115,6 +117,7 @@ function buildSelectQuery(
          sfo_approved, sfo_approved_by,
          ${pgaColumn} AS mr_pga_approved,
          ${pgaColumn}_by AS mr_pga_approved_by,
+         id_ijin_kerja,
          (${TIPE_EXPR}) AS tipe_perusahaan,
          '${formType}' AS jenis_form
        FROM ${table}
@@ -136,6 +139,7 @@ function buildSelectQuery(
        sfo_approved, sfo_approved_by,
        ${pgaColumn} AS mr_pga_approved,
        ${pgaColumn}_by AS mr_pga_approved_by,
+      id_ijin_kerja,
        (${TIPE_EXPR_FW}) AS tipe_perusahaan,
        '${formType}' AS jenis_form
      FROM ${table}
