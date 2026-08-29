@@ -24,6 +24,7 @@ const JWT_EXPIRES = '8h';
 export type UserRole =
   | 'worker'
   | 'firewatch'   // tetap ada untuk login, tapi tidak bisa approve
+  | 'security'
   | 'spv'
   | 'kontraktor'
   | 'admin_k3'
@@ -36,6 +37,7 @@ export type UserRole =
 export const ROLE_ORDER: Record<UserRole, number> = {
   worker:     0,
   firewatch:  0,  // tidak punya hak approve
+  security:   2,
   spv:        1,
   kontraktor: 2,
   admin_k3:   3,
@@ -92,6 +94,7 @@ export const STAGE_TO_ROLE = STAGE_TO_ROLE_FW_INTERNAL;
 export const ROLE_TO_STAGE: Record<UserRole, number> = {
   worker:     -1,
   firewatch:  -1,  // TIDAK punya stage approval
+  security:   -1,
   spv:         1,
   kontraktor:  1,  // stage 1 di alur eksternal
   admin_k3:    2,
@@ -179,7 +182,7 @@ export function canUserApproveAtStage(
   if (userRole === 'admin') return true;
 
   // firewatch tidak punya hak approve sama sekali
-  if (userRole === 'firewatch' || userRole === 'worker') return false;
+  if (userRole === 'firewatch' || userRole === 'worker' || userRole === 'security') return false;
 
   const stageMap     = getStageToRoleMap(formType || '', tipePerusahaan);
   const requiredRole = stageMap[currentStage];

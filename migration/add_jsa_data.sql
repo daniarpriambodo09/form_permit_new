@@ -5,6 +5,9 @@ ALTER TABLE form_ijin_kerja
   ADD COLUMN IF NOT EXISTS izin_kerja_tanggal_dari date,
   ADD COLUMN IF NOT EXISTS izin_kerja_tanggal_sampai date;
 
+ALTER TABLE form_ijin_kerja
+  ADD COLUMN IF NOT EXISTS safety_induction jsonb;
+
 UPDATE form_ijin_kerja
 SET jsa_data = jsonb_build_object(
   'legacyFileUrl', jsa_file_url

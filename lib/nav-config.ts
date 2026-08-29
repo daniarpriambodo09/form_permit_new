@@ -71,6 +71,7 @@ export function getNavSections(role: UserRole): NavSection[] {
           { label: "Kelola Departemen", href: "/kelola-departemen", icon: Building2 }, // ← baru
           { label: "Daftar File Form", href: "/form-files", icon: FileText },
           { label: "Pengaturan SMTP", href: "/smtp-settings", icon: Mail },
+          { label: "Routing Email Admin K3", href:  "/admin/admin-k3-routing", icon:  Mail },
         ],
       },
     ];

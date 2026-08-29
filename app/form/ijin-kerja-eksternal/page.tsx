@@ -27,6 +27,7 @@ import JsaBuilderSection, { createEmptyJsa, type JsaData } from "@/components/Js
 import LicenseUploadSection, {
   type LicenseFileInfo,
 } from "@/components/LicenseUploadSection";
+import { createEmptySafetyInduction, type SafetyInductionData } from "@/components/SafetyInductionSection";
 
 type Kondisi = "" | "ok" | "ng";
 interface AlatItem { pakai: boolean; kondisi: Kondisi }
@@ -186,6 +187,7 @@ export default function IjinKerjaEksternalPage() {
   // ── JSA state (Bagian 4) ────────────────────────────────────────────
   const [perluJsa, setPerluJsa] = useState(false);
   const [jsa, setJsa] = useState<JsaData>(createEmptyJsa());
+  const [safetyInduction, setSafetyInduction] = useState<SafetyInductionData>(createEmptySafetyInduction);
 
   // ── Upload Lisensi state (Bagian 9) — wajib, bisa lebih dari 1 file ──
   const [licenseFiles, setLicenseFiles] = useState<LicenseFileInfo[]>([]);
@@ -210,6 +212,7 @@ export default function IjinKerjaEksternalPage() {
     // Bagian 4: JSA terstruktur
     perluJsa,
     jsaData: perluJsa ? jsa : null,
+    safetyInduction,
     // Bagian 9: Upload Lisensi — array file (wajib, bisa lebih dari satu)
     licenseFiles: licenseFiles
       .filter((f) => f.status === "success" && f.url)

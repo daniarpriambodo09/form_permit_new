@@ -10,7 +10,7 @@ import { hashPassword, verifyToken, COOKIE_NAME } from '@/lib/auth';
 import { encryptPassword } from '@/lib/crypto';
 
 const APPROVER_ROLES = [
-  'spv', 'kontraktor', 'admin_k3', 'sfo', 'smr', 'admin',
+  'spv', 'kontraktor', 'admin_k3', 'sfo', 'smr', 'security', 'admin',
 ] as const;
 
 type ApproverRole = (typeof APPROVER_ROLES)[number];
@@ -26,6 +26,7 @@ const JABATAN_LABEL: Record<ApproverRole, string> = {
   admin_k3:   'Admin K3',
   sfo:        'SFO',
   smr:        'SMR',
+  security:   'Security',
   admin:      'Administrator',
 };
 

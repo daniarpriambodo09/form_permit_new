@@ -178,6 +178,9 @@ jai_permit_db=# \d form_ijin_kerja
  perlu_jsa                        | boolean                  |           |          | false
  jsa_file_url                     | text                     |           |          |
  license_files                    | jsonb                    |           |          | '[]'::jsonb
+ jsa_data                         | jsonb                    |           |          |
+ izin_kerja_tanggal_dari          | date                     |           |          |
+ izin_kerja_tanggal_sampai        | date                     |           |          |
 Indexes:
     "form_ijin_kerja_pkey" PRIMARY KEY, btree (id)
     "form_ijin_kerja_edit_token_key" UNIQUE CONSTRAINT, btree (edit_token)
@@ -196,6 +199,7 @@ Triggers:
     trg_ijk_updated BEFORE UPDATE ON form_ijin_kerja FOR EACH ROW EXECUTE FUNCTION update_updated_at()
 
 
+jai_permit_db=#
 jai_permit_db=# \d form_kerja_ketinggian
                                                         Table "public.form_kerja_ketinggian"
                     Column                     |           Type           | Collation | Nullable |                      Default
@@ -322,6 +326,12 @@ Triggers:
     trg_ketinggian_updated BEFORE UPDATE ON form_kerja_ketinggian FOR EACH ROW EXECUTE FUNCTION update_updated_at()
 
 
+jai_permit_db=#
+jai_permit_db=#
+jai_permit_db=#
+jai_permit_db=#
+jai_permit_db=#
+jai_permit_db=#
 jai_permit_db=# \d form_kerja_panas
                                                         Table "public.form_kerja_panas"
                     Column                     |           Type           | Collation | Nullable |                   Default
@@ -570,43 +580,6 @@ Foreign-key constraints:
     "form_kerja_workshop_user_id_fkey" FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
 Triggers:
     trg_workshop_updated BEFORE UPDATE ON form_kerja_workshop FOR EACH ROW EXECUTE FUNCTION update_updated_at()
-
-
-jai_permit_db=#
-jai_permit_db=# \d master_lisence
-                                       Table "public.master_lisence"
-   Column    |           Type           | Collation | Nullable |                  Default
--------------+--------------------------+-----------+----------+--------------------------------------------
- id          | integer                  |           | not null | nextval('master_lisence_id_seq'::regclass)
- nama        | character varying(255)   |           | not null |
- nik         | character varying(50)    |           | not null |
- jenis_kerja | character varying(20)    |           | not null |
- file_url    | text                     |           | not null |
- file_type   | character varying(10)    |           | not null |
- file_name   | character varying(255)   |           |          |
- tanggal_exp | date                     |           | not null |
- is_active   | boolean                  |           | not null | true
- created_by  | integer                  |           |          |
- updated_by  | integer                  |           |          |
- created_at  | timestamp with time zone |           | not null | now()
- updated_at  | timestamp with time zone |           | not null | now()
- departemen  | character varying(50)    |           |          |
-Indexes:
-    "master_lisence_pkey" PRIMARY KEY, btree (id)
-    "idx_master_lisence_departemen" btree (departemen)
-    "idx_master_lisence_exp" btree (tanggal_exp)
-    "idx_master_lisence_jenis_kerja" btree (jenis_kerja)
-    "idx_master_lisence_nama" btree (nama)
-    "idx_master_lisence_nik" btree (nik)
-    "master_lisence_nik_jenis_unique" UNIQUE CONSTRAINT, btree (nik, jenis_kerja)
-Check constraints:
-    "master_lisence_file_type_check" CHECK (file_type::text = ANY (ARRAY['pdf'::character varying, 'image'::character varying]::text[]))
-    "master_lisence_jenis_kerja_check" CHECK (jenis_kerja::text = ANY (ARRAY['hot_work'::character varying, 'height_work'::character varying, 'workshop'::character varying]::text[]))
-Foreign-key constraints:
-    "master_lisence_created_by_fkey" FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
-    "master_lisence_updated_by_fkey" FOREIGN KEY (updated_by) REFERENCES users(id) ON DELETE SET NULL
-Triggers:
-    trg_master_lisence_updated BEFORE UPDATE ON master_lisence FOR EACH ROW EXECUTE FUNCTION update_updated_at()
 
 
 jai_permit_db=# \d smtp_settings

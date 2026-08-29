@@ -221,6 +221,34 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ data: [], total: 0, message: 'Fire Watch tidak memiliki antrian approval.' });
     }
 
+    // SECURITY: mengisi dan menyetujui Safety Induction pada form eksternal.
+    if (userRole === 'security') {
+      if (countOnly) {
+        const result = await query(`SELECT COUNT(*) FROM form_ijin_kerja WHERE status = 'submitted' AND COALESCE(safety_induction->>'status', 'draft') <> 'approved'`);
+        return NextResponse.json({ counts: { submitted: Number(result[0].count), approved: 0, rejected: 0 } });
+      }
+      if (statusFilter === 'submitted') {
+        const rows = await query(
+          `SELECT id_form, tanggal, tanggal_pelaksanaan, status,
+                  nama_kontraktor_pekerja AS nama_kontraktor_nik,
+                  lokasi_pekerjaan, current_stage,
+                  security_approved,
+                  NULL::boolean AS spv_approved,
+                  NULL::boolean AS kontraktor_approved,
+                  NULL::boolean AS admin_k3_approved,
+                  NULL::boolean AS sfo_approved,
+                  NULL::boolean AS mr_pga_approved,
+                  NULL::text AS tipe_perusahaan,
+                  NULL::text AS id_ijin_kerja,
+                  'external-permit' AS jenis_form
+             FROM form_ijin_kerja
+            WHERE status = 'submitted' AND COALESCE(safety_induction->>'status', 'draft') <> 'approved'
+            ORDER BY tanggal ASC`);
+        return NextResponse.json({ data: rows, total: rows.length });
+      }
+      return NextResponse.json({ data: [], total: 0 });
+    }
+
     // ── SPV ──────────────────────────────────────────────────────
     // ADDED: Filter departmen — SPV hanya melihat form dari departemennya sendiri.
     // Mengambil departmen SPV dari DB (tidak ada di JWT payload).

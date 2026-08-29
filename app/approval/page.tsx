@@ -5,6 +5,9 @@
 //           SessionStorage hanya untuk tampilan nama, bukan sumber kebenaran auth.
 // ADDED: Tombol "Download Excel (Workshop)" — hanya tampil untuk role admin.
 //        Mengunduh rekap form Workshop sesuai tab status yang sedang aktif.
+// ADDED: Tombol "Routing Email Admin K3" — hanya tampil untuk role admin.
+//        Menuju halaman pengaturan email Admin K3 per jenis form
+//        (hot-work/height-work → user tertentu, workshop → user lain).
 "use client";
 import { useState, useEffect } from "react";
 import Link from "next/link";
@@ -12,7 +15,7 @@ import { useRouter } from "next/navigation";
 import {
   Home, CheckCircle, XCircle, Clock, Eye,
   LogOut, User, FileText, RefreshCw,
-  Shield, ShieldCheck, Download, Loader2,
+  Shield, ShieldCheck, Download, Loader2, Mail,
 } from "lucide-react";
 import { useApproverAuth } from "@/hooks/useApproverAuth";
 import AuthLoadingSpinner from "@/components/AuthLoadingSpinner";
@@ -37,6 +40,7 @@ interface FormItem {
   admin_k3_approved?: boolean;
   sfo_approved?: boolean;
   mr_pga_approved?: boolean; // kolom DB tetap, bukan pga_approved
+  security_approved?: boolean; // untuk form external-permit (Safety Induction)
   id_ijin_kerja?: string | null;
 }
 
@@ -56,12 +60,14 @@ const jenisLabel: Record<string, string> = {
   "hot-work":    "Hot Work Permit",
   "workshop":    "Workshop Permit",
   "height-work": "Kerja Ketinggian",
+  "external-permit": "Safety Induction",
 };
 
 const jenisBadge: Record<string, string> = {
-  "hot-work":    "bg-red-100 text-red-700",
-  "workshop":    "bg-purple-100 text-purple-700",
-  "height-work": "bg-orange-100 text-orange-700",
+  "hot-work":         "bg-red-100 text-red-700",
+  "workshop":         "bg-purple-100 text-purple-700",
+  "height-work":      "bg-orange-100 text-orange-700",
+  "external-permit":  "bg-teal-100 text-teal-700",
 };
 
 const roleLabelMap: Record<string, string> = {
@@ -92,6 +98,11 @@ function getStageLabelForForm(form: FormItem): string {
 
 function getApprovalStages(form: FormItem): { key: keyof FormItem; label: string }[] {
   const isEksternal = form.tipe_perusahaan === "eksternal";
+
+  // Form Safety Induction (external-permit) — hanya satu stage: Security
+  if (form.jenis_form === "external-permit") {
+    return [{ key: "security_approved", label: "Security" }];
+  }
 
   if (form.jenis_form === "height-work") {
     if (isEksternal) {
@@ -235,7 +246,8 @@ export default function ApprovalPage() {
   if (authLoading || !user) return <AuthLoadingSpinner />;
 
   const filtered = forms.filter(f => filterJenis === "all" || f.jenis_form === filterJenis);
-  const isAdmin  = user.role === "admin";
+  const isAdmin    = user.role === "admin";
+  const isSecurity = user.role === "security";
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -258,6 +270,17 @@ export default function ApprovalPage() {
               </div>
             </div>
             <div className="flex items-center gap-3">
+              {/* ADDED: Shortcut ke pengaturan routing email Admin K3 — admin only */}
+              {isAdmin && (
+                <Link
+                  href="/admin/admin-k3-routing"
+                  title="Atur email Admin K3 per jenis form (hot-work/height-work/workshop)"
+                  className="hidden md:flex items-center gap-1.5 px-3 py-2 text-sm text-slate-600
+                             hover:bg-orange-50 hover:text-orange-600 rounded-lg transition-colors"
+                >
+                  <Mail className="w-4 h-4" /> Routing Admin K3
+                </Link>
+              )}
               {/* Gunakan data dari user (hasil /api/auth/me), bukan sessionStorage */}
               <div className="hidden md:flex items-center gap-2 bg-slate-100 rounded-lg px-3 py-2">
                 <User className="w-4 h-4 text-slate-500" />
@@ -325,7 +348,7 @@ export default function ApprovalPage() {
         <div className="bg-white rounded-xl border border-slate-200 p-4 flex items-center gap-2 flex-wrap justify-between">
           <div className="flex items-center gap-2 flex-wrap">
             <span className="text-xs font-semibold text-slate-500 mr-1">Filter:</span>
-            {["all", "hot-work", "workshop", "height-work"].map(type => (
+            {["all", "hot-work", "workshop", "height-work", ...(isSecurity || isAdmin ? ["external-permit"] : [])].map(type => (
               <button key={type} onClick={() => setFilterJenis(type)}
                 className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
                   filterJenis === type ? "bg-orange-600 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
@@ -335,20 +358,33 @@ export default function ApprovalPage() {
             ))}
           </div>
 
-          {/* ADDED: Tombol download rekap Excel Workshop — hanya untuk admin */}
-          {isAdmin && (
-            <button
-              onClick={handleExportWorkshop}
-              disabled={exportLoading}
-              title="Download rekap Excel khusus Workshop Permit sesuai tab yang sedang aktif"
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold
-                         bg-green-600 hover:bg-green-700 text-white transition-colors disabled:opacity-50">
-              {exportLoading
-                ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                : <Download className="w-3.5 h-3.5" />}
-              Excel Workshop
-            </button>
-          )}
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* ADDED: Shortcut mobile ke Routing Admin K3 (versi md:hidden, karena versi header disembunyikan di layar kecil) */}
+            {isAdmin && (
+              <Link
+                href="/admin/admin-k3-routing"
+                className="md:hidden flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold
+                           bg-slate-100 hover:bg-slate-200 text-slate-600 transition-colors"
+              >
+                <Mail className="w-3.5 h-3.5" /> Routing Admin K3
+              </Link>
+            )}
+
+            {/* ADDED: Tombol download rekap Excel Workshop — hanya untuk admin */}
+            {isAdmin && (
+              <button
+                onClick={handleExportWorkshop}
+                disabled={exportLoading}
+                title="Download rekap Excel khusus Workshop Permit sesuai tab yang sedang aktif"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold
+                           bg-green-600 hover:bg-green-700 text-white transition-colors disabled:opacity-50">
+                {exportLoading
+                  ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  : <Download className="w-3.5 h-3.5" />}
+                Excel Workshop
+              </button>
+            )}
+          </div>
         </div>
 
         {/* List */}
@@ -470,7 +506,16 @@ export default function ApprovalPage() {
                       )}
                     </div>
 
-                    <Link href={form.id_ijin_kerja ? `/approval/external/${form.id_ijin_kerja}` : `/approval/${form.jenis_form}/${form.id_form}`}
+                    {/* Link ke halaman review */}
+                    <Link href={
+                      // external-permit: selalu ke /approval/external/[id]
+                      form.jenis_form === "external-permit"
+                        ? `/approval/external/${form.id_form}`
+                        // Form yang terkait ke Ijin Kerja Eksternal: ke halaman external parent
+                        : form.id_ijin_kerja
+                          ? `/approval/external/${form.id_ijin_kerja}`
+                          : `/approval/${form.jenis_form}/${form.id_form}`
+                    }
                       className="shrink-0 flex items-center gap-1.5 px-4 py-2.5
                                  bg-orange-600 hover:bg-orange-700 text-white
                                  rounded-lg text-sm font-semibold transition-colors">

@@ -32,7 +32,7 @@ const ADMIN_ONLY_ROUTES = [
 ];
 
 export function middleware(req: NextRequest) {
-  const allowedApproverRoles = ['spv', 'admin', 'kontraktor', 'sfo', 'pga', 'firewatch', 'admin_k3'];
+  const allowedApproverRoles = ['spv', 'admin', 'kontraktor', 'sfo', 'pga', 'firewatch', 'admin_k3', 'security'];
   const { pathname } = req.nextUrl;
 
   // FIX: Skip middleware untuk _next/static, _next/image, favicon, dll.

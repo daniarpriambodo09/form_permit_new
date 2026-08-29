@@ -3,7 +3,11 @@
 // Menentukan approver berikutnya, mencari email mereka dari DB,
 // lalu memanggil fungsi sendEmail dari lib/email.ts.
 //
-// Tidak mengubah logika approval yang ada — murni additive.
+// UPDATED: Saat approverRole === 'admin_k3' dan formType termasuk
+// hot-work/height-work/workshop, email SEKARANG dicek dulu ke tabel
+// admin_k3_email_routing (diatur lewat halaman /admin/admin-k3-routing).
+// Jika belum diatur untuk jenis form tsb, fallback ke perilaku lama
+// (kirim ke semua user role='admin_k3').
 
 import { queryOne, query } from '@/lib/db';
 import {
@@ -16,18 +20,11 @@ import {
   sendRejectionNotification,
   sendExternalApprovalNotification,
 } from '@/lib/email';
+import { getAdminK3ApproverForForm, JenisFormK3 } from '@/lib/admin-k3-routing';
 
 // ── Tipe data ────────────────────────────────────────────────
 
 export type FormType = 'hot-work' | 'workshop' | 'height-work';
-
-interface FormRow {
-  id_form:          string;
-  tipe_perusahaan:  string;
-  current_stage:    number;
-  user_id:          number | null;
-  tanggal:          string;
-}
 
 interface UserRow {
   id:        number;
@@ -36,6 +33,8 @@ interface UserRow {
   role:      string;
   departmen: string | null;
 }
+
+const ROUTABLE_FORM_TYPES: FormType[] = ['hot-work', 'height-work', 'workshop'];
 
 // ── Label jenis form ─────────────────────────────────────────
 
@@ -64,9 +63,6 @@ function formatTanggal(dateStr: string): string {
 }
 
 // ── getNextApprover: role approver pada stage berikutnya ─────
-//
-// Mengembalikan role yang harus approve pada nextStage.
-// Mengembalikan null jika sudah stage terakhir (completed).
 
 export function getNextApprover(
   formType:        FormType,
@@ -82,18 +78,16 @@ export function getNextApprover(
   return stageMap[nextStage] ?? null;
 }
 
-// ── getApproverEmail: cari email approver dari DB ────────────
+// ── getApproverEmails: cari email approver dari DB (perilaku lama) ──
 //
 // Untuk SPV: filter berdasarkan departmen pembuat form.
-// Untuk role lain: ambil user pertama aktif dengan role tersebut.
-// Mengembalikan array karena bisa ada lebih dari satu (misalnya banyak SPV se-departemen).
+// Untuk role lain: ambil semua user aktif dengan role tersebut.
 
 export async function getApproverEmails(
   role:              UserRole,
   makerDepartmen?:   string | null,
 ): Promise<UserRow[]> {
   if (role === 'spv' && makerDepartmen) {
-    // SPV harus dari departemen yang sama dengan pembuat form
     const rows = await query<UserRow>(
       `SELECT id, nama, email, role, departmen
        FROM users
@@ -107,7 +101,6 @@ export async function getApproverEmails(
     return rows;
   }
 
-  // Role lain: semua user aktif dengan role tersebut
   const rows = await query<UserRow>(
     `SELECT id, nama, email, role, departmen
      FROM users
@@ -120,7 +113,7 @@ export async function getApproverEmails(
   return rows;
 }
 
-// ── getMakerDepartmen: ambil departmen pembuat form ──────────
+// ── getMakerDepartmen / getMakerUser ─────────────────────────
 
 async function getMakerDepartmen(userId: number | null): Promise<string | null> {
   if (!userId) return null;
@@ -131,8 +124,6 @@ async function getMakerDepartmen(userId: number | null): Promise<string | null> 
   return row?.departmen ?? null;
 }
 
-// ── getMakerUser: ambil data lengkap pembuat form ────────────
-
 async function getMakerUser(userId: number | null): Promise<UserRow | null> {
   if (!userId) return null;
   return queryOne<UserRow>(
@@ -142,18 +133,6 @@ async function getMakerUser(userId: number | null): Promise<UserRow | null> {
 }
 
 // ── notifyNextApprover: kirim email setelah approval ─────────
-//
-// Dipanggil setelah approver berhasil approve (bukan last stage).
-// nextStage = currentStage + 1 (sudah di-increment di route approval).
-//
-// Parameter:
-//   formType        - jenis form
-//   idForm          - ID form (e.g. "HOW-1030")
-//   tipePerusahaan  - 'internal' | 'eksternal'
-//   nextStage       - stage berikutnya (setelah approval)
-//   userId          - user_id pembuat form (untuk filter departemen SPV)
-//   namaPemohon     - nama pembuat form
-//   tanggal         - tanggal form dibuat
 
 export async function notifyNextApprover(params: {
   formType:        FormType;
@@ -175,9 +154,30 @@ export async function notifyNextApprover(params: {
       return;
     }
 
-    // Ambil departmen pembuat untuk filter SPV
-    const makerDepartmen = await getMakerDepartmen(userId);
+    // ── ROUTING KHUSUS: stage Admin K3 untuk hot-work/height-work/workshop ──
+    // Kalau sudah diatur di halaman /admin/admin-k3-routing, kirim HANYA
+    // ke Admin K3 yang dipilih untuk jenis form ini, lalu selesai (jangan
+    // lanjut ke fallback "semua admin_k3").
+    if (approverRole === 'admin_k3' && ROUTABLE_FORM_TYPES.includes(formType)) {
+      const routed = await getAdminK3ApproverForForm(formType as JenisFormK3);
+      if (routed?.email) {
+        await sendApprovalNotification({
+          idForm,
+          jenisForm:     getFormLabel(formType),
+          namaPemohon,
+          tanggal:       formatTanggal(tanggal),
+          approverName:  routed.nama,
+          approverEmail: routed.email,
+        });
+        console.log(`[EMAIL] Admin K3 routing aktif untuk ${formType} → dikirim ke ${routed.nama} (${routed.email})`);
+        return;
+      }
+      console.log(`[EMAIL] Belum ada routing Admin K3 untuk "${formType}" — fallback ke semua Admin K3.`);
+      // sengaja tidak return, lanjut ke logika default di bawah
+    }
 
+    // ── Perilaku default (SPV per-departemen, atau semua user per-role) ──
+    const makerDepartmen = await getMakerDepartmen(userId);
     const approvers = await getApproverEmails(approverRole, makerDepartmen);
 
     if (approvers.length === 0) {
@@ -185,7 +185,6 @@ export async function notifyNextApprover(params: {
       return;
     }
 
-    // Kirim ke semua approver yang cocok (bisa lebih dari satu SPV se-departemen)
     for (const approver of approvers) {
       if (!approver.email) continue;
 
@@ -201,14 +200,10 @@ export async function notifyNextApprover(params: {
 
   } catch (err) {
     console.error(`[EMAIL] Failed to send approval notification for ${idForm}:`, err);
-    // Tidak melempar error agar tidak mengganggu response approval
   }
 }
 
-// ── notifyFirstApprover: kirim email saat form pertama kali submitted ──
-//
-// Sama seperti notifyNextApprover tapi dipanggil dari route POST form.
-// Stage pertama selalu 1.
+// ── notifyFirstApprover ───────────────────────────────────────
 
 export async function notifyFirstApprover(params: {
   formType:       FormType;
@@ -224,14 +219,14 @@ export async function notifyFirstApprover(params: {
     formType,
     idForm,
     tipePerusahaan,
-    nextStage: 1,  // stage pertama
+    nextStage: 1,
     userId,
     namaPemohon,
     tanggal,
   });
 }
 
-// ── notifyFormRejected: kirim email ke pembuat form saat reject ──
+// ── notifyFormRejected ────────────────────────────────────────
 
 export async function notifyFormRejected(params: {
   formType:      FormType;
@@ -266,7 +261,6 @@ export async function notifyFormRejected(params: {
 
   } catch (err) {
     console.error(`[EMAIL] Failed to send rejection notification for ${idForm}:`, err);
-    // Tidak melempar error agar tidak mengganggu response reject
   }
 }
 

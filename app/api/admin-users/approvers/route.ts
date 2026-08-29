@@ -24,15 +24,15 @@ export async function GET(req: NextRequest) {
 
   try {
     const rows = await query<{
-      id:         number;
-      nama:       string;
-      username:   string;
-      role:       string;
-      nik:        string | null;
-      departmen:  string | null;
-      email:      string | null;
-      no_telp:    string | null;
-      is_active:  boolean;
+      id: number;
+      nama: string;
+      username: string;
+      role: string;
+      nik: string | null;
+      departmen: string | null;
+      email: string | null;
+      no_telp: string | null;
+      is_active: boolean;
       created_at: string;
     }>(
       `SELECT
@@ -47,7 +47,7 @@ export async function GET(req: NextRequest) {
          is_active,
          created_at
        FROM users
-       WHERE role IN ('spv', 'kontraktor', 'admin_k3', 'sfo', 'smr', 'admin')
+       WHERE role IN ('spv', 'kontraktor', 'admin_k3', 'sfo', 'smr', 'admin','security')
        ORDER BY role ASC, created_at DESC`,
       // ↑ 'pga' diganti 'smr' sesuai nilai baru di kolom role tabel users
       []

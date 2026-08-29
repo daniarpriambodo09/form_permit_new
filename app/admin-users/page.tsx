@@ -80,6 +80,7 @@ const APPROVER_ROLE_OPTIONS = [
   { value: "admin_k3",   label: "Admin K3" },
   { value: "sfo",        label: "SFO" },
   { value: "smr",        label: "SMR" },
+  { value: "security",   label: "Security" },
   { value: "admin",      label: "Admin" },
 ] as const;
 
@@ -89,6 +90,7 @@ const ROLE_LABEL: Record<string, string> = {
   admin_k3:   "Admin K3",
   sfo:        "SFO",
   smr:        "SMR",
+  security:   "Security",
   admin:      "Admin",
   worker:     "Worker",
   firewatch:  "Fire Watch",

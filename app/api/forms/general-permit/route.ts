@@ -100,6 +100,9 @@ export async function POST(req: NextRequest) {
     // ── JSA fields (Bagian 4) ─────────────────────────────────────────
     const perluJsa   = f.perluJsa === true;
     const jsaFileUrl = perluJsa ? (f.jsaFileUrl || null) : null;
+    const safetyInduction = f.safetyInduction && typeof f.safetyInduction === 'object'
+      ? f.safetyInduction
+      : null;
     const jsaData = perluJsa && f.jsaData && typeof f.jsaData === 'object'
       ? {
           area: typeof f.jsaData.area === 'string' ? f.jsaData.area : '',
@@ -182,7 +185,7 @@ export async function POST(req: NextRequest) {
         kontraktor_pj, spv_terkait_pj,
         pernyataan_diperiksa, pengawas_pekerjaan_user,
         edit_token, user_id, perlu_jsa, jsa_file_url, license_files,
-        izin_kerja_tanggal_dari, izin_kerja_tanggal_sampai
+        izin_kerja_tanggal_dari, izin_kerja_tanggal_sampai, safety_induction
       ) VALUES (
         $1,$2,$3,$4,
         $5,$6,$7,
@@ -217,7 +220,7 @@ export async function POST(req: NextRequest) {
         $88,$89,
         $90,$91,
         $92,$93,
-        $94,$95,$96,$97,$98,$99,$100
+        $94,$95,$96,$97,$98,$99,$100,$101
       )`,
       [
         idForm, now, toIso(f.tglMulaiKerja), status,
@@ -297,7 +300,7 @@ export async function POST(req: NextRequest) {
         f.kontraktorPj || null, f.spvTerkaitPj || null,
         f.pernyataanDiperiksa ?? false, f.pengawasPekerjaanUser || null,
         editToken, userId, perluJsa, jsaFileUrl, JSON.stringify(licenseFiles),
-        f.tglMulaiKerja || null, f.tglAkhirKerjaRencana || null,
+        f.tglMulaiKerja || null, f.tglAkhirKerjaRencana || null, JSON.stringify(safetyInduction),
       ]
     );
 

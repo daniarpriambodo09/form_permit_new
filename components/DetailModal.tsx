@@ -11,6 +11,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { X, Loader2, AlertCircle, ZoomIn, FileText, Eye, Download } from "lucide-react";
 import ApprovalQRCard from "@/components/ApprovalQRCard";
+import SafetyInductionSection, { createEmptySafetyInduction, type SafetyInductionData } from "@/components/SafetyInductionSection";
 
 interface DetailModalProps {
   isOpen: boolean;
@@ -59,12 +60,21 @@ const BF = ({ label, value }: { label: string; value: any }) => {
   );
 };
 
-const JsaDisplay = ({ perluJsa, jsaFileUrl }: { perluJsa: boolean; jsaFileUrl?: string | null }) => {
+const JsaDisplay = ({ perluJsa, jsaFileUrl, jsaData }: { perluJsa: boolean; jsaFileUrl?: string | null; jsaData?: any }) => {
   if (!perluJsa) {
     return (
       <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg border border-slate-200">
         <FileText className="w-5 h-5 text-slate-400 shrink-0" />
         <span className="text-sm text-slate-600">JSA <strong>Tidak Diperlukan</strong> untuk pekerjaan ini.</span>
+      </div>
+    );
+  }
+  if (jsaData) {
+    return (
+      <div className="space-y-3 bg-green-50 border border-green-200 rounded-lg p-3">
+        <div className="grid grid-cols-2 gap-3"><F label="Area" value={jsaData.area} /><F label="Jenis Pekerjaan" value={jsaData.jenisPekerjaan} /><F label="Sect/Dept" value={jsaData.sectDept} /><F label="PIC" value={jsaData.pic} /></div>
+        <p className="text-xs font-semibold text-slate-600">Petugas: {(jsaData.petugas || []).filter(Boolean).join(", ") || "-"}</p>
+        <div className="overflow-x-auto"><table className="w-full min-w-[650px] text-xs"><thead className="bg-white"><tr>{["Tanggal", "Jenis Pekerjaan", "Langkah Kerja", "Potensi Bahaya", "Pengendalian", "Saran"].map(h => <th key={h} className="p-2 text-left">{h}</th>)}</tr></thead><tbody>{(jsaData.rows || []).map((row: any, i: number) => <tr key={i} className="border-t border-green-200 align-top">{[row.tanggal, row.jenisPekerjaan, row.langkahKerja, row.potensiBahaya, row.pengendalian, row.saran].map((v: any, j: number) => <td key={j} className="p-2 whitespace-pre-wrap">{v || "-"}</td>)}</tr>)}</tbody></table></div>
       </div>
     );
   }
@@ -360,6 +370,148 @@ function DownloadPdfButton({
   );
 }
 
+// ── Safety Induction Status Card (for child forms) ───────────
+// Ditampilkan di form hot-work/workshop/height-work yang terkait ke Ijin Kerja Eksternal.
+// Menunjukkan status Safety Induction dari form induk.
+function SafetyInductionStatusCard({ safetyInduction, parentIdForm }: { safetyInduction: any; parentIdForm: string }) {
+  const status = safetyInduction?.status;
+  const isApproved = status === "approved";
+  const isDraft    = status === "draft";
+  const hasData    = safetyInduction && (safetyInduction.namaSubcont || safetyInduction.aktivitasPekerjaan);
+
+  if (!hasData) {
+    return (
+      <div className="flex items-center gap-3 p-3 bg-amber-50 rounded-lg border border-amber-200">
+        <AlertCircle className="w-5 h-5 text-amber-600 shrink-0" />
+        <div>
+          <p className="text-sm font-semibold text-amber-800">Belum Diisi</p>
+          <p className="text-xs text-amber-600">Safety Induction untuk Ijin Kerja Eksternal {parentIdForm} belum diisi oleh Security.</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className={`rounded-lg border p-4 space-y-3 ${isApproved ? "bg-green-50 border-green-200" : "bg-blue-50 border-blue-200"}`}>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <FileText className={`w-4 h-4 ${isApproved ? "text-green-600" : "text-blue-600"}`} />
+          <span className="text-sm font-semibold text-slate-800">Safety Induction</span>
+        </div>
+        <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
+          isApproved ? "bg-green-100 text-green-700" : isDraft ? "bg-blue-100 text-blue-700" : "bg-slate-100 text-slate-600"
+        }`}>
+          {isApproved ? "✓ Disetujui" : isDraft ? "Draft" : "Belum Selesai"}
+        </span>
+      </div>
+      <div className="grid grid-cols-2 gap-3 text-sm">
+        <div><span className="text-xs text-slate-500">Nama Subcont</span><p className="font-semibold text-slate-800 mt-0.5">{safetyInduction.namaSubcont || "-"}</p></div>
+        <div><span className="text-xs text-slate-500">Aktivitas Pekerjaan</span><p className="font-semibold text-slate-800 mt-0.5">{safetyInduction.aktivitasPekerjaan || "-"}</p></div>
+      </div>
+      {safetyInduction.namaPekerja?.filter(Boolean).length > 0 && (
+        <div>
+          <span className="text-xs text-slate-500">Jumlah Pekerja Terdaftar</span>
+          <p className="font-semibold text-slate-800 mt-0.5">{safetyInduction.namaPekerja.filter(Boolean).length} orang</p>
+        </div>
+      )}
+      {isApproved && safetyInduction.approvedBy && (
+        <p className="text-xs text-green-700">✓ Disetujui oleh: <strong>{safetyInduction.approvedBy}</strong></p>
+      )}
+      <p className="text-xs text-slate-500">Dari form induk: <span className="font-mono font-semibold">{parentIdForm}</span></p>
+    </div>
+  );
+}
+
+// ── General Permit Safety Induction Card ──────────────────────
+// Ditampilkan di dalam renderGeneralPermit() — lebih informatif dari raw SafetyInductionSection.
+function GeneralPermitSafetyInductionCard({ safetyInduction }: { safetyInduction: any }) {
+  const status   = safetyInduction?.status;
+  const isApproved = status === "approved";
+  const isDraft    = status === "draft";
+  const hasData    = safetyInduction && (safetyInduction.namaSubcont || safetyInduction.aktivitasPekerjaan);
+
+  if (!hasData) {
+    return (
+      <div className="flex items-center gap-3 p-4 bg-amber-50 rounded-lg border border-amber-200">
+        <AlertCircle className="w-5 h-5 text-amber-500 shrink-0" />
+        <div>
+          <p className="text-sm font-semibold text-amber-800">Safety Induction Belum Diisi</p>
+          <p className="text-xs text-amber-700 mt-0.5">
+            Menunggu Security untuk mengisi form Safety Induction berdasarkan data Ijin Kerja Eksternal ini.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* Status Banner */}
+      <div className={`flex items-center justify-between p-3 rounded-lg ${
+        isApproved ? "bg-green-50 border border-green-200" : "bg-blue-50 border border-blue-200"
+      }`}>
+        <div className="flex items-center gap-2">
+          <FileText className={`w-4 h-4 ${isApproved ? "text-green-600" : "text-blue-600"}`} />
+          <span className={`text-sm font-semibold ${isApproved ? "text-green-800" : "text-blue-800"}`}>
+            Status Safety Induction
+          </span>
+        </div>
+        <span className={`text-xs font-bold px-3 py-1 rounded-full ${
+          isApproved ? "bg-green-100 text-green-700" : isDraft ? "bg-blue-100 text-blue-700" : "bg-slate-100 text-slate-600"
+        }`}>
+          {isApproved ? "✓ Disetujui Security" : isDraft ? "📝 Draft" : "⏳ Pending"}
+        </span>
+      </div>
+
+      {/* Info Utama */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div className="p-3 bg-slate-50 rounded-lg">
+          <span className="text-xs text-slate-500">Nama Subcont</span>
+          <p className="font-semibold text-slate-800 mt-0.5">{safetyInduction.namaSubcont || "-"}</p>
+        </div>
+        <div className="p-3 bg-slate-50 rounded-lg">
+          <span className="text-xs text-slate-500">Aktivitas Pekerjaan</span>
+          <p className="font-semibold text-slate-800 mt-0.5">{safetyInduction.aktivitasPekerjaan || "-"}</p>
+        </div>
+        <div className="p-3 bg-slate-50 rounded-lg">
+          <span className="text-xs text-slate-500">Koord. Kerja / No. HP</span>
+          <p className="font-semibold text-slate-800 mt-0.5">{safetyInduction.koordinatNoHp || "-"}</p>
+        </div>
+      </div>
+
+      {/* Daftar Pekerja */}
+      {safetyInduction.namaPekerja?.filter(Boolean).length > 0 && (
+        <div>
+          <h4 className="text-xs font-semibold text-slate-600 mb-2">Daftar Nama Pekerja ({safetyInduction.namaPekerja.filter(Boolean).length} orang)</h4>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+            {safetyInduction.namaPekerja.filter(Boolean).map((name: string, i: number) => (
+              <div key={i} className="flex items-center gap-2 p-2 bg-slate-50 rounded text-sm">
+                <span className="text-xs text-slate-400 w-5 shrink-0 text-right">{i + 1}</span>
+                <span className="text-slate-700">{name}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Tanda Tangan */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 border-t border-slate-200 pt-3">
+        <div className="p-3 bg-slate-50 rounded-lg">
+          <span className="text-xs text-slate-500">Koordinator Sub Contractor</span>
+          <p className="font-semibold text-slate-800 mt-0.5">{safetyInduction.koordinatorSubcont || "-"}</p>
+        </div>
+        <div className={`p-3 rounded-lg ${isApproved ? "bg-green-50" : "bg-slate-50"}`}>
+          <span className="text-xs text-slate-500">Security</span>
+          <p className="font-semibold text-slate-800 mt-0.5">{safetyInduction.security || "-"}</p>
+          {isApproved && safetyInduction.approvedBy && (
+            <p className="text-xs text-green-600 mt-1">✓ Disetujui oleh: {safetyInduction.approvedBy}</p>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Main ──────────────────────────────────────────────────────
 export default function DetailModal({ isOpen, onClose, formId, formType }: DetailModalProps) {
   const [data, setData]       = useState<any>(null);
@@ -373,7 +525,30 @@ export default function DetailModal({ isOpen, onClose, formId, formType }: Detai
       const res = await fetch(`/form-permit/api/forms/${formType}/${formId}`);
       if (!res.ok) throw new Error("Gagal memuat data form");
       const json = await res.json();
-      setData(json.data);
+      let detail = json.data;
+      if (detail?.id_ijin_kerja) {
+        // Form ini adalah lampiran dari Ijin Kerja Eksternal.
+        // Ambil data parent untuk mendapatkan JSA dan Safety Induction.
+        const parentRes = await fetch(`/form-permit/api/forms/general-permit/${detail.id_ijin_kerja}`);
+        if (parentRes.ok) {
+          const parent = await parentRes.json();
+          const parentData = parent.data;
+          // Merge data JSA dari parent: perlu_jsa, jsa_data, jsa_file_url
+          // Prioritaskan jsa_data/jsa_file_url dari form anak (detail) dulu,
+          // fallback ke parent jika form anak tidak punya.
+          detail = {
+            ...detail,
+            perlu_jsa: detail.perlu_jsa ?? parentData?.perlu_jsa,
+            jsa_data: detail.jsa_data ?? parentData?.jsa_data,
+            jsa_file_url: detail.jsa_file_url ?? parentData?.jsa_file_url,
+            safety_induction: parentData?.safety_induction,
+            // Simpan info parent untuk referensi di tampilan
+            _parent_id_form: parentData?.id_form,
+            _parent_nama_kontraktor: parentData?.nama_kontraktor_pekerja,
+          };
+        }
+      }
+      setData(detail);
     } catch (err: any) {
       setError(err.message || "Terjadi kesalahan");
     } finally {
@@ -475,8 +650,13 @@ export default function DetailModal({ isOpen, onClose, formId, formType }: Detai
           )}
         </MS>
         <MS title="Dokumen JSA (Job Safety Analysis)">
-          <JsaDisplay perluJsa={!!p.perlu_jsa} jsaFileUrl={p.jsa_file_url} />
+          <JsaDisplay perluJsa={!!p.perlu_jsa} jsaFileUrl={p.jsa_file_url} jsaData={p.jsa_data} />
         </MS>
+        {p._parent_id_form && (
+          <MS title="Safety Induction">
+            <SafetyInductionStatusCard safetyInduction={p.safety_induction} parentIdForm={p._parent_id_form} />
+          </MS>
+        )}
         <MS title="Bagian 5: Persetujuan & Verifikasi QR">
           <ApprovalGrid p={p} formType="hot-work" isEksternal={isEksternal} />
         </MS>
@@ -604,8 +784,13 @@ export default function DetailModal({ isOpen, onClose, formId, formType }: Detai
           </div>
         </MS>
         <MS title="Dokumen JSA (Job Safety Analysis)">
-          <JsaDisplay perluJsa={!!p.perlu_jsa} jsaFileUrl={p.jsa_file_url} />
+          <JsaDisplay perluJsa={!!p.perlu_jsa} jsaFileUrl={p.jsa_file_url} jsaData={p.jsa_data} />
         </MS>
+        {p._parent_id_form && (
+          <MS title="Safety Induction">
+            <SafetyInductionStatusCard safetyInduction={p.safety_induction} parentIdForm={p._parent_id_form} />
+          </MS>
+        )}
         <MS title="Bagian 6: Persetujuan & Verifikasi QR">
           <ApprovalGrid p={p} formType="height-work" isEksternal={isEksternal} />
         </MS>
@@ -720,8 +905,13 @@ export default function DetailModal({ isOpen, onClose, formId, formType }: Detai
           )}
         </MS>
         <MS title="Dokumen JSA (Job Safety Analysis)">
-          <JsaDisplay perluJsa={!!p.perlu_jsa} jsaFileUrl={p.jsa_file_url} />
+          <JsaDisplay perluJsa={!!p.perlu_jsa} jsaFileUrl={p.jsa_file_url} jsaData={p.jsa_data} />
         </MS>
+        {p._parent_id_form && (
+          <MS title="Safety Induction">
+            <SafetyInductionStatusCard safetyInduction={p.safety_induction} parentIdForm={p._parent_id_form} />
+          </MS>
+        )}
         <MS title="Bagian 5: Persetujuan & Verifikasi QR">
           <ApprovalGrid p={p} formType="workshop" isEksternal={isEksternal} />
         </MS>
@@ -774,6 +964,12 @@ export default function DetailModal({ isOpen, onClose, formId, formType }: Detai
             <F label="Kontraktor PJ"  value={p.kontraktor_pj} />
             <F label="SPV Terkait PJ" value={p.spv_terkait_pj} />
           </div>
+        </MS>
+        <MS title="Bagian 4: JSA">
+          <JsaDisplay perluJsa={!!p.perlu_jsa} jsaFileUrl={p.jsa_file_url} jsaData={p.jsa_data} />
+        </MS>
+        <MS title="Safety Induction">
+          <GeneralPermitSafetyInductionCard safetyInduction={p.safety_induction} />
         </MS>
         <MS title="Bagian 12: Form Jenis Pekerjaan Terkait">
           <LinkedJobFormsSection
