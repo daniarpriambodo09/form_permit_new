@@ -1,39 +1,24 @@
 // app/api/approval/external/[id]/safety-induction/sign/route.ts
-// Tanda tangan Security untuk Safety Induction pada form Ijin Kerja
-// Eksternal. Hanya bisa dijalankan saat current_stage === 3 (giliran
-// Security). Efek: security_approved = TRUE, current_stage -> 4 (SFO),
-// SFO dinotifikasi via email.
-
 import { NextRequest, NextResponse } from "next/server";
 import { query, queryOne } from "@/lib/db";
 import { verifyToken, COOKIE_NAME } from "@/lib/auth";
-import { notifyGeneralPermitNextApprover } from "@/lib/approval-email";
 
 function getUser(req: NextRequest) {
   const token = req.cookies.get(COOKIE_NAME)?.value;
   return token ? verifyToken(token) : null;
 }
 
-export async function PATCH(
-  req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const user = getUser(req);
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   if (user.role !== "security" && user.role !== "admin") {
-    return NextResponse.json(
-      { error: "Hanya Security yang dapat menandatangani." },
-      { status: 403 }
-    );
+    return NextResponse.json({ error: "Hanya Security yang dapat menandatangani." }, { status: 403 });
   }
 
   const { id } = await params;
   const body = await req.json();
   const { safetyInduction, signatureUrl } = body;
-
-  if (!signatureUrl) {
-    return NextResponse.json({ error: "Tanda tangan wajib diisi." }, { status: 400 });
-  }
+  if (!signatureUrl) return NextResponse.json({ error: "Tanda tangan wajib diisi." }, { status: 400 });
   if (!safetyInduction || typeof safetyInduction !== "object") {
     return NextResponse.json({ error: "Data Safety Induction wajib diisi." }, { status: 400 });
   }
@@ -43,27 +28,20 @@ export async function PATCH(
     !Array.isArray(safetyInduction.namaPekerja) ||
     !safetyInduction.namaPekerja.some((n: unknown) => typeof n === "string" && n.trim())
   ) {
-    return NextResponse.json(
-      { error: "Nama Subcont, Aktivitas Pekerjaan, dan minimal satu pekerja wajib diisi." },
-      { status: 400 }
-    );
+    return NextResponse.json({ error: "Nama Subcont, Aktivitas Pekerjaan, dan minimal satu pekerja wajib diisi." }, { status: 400 });
   }
 
   const existing = await queryOne<any>(
-    `SELECT id_form, status, current_stage, security_approved,
-            user_id, nama_kontraktor_pekerja, tanggal
+    `SELECT id_form, kontraktor_signature_url, security_approved
        FROM form_ijin_kerja WHERE id_form = $1`,
     [id]
   );
   if (!existing) return NextResponse.json({ error: "Form tidak ditemukan." }, { status: 404 });
-  if (existing.status !== "submitted") {
-    return NextResponse.json({ error: `Form berstatus "${existing.status}".` }, { status: 409 });
+  if (!existing.kontraktor_signature_url) {
+    return NextResponse.json({ error: "Kontraktor belum menandatangani form ini." }, { status: 409 });
   }
-  if (existing.current_stage !== 3 || existing.security_approved) {
-    return NextResponse.json(
-      { error: "Belum giliran Security, atau Safety Induction sudah disetujui." },
-      { status: 409 }
-    );
+  if (existing.security_approved) {
+    return NextResponse.json({ error: "Safety Induction ini sudah disetujui Security." }, { status: 409 });
   }
 
   const finalData = {
@@ -81,21 +59,12 @@ export async function PATCH(
             security_approved_by = $2,
             security_approved_at = NOW(),
             security_signature_url = $3,
-            current_stage = 4,
             updated_at = NOW()
       WHERE id_form = $4`,
     [JSON.stringify(finalData), user.nama || user.username, signatureUrl, id]
   );
 
-  notifyGeneralPermitNextApprover({
-    idForm: id,
-    nextStage: 4,
-    userId: existing.user_id,
-    namaPemohon: existing.nama_kontraktor_pekerja || "-",
-    tanggal: existing.tanggal,
-  }).catch((err) => {
-    console.error(`[EMAIL] notify sfo after security sign ${id}:`, err);
-  });
+  // TODO: notify SFO next — tergantung stage map final general-permit (lihat catatan di atas)
 
   return NextResponse.json({ success: true, data: finalData });
 }

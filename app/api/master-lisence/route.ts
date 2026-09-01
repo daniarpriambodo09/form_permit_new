@@ -81,14 +81,8 @@ export async function POST(req: NextRequest) {
     if (!JENIS_KERJA_VALID.includes(jenisKerja)) {
       return NextResponse.json({ error: "Jenis kerja tidak valid" }, { status: 400 });
     }
-    if (!fileUrl) {
-      return NextResponse.json({ error: "File lisence wajib diupload" }, { status: 400 });
-    }
-    if (!["pdf", "image"].includes(fileType)) {
+    if (fileUrl && !["pdf", "image"].includes(fileType)) {
       return NextResponse.json({ error: "Tipe file lisence tidak valid" }, { status: 400 });
-    }
-    if (!tanggalExp) {
-      return NextResponse.json({ error: "Tanggal exp lisence wajib diisi" }, { status: 400 });
     }
 
     const row = await queryOne<MasterLisenceRow>(
@@ -101,10 +95,10 @@ export async function POST(req: NextRequest) {
         String(nik).trim(),
         jenisKerja,
         String(departemen).trim(),
-        fileUrl,
-        fileType,
+        fileUrl || null,
+        fileType || null,
         fileName ?? null,
-        tanggalExp,
+        tanggalExp || null,
         user.userId,
       ]
     );

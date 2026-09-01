@@ -639,3 +639,22 @@ Triggers:
 
 
 jai_permit_db=#
+
+jai_permit_db=# \d admin_k3_email_routing
+                   Table "public.admin_k3_email_routing"
+   Column   |            Type             | Collation | Nullable | Default
+------------+-----------------------------+-----------+----------+---------
+ jenis_form | character varying(20)       |           | not null |
+ user_id    | integer                     |           | not null |
+ updated_at | timestamp without time zone |           |          | now()
+ updated_by | integer                     |           |          |
+Indexes:
+    "admin_k3_email_routing_pkey" PRIMARY KEY, btree (jenis_form)
+Check constraints:
+    "admin_k3_email_routing_jenis_form_check" CHECK (jenis_form::text = ANY (ARRAY['hot-work'::character varying, 'height-work'::character varying, 'workshop'::character varying]::text[]))
+Foreign-key constraints:
+    "admin_k3_email_routing_updated_by_fkey" FOREIGN KEY (updated_by) REFERENCES users(id)
+    "admin_k3_email_routing_user_id_fkey" FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE RESTRICT
+
+
+jai_permit_db=#

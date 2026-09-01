@@ -31,10 +31,10 @@ interface LisenceItem {
   nik: string;
   jenis_kerja: JenisKerja;
   departemen: string | null;
-  file_url: string;
-  file_type: FileType;
+  file_url: string | null;
+  file_type: FileType | null;
   file_name: string | null;
-  tanggal_exp: string; // ISO date (yyyy-mm-dd)
+  tanggal_exp: string | null; // ISO date (yyyy-mm-dd)
   is_active: boolean;
   created_at: string;
   updated_at: string;
@@ -47,13 +47,13 @@ interface WorkerGroup {
   licenses: LisenceItem[];
 }
 
-type ExpStatus = "expired" | "soon" | "active";
+type ExpStatus = "expired" | "soon" | "active" | "no_exp";
 type PickerMode = "view" | "edit" | "delete";
 
 const JENIS_KERJA_META: Record<JenisKerja, { label: string; icon: React.ElementType; badge: string; dot: string }> = {
-  hot_work:    { label: "Hot Work",    icon: Flame,         badge: "bg-orange-100 text-orange-700 border-orange-200", dot: "bg-orange-500" },
+  hot_work: { label: "Hot Work", icon: Flame, badge: "bg-orange-100 text-orange-700 border-orange-200", dot: "bg-orange-500" },
   height_work: { label: "Height Work", icon: AlertTriangle, badge: "bg-purple-100 text-purple-700 border-purple-200", dot: "bg-purple-500" },
-  workshop:    { label: "Workshop",    icon: FileText,      badge: "bg-blue-100 text-blue-700 border-blue-200",       dot: "bg-blue-500" },
+  workshop: { label: "Workshop", icon: FileText, badge: "bg-blue-100 text-blue-700 border-blue-200", dot: "bg-blue-500" },
 };
 
 const JENIS_KERJA_OPTIONS: { value: JenisKerja; label: string }[] = [
@@ -68,7 +68,8 @@ const JENIS_KERJA_OPTIONS: { value: JenisKerja; label: string }[] = [
 const DEPARTEMEN_OPTIONS = ["QA", "ENG", "MTC", "PRODUKSI", "NYS", "FATP-Exim", "MPC-WHS", "PGA"];
 
 // ── Helpers ───────────────────────────────────────────────────────────────
-function getExpStatus(tanggalExp: string): ExpStatus {
+function getExpStatus(tanggalExp: string | null): ExpStatus {
+  if (!tanggalExp) return "no_exp";
   const today = new Date(); today.setHours(0, 0, 0, 0);
   const exp = new Date(tanggalExp); exp.setHours(0, 0, 0, 0);
   const diffDays = Math.round((exp.getTime() - today.getTime()) / 86400000);
@@ -77,14 +78,16 @@ function getExpStatus(tanggalExp: string): ExpStatus {
   return "active";
 }
 
-function formatDate(iso: string) {
+function formatDate(iso: string | null) {
+  if (!iso) return "-";
   return new Date(iso).toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" });
 }
 
 const EXP_BADGE: Record<ExpStatus, { label: string; cls: string; dot: string }> = {
   expired: { label: "Kadaluarsa", cls: "bg-red-100 text-red-700 border-red-200", dot: "bg-red-500" },
-  soon:    { label: "Segera Habis", cls: "bg-amber-100 text-amber-700 border-amber-200", dot: "bg-amber-500" },
-  active:  { label: "Aktif", cls: "bg-green-100 text-green-700 border-green-200", dot: "bg-green-500" },
+  soon: { label: "Segera Habis", cls: "bg-amber-100 text-amber-700 border-amber-200", dot: "bg-amber-500" },
+  active: { label: "Aktif", cls: "bg-green-100 text-green-700 border-green-200", dot: "bg-green-500" },
+  no_exp: { label: "Training / Tanpa Exp", cls: "bg-slate-100 text-slate-600 border-slate-200", dot: "bg-slate-400" },
 };
 
 // ── Toast ─────────────────────────────────────────────────────────────────
@@ -196,23 +199,68 @@ interface AddModalProps {
   onItemAdded: (item: LisenceItem) => void;
 }
 
-function AddLisenceModal({ onClose, onItemAdded }: AddModalProps) {
-  const [nama, setNama] = useState("");
-  const [nik, setNik] = useState("");
-  const [departemen, setDepartemen] = useState("");
-  const [locked, setLocked] = useState(false); // nama, nik & departemen dikunci setelah lisence pertama tersimpan
-  const [addedJenis, setAddedJenis] = useState<JenisKerja[]>([]);
+// ── Draft form Tambah Lisence — dipersist ke localStorage supaya data
+// tidak hilang saat card ditutup tanpa sengaja.
+const ADD_DRAFT_KEY = "jai_master_lisence_add_draft";
+
+interface AddDraft {
+  nama: string;
+  nik: string;
+  departemen: string;
+  locked: boolean;
+  addedJenis: JenisKerja[];
+  jenisKerja: JenisKerja;
+  tanggalExp: string;
+  fileUrl: string | null;
+  fileType: FileType | null;
+  fileName: string | null;
+}
+
+const emptyAddDraft = (): AddDraft => ({
+  nama: "",
+  nik: "",
+  departemen: "",
+  locked: false,
+  addedJenis: [],
+  jenisKerja: JENIS_KERJA_OPTIONS[0].value,
+  tanggalExp: "",
+  fileUrl: null,
+  fileType: null,
+  fileName: null,
+});
+
+function loadAddDraft(): AddDraft {
+  if (typeof window === "undefined") return emptyAddDraft();
+  try {
+    const raw = localStorage.getItem(ADD_DRAFT_KEY);
+    if (!raw) return emptyAddDraft();
+    return { ...emptyAddDraft(), ...JSON.parse(raw) };
+  } catch {
+    return emptyAddDraft();
+  }
+}
+
+// ── Modal Tambah Lisence (multi jenis kerja per pekerja) ───────────────────
+interface AddModalProps {
+  onClose: () => void;
+  onItemAdded: (item: LisenceItem) => void;
+  draft: AddDraft;
+  setDraft: React.Dispatch<React.SetStateAction<AddDraft>>;
+}
+
+function AddLisenceModal({ onClose, onItemAdded, draft, setDraft }: AddModalProps) {
+  const { nama, nik, departemen, locked, addedJenis, jenisKerja, tanggalExp, fileUrl, fileType, fileName } = draft;
+  const setNama = (v: string) => setDraft((d) => ({ ...d, nama: v }));
+  const setNik = (v: string) => setDraft((d) => ({ ...d, nik: v }));
+  const setDepartemen = (v: string) => setDraft((d) => ({ ...d, departemen: v }));
+  const setJenisKerja = (v: JenisKerja) => setDraft((d) => ({ ...d, jenisKerja: v }));
+  const setTanggalExp = (v: string) => setDraft((d) => ({ ...d, tanggalExp: v }));
 
   const remainingOptions = useMemo(
     () => JENIS_KERJA_OPTIONS.filter((o) => !addedJenis.includes(o.value)),
     [addedJenis]
   );
 
-  const [jenisKerja, setJenisKerja] = useState<JenisKerja>(JENIS_KERJA_OPTIONS[0].value);
-  const [tanggalExp, setTanggalExp] = useState("");
-  const [fileUrl, setFileUrl] = useState<string | null>(null);
-  const [fileType, setFileType] = useState<FileType | null>(null);
-  const [fileName, setFileName] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState("");
   const [saving, setSaving] = useState(false);
@@ -234,9 +282,7 @@ function AddLisenceModal({ onClose, onItemAdded }: AddModalProps) {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Upload gagal");
-      setFileUrl(data.url);
-      setFileType(data.fileType);
-      setFileName(data.fileName || file.name);
+      setDraft((d) => ({ ...d, fileUrl: data.url, fileType: data.fileType, fileName: data.fileName || file.name }));
     } catch (err: any) {
       setUploadError(err.message || "Upload gagal, coba lagi");
     } finally {
@@ -247,11 +293,9 @@ function AddLisenceModal({ onClose, onItemAdded }: AddModalProps) {
   const handleAddEntry = async () => {
     setError("");
     setSuccessMsg("");
-    if (!nama.trim())       { setError("Nama pekerja wajib diisi."); return; }
-    if (!nik.trim())        { setError("NIK wajib diisi."); return; }
+    if (!nama.trim()) { setError("Nama pekerja wajib diisi."); return; }
+    if (!nik.trim()) { setError("NIK wajib diisi."); return; }
     if (!departemen.trim()) { setError("Departemen wajib dipilih."); return; }
-    if (!fileUrl)           { setError("File lisence wajib diupload."); return; }
-    if (!tanggalExp)        { setError("Tanggal exp lisence wajib diisi."); return; }
 
     setSaving(true);
     try {
@@ -264,10 +308,10 @@ function AddLisenceModal({ onClose, onItemAdded }: AddModalProps) {
           nik: nik.trim(),
           departemen,
           jenisKerja,
-          fileUrl,
-          fileType,
-          fileName,
-          tanggalExp,
+          fileUrl: fileUrl || null,
+          fileType: fileType || null,
+          fileName: fileName || null,
+          tanggalExp: tanggalExp || null,
         }),
       });
       const data = await res.json();
@@ -276,15 +320,17 @@ function AddLisenceModal({ onClose, onItemAdded }: AddModalProps) {
       onItemAdded(data.data);
 
       const newAddedJenis = [...addedJenis, jenisKerja];
-      setAddedJenis(newAddedJenis);
-      setLocked(true);
       setSuccessMsg(`Lisence ${JENIS_KERJA_META[jenisKerja].label} berhasil ditambahkan.`);
 
-      // Reset field khusus per-entry, siap untuk jenis kerja berikutnya
-      setFileUrl(null); setFileType(null); setFileName(null);
-      setTanggalExp("");
       const next = JENIS_KERJA_OPTIONS.find((o) => !newAddedJenis.includes(o.value));
-      if (next) setJenisKerja(next.value);
+      setDraft((d) => ({
+        ...d,
+        addedJenis: newAddedJenis,
+        locked: true,
+        // Reset field khusus per-entry, siap untuk jenis kerja berikutnya
+        fileUrl: null, fileType: null, fileName: null, tanggalExp: "",
+        jenisKerja: next ? next.value : d.jenisKerja,
+      }));
     } catch {
       setError("Terjadi kesalahan. Coba lagi.");
     } finally {
@@ -363,9 +409,8 @@ function AddLisenceModal({ onClose, onItemAdded }: AddModalProps) {
               return (
                 <span
                   key={opt.value}
-                  className={`inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full border ${
-                    done ? "bg-green-50 text-green-700 border-green-200" : "bg-slate-50 text-slate-400 border-slate-200"
-                  }`}
+                  className={`inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full border ${done ? "bg-green-50 text-green-700 border-green-200" : "bg-slate-50 text-slate-400 border-slate-200"
+                    }`}
                 >
                   {done ? <Check className="w-3.5 h-3.5" /> : <Icon className="w-3.5 h-3.5" />}
                   {meta.label}
@@ -402,20 +447,23 @@ function AddLisenceModal({ onClose, onItemAdded }: AddModalProps) {
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-1.5">Tanggal Exp Lisence <span className="text-red-500">*</span></label>
+                <label className="block text-sm font-semibold text-slate-700 mb-1.5">
+                  Tanggal Exp Lisence <span className="text-xs font-normal text-slate-400">(opsional — kosongkan jika hanya training)</span>
+                </label>
                 <input type="date" value={tanggalExp} onChange={(e) => setTanggalExp(e.target.value)}
                   className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent" />
               </div>
 
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-1.5">
-                  File Lisence — {JENIS_KERJA_META[jenisKerja].label} <span className="text-red-500">*</span>
+                  File Lisence — {JENIS_KERJA_META[jenisKerja].label}{" "}
+                  <span className="text-xs font-normal text-slate-400">(opsional — kosongkan jika hanya training)</span>
                 </label>
                 <FileUploadField
                   fileUrl={fileUrl} fileType={fileType} fileName={fileName}
                   uploading={uploading} error={uploadError}
                   onUpload={handleUpload}
-                  onRemove={() => { setFileUrl(null); setFileType(null); setFileName(null); }}
+                  onRemove={() => setDraft((d) => ({ ...d, fileUrl: null, fileType: null, fileName: null }))}
                 />
               </div>
 
@@ -432,6 +480,14 @@ function AddLisenceModal({ onClose, onItemAdded }: AddModalProps) {
         </div>
 
         <div className="flex gap-3 px-6 py-4 border-t border-slate-100 sticky bottom-0 bg-white rounded-b-2xl">
+          {(nama || nik || departemen || addedJenis.length > 0) && (
+            <button
+              onClick={() => setDraft(emptyAddDraft())}
+              className="px-4 py-2.5 border-2 border-slate-200 hover:bg-slate-50 text-slate-600 font-semibold rounded-xl text-sm transition-colors"
+            >
+              Mulai Baru
+            </button>
+          )}
           <button onClick={onClose}
             className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-slate-800 hover:bg-slate-900 text-white font-semibold rounded-xl text-sm transition-colors">
             <CheckCircle className="w-4 h-4" /> Selesai
@@ -453,7 +509,7 @@ function EditLisenceModal({ item, onClose, onSuccess }: EditModalProps) {
   const [nama, setNama] = useState(item.nama);
   const [nik, setNik] = useState(item.nik);
   const [departemen, setDepartemen] = useState(item.departemen ?? "");
-  const [tanggalExp, setTanggalExp] = useState(item.tanggal_exp.slice(0, 10));
+  const [tanggalExp, setTanggalExp] = useState(item.tanggal_exp ? item.tanggal_exp.slice(0, 10) : "");
   const [fileUrl, setFileUrl] = useState<string | null>(item.file_url);
   const [fileType, setFileType] = useState<FileType | null>(item.file_type);
   const [fileName, setFileName] = useState<string | null>(item.file_name);
@@ -492,11 +548,11 @@ function EditLisenceModal({ item, onClose, onSuccess }: EditModalProps) {
 
   const handleSubmit = async () => {
     setError("");
-    if (!nama.trim())       { setError("Nama pekerja wajib diisi."); return; }
-    if (!nik.trim())        { setError("NIK wajib diisi."); return; }
+    if (!nama.trim()) { setError("Nama pekerja wajib diisi."); return; }
+    if (!nik.trim()) { setError("NIK wajib diisi."); return; }
     if (!departemen.trim()) { setError("Departemen wajib dipilih."); return; }
-    if (!tanggalExp)        { setError("Tanggal exp lisence wajib diisi."); return; }
-    if (!fileUrl)           { setError("File lisence wajib ada."); return; }
+    if (!tanggalExp) { setError("Tanggal exp lisence wajib diisi."); return; }
+    if (!fileUrl) { setError("File lisence wajib ada."); return; }
 
     setSaving(true);
     try {
@@ -622,7 +678,9 @@ function ViewLisenceModal({ item, onClose }: { item: LisenceItem; onClose: () =>
           </button>
         </div>
         <div className="flex-1 overflow-auto bg-slate-100 flex items-center justify-center p-4">
-          {item.file_type === "image" ? (
+          {!item.file_url ? (
+            <p className="text-sm text-slate-400">Tidak ada file lisensi yang terlampir.</p>
+          ) : item.file_type === "image" ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={item.file_url} alt={`Lisence ${item.nama}`} className="max-w-full max-h-[70vh] object-contain rounded-lg bg-white" />
           ) : (
@@ -631,9 +689,11 @@ function ViewLisenceModal({ item, onClose }: { item: LisenceItem; onClose: () =>
         </div>
         <div className="px-5 py-3 border-t border-slate-100 flex items-center justify-between shrink-0">
           <p className="text-xs text-slate-500">Berlaku hingga <span className="font-semibold text-slate-700">{formatDate(item.tanggal_exp)}</span></p>
-          <a href={item.file_url} target="_blank" rel="noopener noreferrer" className="text-xs font-semibold text-orange-600 hover:text-orange-700">
-            Buka di tab baru →
-          </a>
+          {item.file_url && (
+            <a href={item.file_url} target="_blank" rel="noopener noreferrer" className="text-xs font-semibold text-orange-600 hover:text-orange-700">
+              Buka di tab baru →
+            </a>
+          )}
         </div>
       </div>
     </div>
@@ -739,9 +799,8 @@ function ActionPicker({
               key={lic.id}
               type="button"
               onClick={handleClick}
-              className={`w-full flex items-center gap-2.5 px-4 py-2.5 text-sm transition-colors ${
-                mode === "delete" ? "text-red-600 hover:bg-red-50" : "text-slate-700 hover:bg-slate-50"
-              }`}
+              className={`w-full flex items-center gap-2.5 px-4 py-2.5 text-sm transition-colors ${mode === "delete" ? "text-red-600 hover:bg-red-50" : "text-slate-700 hover:bg-slate-50"
+                }`}
             >
               <Icon className="w-4 h-4 shrink-0 opacity-70" />
               <span className="flex-1 text-left font-medium">{meta.label}</span>
@@ -784,6 +843,7 @@ export default function MasterLisencePage() {
   const [statusFilter, setStatusFilter] = useState<ExpStatus | "all">("all");
 
   const [showAddModal, setShowAddModal] = useState(false);
+  const [addDraft, setAddDraft] = useState<AddDraft>(emptyAddDraft);
   const [editItem, setEditItem] = useState<LisenceItem | null>(null);
   const [viewItem, setViewItem] = useState<LisenceItem | null>(null);
   const [openPicker, setOpenPicker] = useState<PickerState | null>(null);
@@ -794,6 +854,28 @@ export default function MasterLisencePage() {
     | null
   >(null);
   const [deleting, setDeleting] = useState(false);
+
+  // ── Muat draft "Tambah Lisence" dari localStorage saat halaman dibuka ──
+  useEffect(() => {
+    setAddDraft(loadAddDraft());
+  }, []);
+
+  // ── Simpan draft setiap kali berubah, supaya bertahan walau modal ditutup
+  //    atau halaman di-reload. ──
+  useEffect(() => {
+    try {
+      localStorage.setItem(ADD_DRAFT_KEY, JSON.stringify(addDraft));
+    } catch {
+      // localStorage penuh/diblokir — abaikan, draft tetap ada di state selama sesi ini
+    }
+  }, [addDraft]);
+
+  // Setelah item benar-benar tersimpan ke server, hapus draft supaya modal
+  // "Tambah Lisence" berikutnya (untuk pekerja lain) mulai dari kosong —
+  // tetap mempertahankan progres multi-jenis-kerja SELAMA modal masih
+  // menampilkan pekerja yang sama (addedJenis belum sempat mengunci ulang).
+  // Draft tetap tersimpan sampai user klik "Mulai Baru" atau menutup modal
+  // setelah semua jenis kerja selesai ditambahkan.
 
   // Guard: hanya admin
   useEffect(() => {
@@ -972,9 +1054,8 @@ export default function MasterLisencePage() {
           <button
             type="button"
             onClick={() => setStatusFilter("all")}
-            className={`text-left bg-white rounded-2xl border shadow-sm p-5 flex items-center gap-4 transition-all ${
-              statusFilter === "all" ? "border-slate-300 ring-2 ring-slate-200" : "border-slate-200 hover:border-slate-300"
-            }`}
+            className={`text-left bg-white rounded-2xl border shadow-sm p-5 flex items-center gap-4 transition-all ${statusFilter === "all" ? "border-slate-300 ring-2 ring-slate-200" : "border-slate-200 hover:border-slate-300"
+              }`}
           >
             <div className="p-3 bg-slate-100 rounded-xl"><BadgeCheck className="w-5 h-5 text-slate-600" /></div>
             <div>
@@ -985,9 +1066,8 @@ export default function MasterLisencePage() {
           <button
             type="button"
             onClick={() => setStatusFilter((prev) => (prev === "soon" ? "all" : "soon"))}
-            className={`text-left bg-white rounded-2xl border shadow-sm p-5 flex items-center gap-4 transition-all ${
-              statusFilter === "soon" ? "border-amber-300 ring-2 ring-amber-200" : "border-slate-200 hover:border-amber-300"
-            }`}
+            className={`text-left bg-white rounded-2xl border shadow-sm p-5 flex items-center gap-4 transition-all ${statusFilter === "soon" ? "border-amber-300 ring-2 ring-amber-200" : "border-slate-200 hover:border-amber-300"
+              }`}
           >
             <div className="p-3 bg-amber-100 rounded-xl"><CalendarClock className="w-5 h-5 text-amber-600" /></div>
             <div>
@@ -998,9 +1078,8 @@ export default function MasterLisencePage() {
           <button
             type="button"
             onClick={() => setStatusFilter((prev) => (prev === "expired" ? "all" : "expired"))}
-            className={`text-left bg-white rounded-2xl border shadow-sm p-5 flex items-center gap-4 transition-all ${
-              statusFilter === "expired" ? "border-red-300 ring-2 ring-red-200" : "border-slate-200 hover:border-red-300"
-            }`}
+            className={`text-left bg-white rounded-2xl border shadow-sm p-5 flex items-center gap-4 transition-all ${statusFilter === "expired" ? "border-red-300 ring-2 ring-red-200" : "border-slate-200 hover:border-red-300"
+              }`}
           >
             <div className="p-3 bg-red-100 rounded-xl"><AlertCircle className="w-5 h-5 text-red-600" /></div>
             <div>
@@ -1046,9 +1125,8 @@ export default function MasterLisencePage() {
                 <button
                   key={val}
                   onClick={() => setFilterJenis(val)}
-                  className={`px-3.5 py-2 rounded-xl text-xs font-semibold whitespace-nowrap border transition-colors ${
-                    active ? "bg-orange-500 border-orange-500 text-white" : "bg-white border-slate-200 text-slate-600 hover:border-orange-300"
-                  }`}
+                  className={`px-3.5 py-2 rounded-xl text-xs font-semibold whitespace-nowrap border transition-colors ${active ? "bg-orange-500 border-orange-500 text-white" : "bg-white border-slate-200 text-slate-600 hover:border-orange-300"
+                    }`}
                 >
                   {label}
                 </button>
@@ -1145,7 +1223,12 @@ export default function MasterLisencePage() {
       </main>
 
       {showAddModal && (
-        <AddLisenceModal onClose={() => setShowAddModal(false)} onItemAdded={handleItemAdded} />
+        <AddLisenceModal
+          onClose={() => setShowAddModal(false)}
+          onItemAdded={handleItemAdded}
+          draft={addDraft}
+          setDraft={setAddDraft}
+        />
       )}
       {editItem && (
         <EditLisenceModal item={editItem} onClose={() => setEditItem(null)} onSuccess={handleEditSuccess} />

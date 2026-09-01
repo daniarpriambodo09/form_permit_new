@@ -583,22 +583,8 @@ export default function IjinKerjaEksternalPage() {
             </div>
           </SectionCard>
 
-          {/* ═══ BAGIAN 12 (dulu 11) ═══ */}
-          <SectionCard nomor={12} title="Penanggung Jawab Pelaksanaan Pekerjaan">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2">Kontraktor</label>
-                <input type="text" value={form.kontraktorPj} onChange={(e) => set("kontraktorPj", e.target.value)} className={inputCls} />
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2">SPV Terkait</label>
-                <input type="text" value={form.spvTerkaitPj} onChange={(e) => set("spvTerkaitPj", e.target.value)} className={inputCls} />
-              </div>
-            </div>
-          </SectionCard>
-
           <div className="px-4 py-3 rounded-xl text-xs bg-blue-50 text-blue-700 border border-blue-200">
-            <strong>Alur approval Ijin Kerja (Bagian 13) yang akan diterapkan:</strong>
+            <strong>Alur approval Ijin Kerja (Bagian 12) yang akan diterapkan:</strong>
             <span className="ml-1">Security → SFO → PGA Manager</span>
           </div>
 

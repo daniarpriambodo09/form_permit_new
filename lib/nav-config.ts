@@ -13,6 +13,7 @@ import {
   Mail,
   BadgeCheck,
   History,
+  ShieldCheck,
 } from "lucide-react";
 
 export type UserRole =
@@ -23,6 +24,7 @@ export type UserRole =
   | "admin_k3"
   | "sfo"
   | "smr"
+  | "security"
   | "admin";
 
 export const ROLE_LABEL: Record<UserRole, string> = {
@@ -33,10 +35,11 @@ export const ROLE_LABEL: Record<UserRole, string> = {
   admin_k3: "Admin K3",
   sfo: "SFO",
   smr: "SMR",
+  security: "Security",
   admin: "Admin",
 };
 
-const APPROVER_ROLES: UserRole[] = ["firewatch", "kontraktor", "admin_k3", "sfo", "smr"];
+const APPROVER_ROLES: UserRole[] = ["firewatch", "kontraktor", "admin_k3", "sfo", "smr", "security"];
 
 // ── Sidebar: grup menu utama ────────────────────────────────────
 export interface NavItem {
@@ -68,10 +71,10 @@ export function getNavSections(role: UserRole): NavSection[] {
         items: [
           { label: "Kelola Akun Users", href: "/admin-users", icon: Users },
           { label: "Master Lisence", href: "/master-lisence", icon: BadgeCheck },
-          { label: "Kelola Departemen", href: "/kelola-departemen", icon: Building2 }, // ← baru
+          { label: "Kelola Departemen", href: "/kelola-departemen", icon: Building2 },
           { label: "Daftar File Form", href: "/form-files", icon: FileText },
           { label: "Pengaturan SMTP", href: "/smtp-settings", icon: Mail },
-          { label: "Routing Email Admin K3", href:  "/admin/admin-k3-routing", icon:  Mail },
+          { label: "Routing Email Admin K3", href: "/admin/admin-k3-routing", icon: Mail },
         ],
       },
     ];
@@ -86,6 +89,18 @@ export function getNavSections(role: UserRole): NavSection[] {
       {
         label: "Administrasi",
         items: [{ label: "Kelola Akun Departemen", href: "/admin-users", icon: Users }],
+      },
+    ];
+  }
+
+  if (role === "security") {
+    return [
+      {
+        label: "Menu Utama",
+        items: [
+          beranda,
+          { label: "Daftar Form", href: "/approval", icon: ClipboardList },
+        ],
       },
     ];
   }
@@ -153,6 +168,17 @@ export function getFeaturedCards(role: UserRole): FeaturedCard[] {
         description: "Tambah atau hapus akun administrator di departemen Anda.",
         href: "/admin-users",
         icon: Users,
+      },
+    ];
+  }
+
+  if (role === "security") {
+    return [
+      {
+        title: "Daftar Form",
+        description: "Ijin Kerja Eksternal yang menunggu Safety Induction & tanda tangan Anda.",
+        href: "/approval",
+        icon: ShieldCheck,
       },
     ];
   }

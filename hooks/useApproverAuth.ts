@@ -8,27 +8,27 @@ import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 
 export interface ApproverUser {
-  userId:    number;
-  username:  string;
-  nama:      string;
-  jabatan:   string;
-  role:      string;
-  nik:       string | null;
+  userId: number;
+  username: string;
+  nama: string;
+  jabatan: string;
+  role: string;
+  nik: string | null;
   departmen: string | null;
 }
 
-const APPROVER_ROLES = ["spv", "admin", "kontraktor", "sfo", "smr", "firewatch", "admin_k3"];
+const APPROVER_ROLES = ["spv", "admin", "kontraktor", "sfo", "smr", "firewatch", "admin_k3", "security"];
 
 interface UseApproverAuthResult {
-  user:    ApproverUser | null;
+  user: ApproverUser | null;
   loading: boolean;
 }
 
 export function useApproverAuth(): UseApproverAuthResult {
-  const router   = useRouter();
+  const router = useRouter();
   const pathname = usePathname();
 
-  const [user,    setUser]    = useState<ApproverUser | null>(null);
+  const [user, setUser] = useState<ApproverUser | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -66,9 +66,9 @@ export function useApproverAuth(): UseApproverAuthResult {
         }
 
         // Sinkronkan sessionStorage (hanya untuk tampilan nama, bukan auth)
-        sessionStorage.setItem("user_nama",    u.nama);
+        sessionStorage.setItem("user_nama", u.nama);
         sessionStorage.setItem("user_jabatan", u.jabatan);
-        sessionStorage.setItem("user_role",    u.role);
+        sessionStorage.setItem("user_role", u.role);
 
         setUser(u);
       } catch {

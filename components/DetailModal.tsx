@@ -1,17 +1,9 @@
 // components/DetailModal.tsx
-// UPDATED: Tambah tombol "Download PDF" yang memanggil generatePermitPdf().
-// UPDATED: Tambah branch formType === "general-permit" (Ijin Kerja
-// Eksternal) — menampilkan detail Bagian 1-11/14, approval grid
-// Security/SFO/PGA, dan section "Form Jenis Pekerjaan Terkait" yang
-// status-aware: kalau job-form untuk suatu jenis SUDAH ada (draft/
-// submitted/approved/rejected), tampilkan status + aksi (Lihat Detail,
-// dan Edit/Perbaiki khusus draft/rejected) — BUKAN link "+ Tambah" lagi,
-// supaya tidak bisa submit duplikat untuk jenis yang sama.
 "use client";
 import { useState, useEffect, useCallback } from "react";
-import { X, Loader2, AlertCircle, ZoomIn, FileText, Eye, Download } from "lucide-react";
+import { X, Loader2, AlertCircle, ZoomIn, FileText, Eye, Download, ShieldCheck } from "lucide-react";
 import ApprovalQRCard from "@/components/ApprovalQRCard";
-import SafetyInductionSection, { createEmptySafetyInduction, type SafetyInductionData } from "@/components/SafetyInductionSection";
+import SignaturePad from "@/components/SignaturePad";
 
 interface DetailModalProps {
   isOpen: boolean;
@@ -60,6 +52,26 @@ const BF = ({ label, value }: { label: string; value: any }) => {
   );
 };
 
+// ── Modal generik untuk konten "Lihat JSA" / "Lihat Safety Induction" ──
+function InfoModal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
+  return (
+    <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" onClick={onClose}>
+      <div
+        className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[85vh] flex flex-col overflow-hidden"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="shrink-0 flex items-center justify-between px-5 py-4 border-b border-slate-100">
+          <h3 className="font-bold text-slate-800">{title}</h3>
+          <button onClick={onClose} className="p-1.5 hover:bg-slate-100 rounded-lg transition-colors">
+            <X className="w-4 h-4 text-slate-500" />
+          </button>
+        </div>
+        <div className="overflow-y-auto p-5">{children}</div>
+      </div>
+    </div>
+  );
+}
+
 const JsaDisplay = ({ perluJsa, jsaFileUrl, jsaData }: { perluJsa: boolean; jsaFileUrl?: string | null; jsaData?: any }) => {
   if (!perluJsa) {
     return (
@@ -80,7 +92,7 @@ const JsaDisplay = ({ perluJsa, jsaFileUrl, jsaData }: { perluJsa: boolean; jsaF
   }
   if (jsaFileUrl) {
     const fileName = jsaFileUrl.split("/").pop() || "Dokumen JSA";
-    const fileUrl  = jsaFileUrl.startsWith("http") ? jsaFileUrl : `${window.location.origin}${jsaFileUrl}`;
+    const fileUrl = jsaFileUrl.startsWith("http") ? jsaFileUrl : `${window.location.origin}${jsaFileUrl}`;
     return (
       <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg border border-green-200">
         <div className="flex items-center gap-3 min-w-0">
@@ -190,23 +202,53 @@ function ApprovalGrid({
   );
 }
 
-// ── Approval grid khusus general-permit (Security / SFO / PGA Manager) ──
+// ── Kotak tanda tangan sederhana (tanpa QR) — dipakai untuk Kontraktor & Security ──
+function SignatureBox({ label, signatureUrl }: { label: string; signatureUrl?: string | null }) {
+  return (
+    <div className="rounded-xl border border-slate-200 p-3">
+      <p className="text-xs font-bold text-slate-500 uppercase mb-1">{label} (Tanda Tangan)</p>
+      {signatureUrl ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={signatureUrl} alt={`TTD ${label}`} className="h-16 border border-slate-100 rounded bg-white" />
+      ) : (
+        <p className="text-xs text-slate-400 italic">Belum tanda tangan</p>
+      )}
+    </div>
+  );
+}
+
+// ── Approval grid khusus general-permit (Kontraktor/SPV/Security/SFO/SMR) ──
+// Kontraktor & Security memakai tanda tangan manual (bukan QR).
 function GeneralPermitApprovalGrid({ p }: { p: any }) {
   const common = { formId: p.id_form, formType: "general-permit" };
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <SignatureBox label="Kontraktor" signatureUrl={p.kontraktor_signature_url} />
       <ApprovalQRCard {...common}
-        label="Security" role="security"
-        approved={p.security_approved} approvedBy={p.security_approved_by}
-        approvedAt={p.security_approved_at}
+        label="SPV" role="spv"
+        approved={p.spv_approved} approvedBy={p.spv_approved_by}
+        approvedAt={p.spv_approved_at}
       />
+      <div className="rounded-xl border border-slate-200 p-3 flex flex-col justify-between">
+        <div className="flex items-center gap-2 mb-2">
+          <ShieldCheck className={`w-4 h-4 ${p.security_approved ? "text-green-600" : "text-slate-400"}`} />
+          <p className="text-sm font-semibold text-slate-800">Security</p>
+          {p.security_approved && (
+            <span className="ml-auto text-[10px] bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-semibold">✓ Disetujui</span>
+          )}
+        </div>
+        {p.security_approved_by && (
+          <p className="text-xs text-slate-500">{p.security_approved_by} — {formatDate(p.security_approved_at)}</p>
+        )}
+      </div>
+      <SignatureBox label="Security" signatureUrl={p.security_signature_url} />
       <ApprovalQRCard {...common}
         label="SFO" role="sfo"
         approved={p.sfo_approved} approvedBy={p.sfo_approved_by}
         approvedAt={p.sfo_approved_at}
       />
       <ApprovalQRCard {...common}
-        label="PGA Manager" role="pga"
+        label="SMR / PGA Manager" role="pga"
         approved={p.pga_approved} approvedBy={p.pga_approved_by}
         approvedAt={p.pga_approved_at}
       />
@@ -219,16 +261,16 @@ type LinkedJobForm = { id_form: string; status: string; tanggal: string; jenis: 
 interface LinkedJobForms { hotWork: LinkedJobForm; heightWork: LinkedJobForm; workshop: LinkedJobForm }
 
 const JOB_TYPE_META: Record<string, { label: string; shortLabel: string; icon: string; addHref: (id: string) => string }> = {
-  hotWork:    { label: "Ijin Kerja Panas (Hot Work)",         shortLabel: "Hot Work",     icon: "🔥", addHref: (id) => `/form-permit/form/hot-work?id_ijin_kerja=${id}` },
-  heightWork: { label: "Ijin Kerja Ketinggian (Height Work)", shortLabel: "Height Work",  icon: "⚠️", addHref: (id) => `/form-permit/form/height-work?id_ijin_kerja=${id}` },
-  workshop:   { label: "Ijin Kerja Workshop",                 shortLabel: "Workshop",     icon: "🔧", addHref: (id) => `/form-permit/form/workshop?id_ijin_kerja=${id}` },
+  hotWork: { label: "Ijin Kerja Panas (Hot Work)", shortLabel: "Hot Work", icon: "🔥", addHref: (id) => `/form-permit/form/hot-work?id_ijin_kerja=${id}` },
+  heightWork: { label: "Ijin Kerja Ketinggian (Height Work)", shortLabel: "Height Work", icon: "⚠️", addHref: (id) => `/form-permit/form/height-work?id_ijin_kerja=${id}` },
+  workshop: { label: "Ijin Kerja Workshop", shortLabel: "Workshop", icon: "🔧", addHref: (id) => `/form-permit/form/workshop?id_ijin_kerja=${id}` },
 };
 
 const STATUS_META: Record<string, { label: string; cls: string }> = {
-  draft:     { label: "Draft",     cls: "bg-slate-100 text-slate-600" },
-  submitted: { label: "Diajukan",  cls: "bg-blue-100 text-blue-700" },
-  approved:  { label: "Disetujui", cls: "bg-green-100 text-green-700" },
-  rejected:  { label: "Ditolak",   cls: "bg-red-100 text-red-700" },
+  draft: { label: "Draft", cls: "bg-slate-100 text-slate-600" },
+  submitted: { label: "Diajukan", cls: "bg-blue-100 text-blue-700" },
+  approved: { label: "Disetujui", cls: "bg-green-100 text-green-700" },
+  rejected: { label: "Ditolak", cls: "bg-red-100 text-red-700" },
 };
 
 function LinkedJobFormsSection({ generalPermitId, onOpenDetail, onOpenEdit }: {
@@ -262,7 +304,6 @@ function LinkedJobFormsSection({ generalPermitId, onOpenDetail, onOpenEdit }: {
         const meta = JOB_TYPE_META[key];
         const jf = jobForms?.[key];
 
-        // ── Sudah ada form untuk jenis ini: TIDAK BISA tambah lagi ──
         if (jf) {
           const statusMeta = STATUS_META[jf.status] || STATUS_META.submitted;
           const canEdit = jf.status === "draft" || jf.status === "rejected";
@@ -307,7 +348,6 @@ function LinkedJobFormsSection({ generalPermitId, onOpenDetail, onOpenEdit }: {
           );
         }
 
-        // ── Belum ada form untuk jenis ini: boleh tambah ──
         return (
           <a key={key} href={meta.addHref(generalPermitId)}
             className="w-full flex items-center gap-2.5 p-3 border-2 border-dashed border-slate-200 rounded-lg hover:border-orange-400 hover:bg-orange-50 transition-colors">
@@ -328,7 +368,7 @@ function DownloadPdfButton({
   formType: "hot-work" | "height-work" | "workshop";
 }) {
   const [generating, setGenerating] = useState(false);
-  const [pdfError, setPdfError]     = useState<string | null>(null);
+  const [pdfError, setPdfError] = useState<string | null>(null);
 
   const handleDownload = async () => {
     setGenerating(true);
@@ -370,14 +410,12 @@ function DownloadPdfButton({
   );
 }
 
-// ── Safety Induction Status Card (for child forms) ───────────
-// Ditampilkan di form hot-work/workshop/height-work yang terkait ke Ijin Kerja Eksternal.
-// Menunjukkan status Safety Induction dari form induk.
+// ── Safety Induction Status Card (untuk job-type forms terkait) ───────────
 function SafetyInductionStatusCard({ safetyInduction, parentIdForm }: { safetyInduction: any; parentIdForm: string }) {
   const status = safetyInduction?.status;
   const isApproved = status === "approved";
-  const isDraft    = status === "draft";
-  const hasData    = safetyInduction && (safetyInduction.namaSubcont || safetyInduction.aktivitasPekerjaan);
+  const isDraft = status === "draft";
+  const hasData = safetyInduction && (safetyInduction.namaSubcont || safetyInduction.aktivitasPekerjaan);
 
   if (!hasData) {
     return (
@@ -398,9 +436,8 @@ function SafetyInductionStatusCard({ safetyInduction, parentIdForm }: { safetyIn
           <FileText className={`w-4 h-4 ${isApproved ? "text-green-600" : "text-blue-600"}`} />
           <span className="text-sm font-semibold text-slate-800">Safety Induction</span>
         </div>
-        <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
-          isApproved ? "bg-green-100 text-green-700" : isDraft ? "bg-blue-100 text-blue-700" : "bg-slate-100 text-slate-600"
-        }`}>
+        <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${isApproved ? "bg-green-100 text-green-700" : isDraft ? "bg-blue-100 text-blue-700" : "bg-slate-100 text-slate-600"
+          }`}>
           {isApproved ? "✓ Disetujui" : isDraft ? "Draft" : "Belum Selesai"}
         </span>
       </div>
@@ -423,12 +460,22 @@ function SafetyInductionStatusCard({ safetyInduction, parentIdForm }: { safetyIn
 }
 
 // ── General Permit Safety Induction Card ──────────────────────
-// Ditampilkan di dalam renderGeneralPermit() — lebih informatif dari raw SafetyInductionSection.
-function GeneralPermitSafetyInductionCard({ safetyInduction }: { safetyInduction: any }) {
-  const status   = safetyInduction?.status;
+// UPDATED: "Koordinator Sub Contractor" dan "Security" sekarang menampilkan
+// gambar tanda tangan asli (kontraktorSignatureUrl / securitySignatureUrl),
+// bukan lagi field teks kosong. Tanda tangan Koordinator Sub Contractor
+// SAMA dengan tanda tangan Kontraktor yang sudah dibubuhkan di stage 1
+// (form induk) — tidak perlu tanda tangan terpisah.
+function GeneralPermitSafetyInductionCard({
+  safetyInduction, kontraktorSignatureUrl, securitySignatureUrl,
+}: {
+  safetyInduction: any;
+  kontraktorSignatureUrl?: string | null;
+  securitySignatureUrl?: string | null;
+}) {
+  const status = safetyInduction?.status;
   const isApproved = status === "approved";
-  const isDraft    = status === "draft";
-  const hasData    = safetyInduction && (safetyInduction.namaSubcont || safetyInduction.aktivitasPekerjaan);
+  const isDraft = status === "draft";
+  const hasData = safetyInduction && (safetyInduction.namaSubcont || safetyInduction.aktivitasPekerjaan);
 
   if (!hasData) {
     return (
@@ -446,24 +493,20 @@ function GeneralPermitSafetyInductionCard({ safetyInduction }: { safetyInduction
 
   return (
     <div className="space-y-4">
-      {/* Status Banner */}
-      <div className={`flex items-center justify-between p-3 rounded-lg ${
-        isApproved ? "bg-green-50 border border-green-200" : "bg-blue-50 border border-blue-200"
-      }`}>
+      <div className={`flex items-center justify-between p-3 rounded-lg ${isApproved ? "bg-green-50 border border-green-200" : "bg-blue-50 border border-blue-200"
+        }`}>
         <div className="flex items-center gap-2">
           <FileText className={`w-4 h-4 ${isApproved ? "text-green-600" : "text-blue-600"}`} />
           <span className={`text-sm font-semibold ${isApproved ? "text-green-800" : "text-blue-800"}`}>
             Status Safety Induction
           </span>
         </div>
-        <span className={`text-xs font-bold px-3 py-1 rounded-full ${
-          isApproved ? "bg-green-100 text-green-700" : isDraft ? "bg-blue-100 text-blue-700" : "bg-slate-100 text-slate-600"
-        }`}>
+        <span className={`text-xs font-bold px-3 py-1 rounded-full ${isApproved ? "bg-green-100 text-green-700" : isDraft ? "bg-blue-100 text-blue-700" : "bg-slate-100 text-slate-600"
+          }`}>
           {isApproved ? "✓ Disetujui Security" : isDraft ? "📝 Draft" : "⏳ Pending"}
         </span>
       </div>
 
-      {/* Info Utama */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
         <div className="p-3 bg-slate-50 rounded-lg">
           <span className="text-xs text-slate-500">Nama Subcont</span>
@@ -479,7 +522,6 @@ function GeneralPermitSafetyInductionCard({ safetyInduction }: { safetyInduction
         </div>
       </div>
 
-      {/* Daftar Pekerja */}
       {safetyInduction.namaPekerja?.filter(Boolean).length > 0 && (
         <div>
           <h4 className="text-xs font-semibold text-slate-600 mb-2">Daftar Nama Pekerja ({safetyInduction.namaPekerja.filter(Boolean).length} orang)</h4>
@@ -494,17 +536,29 @@ function GeneralPermitSafetyInductionCard({ safetyInduction }: { safetyInduction
         </div>
       )}
 
-      {/* Tanda Tangan */}
+      {/* ── Tanda tangan: Koordinator Sub Contractor (= TTD Kontraktor) & Security ── */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 border-t border-slate-200 pt-3">
         <div className="p-3 bg-slate-50 rounded-lg">
-          <span className="text-xs text-slate-500">Koordinator Sub Contractor</span>
-          <p className="font-semibold text-slate-800 mt-0.5">{safetyInduction.koordinatorSubcont || "-"}</p>
+          <span className="text-xs text-slate-500">Koordinator Sub Contractor (Tanda Tangan)</span>
+          {kontraktorSignatureUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={kontraktorSignatureUrl} alt="TTD Koordinator Sub Contractor" className="h-14 mt-1.5 border border-slate-200 rounded bg-white" />
+          ) : (
+            <p className="text-xs text-slate-400 italic mt-1">Belum tanda tangan</p>
+          )}
         </div>
         <div className={`p-3 rounded-lg ${isApproved ? "bg-green-50" : "bg-slate-50"}`}>
-          <span className="text-xs text-slate-500">Security</span>
-          <p className="font-semibold text-slate-800 mt-0.5">{safetyInduction.security || "-"}</p>
-          {isApproved && safetyInduction.approvedBy && (
-            <p className="text-xs text-green-600 mt-1">✓ Disetujui oleh: {safetyInduction.approvedBy}</p>
+          <span className="text-xs text-slate-500">Security (Tanda Tangan)</span>
+          {securitySignatureUrl ? (
+            <>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={securitySignatureUrl} alt="TTD Security" className="h-14 mt-1.5 border border-slate-200 rounded bg-white" />
+              {isApproved && safetyInduction.approvedBy && (
+                <p className="text-xs text-green-600 mt-1.5">✓ Disetujui oleh: {safetyInduction.approvedBy}</p>
+              )}
+            </>
+          ) : (
+            <p className="text-xs text-slate-400 italic mt-1">Belum tanda tangan</p>
           )}
         </div>
       </div>
@@ -512,11 +566,64 @@ function GeneralPermitSafetyInductionCard({ safetyInduction }: { safetyInduction
   );
 }
 
+// ── Blok tanda tangan Kontraktor (dipakai di general-permit & job forms) ──
+function ContractorSignatureBlock({
+  endpoint, onSigned,
+}: { endpoint: string; onSigned: () => void }) {
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
+
+  const handleConfirm = async (dataUrl: string) => {
+    setSubmitting(true);
+    setError("");
+    try {
+      const blob = await (await fetch(dataUrl)).blob();
+      const fd = new FormData();
+      fd.append("file", blob, "signature.png");
+      fd.append("context", "kontraktor");
+      const uploadRes = await fetch("/form-permit/api/upload/signature", { method: "POST", body: fd });
+      const uploadJson = await uploadRes.json();
+      if (!uploadRes.ok) throw new Error(uploadJson.error || "Upload tanda tangan gagal");
+
+      const signRes = await fetch(endpoint, {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ signatureUrl: uploadJson.url }),
+      });
+      const signJson = await signRes.json();
+      if (!signRes.ok) throw new Error(signJson.error || "Gagal menyimpan tanda tangan");
+      onSigned();
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="rounded-xl border-2 border-orange-200 bg-orange-50 p-4 space-y-3">
+      <p className="text-sm font-semibold text-orange-800">Tanda Tangan Kontraktor Diperlukan</p>
+      <p className="text-xs text-orange-700">
+        Form ini sudah diajukan dan menunggu tanda tangan Kontraktor sebelum lanjut ke tahap approval berikutnya.
+        Tanda tangan ini juga akan tercatat sebagai tanda tangan Koordinator Sub Contractor pada Safety Induction.
+      </p>
+      {error && <p className="text-xs text-red-600">{error}</p>}
+      <SignaturePad
+        onConfirm={handleConfirm}
+        disabled={submitting}
+        confirmLabel={submitting ? "Menyimpan..." : "Konfirmasi Tanda Tangan"}
+      />
+    </div>
+  );
+}
+
 // ── Main ──────────────────────────────────────────────────────
 export default function DetailModal({ isOpen, onClose, formId, formType }: DetailModalProps) {
-  const [data, setData]       = useState<any>(null);
+  const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(false);
-  const [error, setError]     = useState("");
+  const [error, setError] = useState("");
+  const [activeInfoModal, setActiveInfoModal] = useState<"jsa" | "safety-induction" | null>(null);
 
   const loadFormData = useCallback(async () => {
     setLoading(true);
@@ -527,24 +634,20 @@ export default function DetailModal({ isOpen, onClose, formId, formType }: Detai
       const json = await res.json();
       let detail = json.data;
       if (detail?.id_ijin_kerja) {
-        // Form ini adalah lampiran dari Ijin Kerja Eksternal.
-        // Ambil data parent untuk mendapatkan JSA dan Safety Induction.
         const parentRes = await fetch(`/form-permit/api/forms/general-permit/${detail.id_ijin_kerja}`);
         if (parentRes.ok) {
           const parent = await parentRes.json();
           const parentData = parent.data;
-          // Merge data JSA dari parent: perlu_jsa, jsa_data, jsa_file_url
-          // Prioritaskan jsa_data/jsa_file_url dari form anak (detail) dulu,
-          // fallback ke parent jika form anak tidak punya.
           detail = {
             ...detail,
             perlu_jsa: detail.perlu_jsa ?? parentData?.perlu_jsa,
             jsa_data: detail.jsa_data ?? parentData?.jsa_data,
             jsa_file_url: detail.jsa_file_url ?? parentData?.jsa_file_url,
             safety_induction: parentData?.safety_induction,
-            // Simpan info parent untuk referensi di tampilan
             _parent_id_form: parentData?.id_form,
             _parent_nama_kontraktor: parentData?.nama_kontraktor_pekerja,
+            _parent_kontraktor_signature_url: parentData?.kontraktor_signature_url,
+            _parent_security_signature_url: parentData?.security_signature_url,
           };
         }
       }
@@ -561,6 +664,11 @@ export default function DetailModal({ isOpen, onClose, formId, formType }: Detai
     loadFormData();
   }, [isOpen, formId, loadFormData]);
 
+  // Reset modal info setiap kali DetailModal dibuka/tutup
+  useEffect(() => {
+    if (!isOpen) setActiveInfoModal(null);
+  }, [isOpen]);
+
   const renderHotWork = () => {
     if (!data) return null;
     const p = data;
@@ -569,15 +677,15 @@ export default function DetailModal({ isOpen, onClose, formId, formType }: Detai
       <>
         <MS title="Bagian 1: Informasi Dasar">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <F label="ID Form"              value={p.id_form} />
-            <F label="Tanggal Pembuatan"    value={formatDate(p.tanggal)} />
-            <F label="Tanggal Pelaksanaan"  value={formatDate(p.tanggal_pelaksanaan)} />
-            <F label="Status"               value={p.status} />
-            <F label="No. Registrasi"       value={p.no_registrasi} />
+            <F label="ID Form" value={p.id_form} />
+            <F label="Tanggal Pembuatan" value={formatDate(p.tanggal)} />
+            <F label="Tanggal Pelaksanaan" value={formatDate(p.tanggal_pelaksanaan)} />
+            <F label="Status" value={p.status} />
+            <F label="No. Registrasi" value={p.no_registrasi} />
             <F label="Nama Kontraktor / NIK" value={p.nama_kontraktor_nik} />
-            <F label="Nama Pekerja / NIK"   value={p.nama_pekerja_nik} />
-            <F label="Lokasi Pekerjaan"     value={p.lokasi_pekerjaan} />
-            <F label="Waktu Pukul"          value={formatTime(p.waktu_pukul)} />
+            <F label="Nama Pekerja / NIK" value={p.nama_pekerja_nik} />
+            <F label="Lokasi Pekerjaan" value={p.lokasi_pekerjaan} />
+            <F label="Waktu Pukul" value={formatTime(p.waktu_pukul)} />
           </div>
         </MS>
         <MS title="Bagian 2: Fire Watch & Pemberi Izin">
@@ -585,12 +693,12 @@ export default function DetailModal({ isOpen, onClose, formId, formType }: Detai
             <div className="p-3 bg-blue-50 rounded-lg">
               <h4 className="font-bold text-blue-800 text-xs mb-2">Fire Watch</h4>
               <F label="Nama" value={p.nama_fire_watch} />
-              <F label="NIK"  value={p.nik_fire_watch} />
+              <F label="NIK" value={p.nik_fire_watch} />
             </div>
             <div className="p-3 bg-green-50 rounded-lg">
               <h4 className="font-bold text-green-800 text-xs mb-2">Pemberi Izin (SPV)</h4>
               <F label="Jabatan" value={p.jabatan_pemberi_izin} />
-              <F label="NIK"     value={p.nik_pemberi_ijin} />
+              <F label="NIK" value={p.nik_pemberi_ijin} />
             </div>
           </div>
         </MS>
@@ -604,9 +712,9 @@ export default function DetailModal({ isOpen, onClose, formId, formType }: Detai
             </div>
           </div>
           {[
-            { l: "Cutting",  d: p.detail_cutting,  m: p.t_mulai_cutting,  s: p.t_selesai_cutting },
+            { l: "Cutting", d: p.detail_cutting, m: p.t_mulai_cutting, s: p.t_selesai_cutting },
             { l: "Grinding", d: p.detail_grinding, m: p.t_mulai_grinding, s: p.t_selesai_grinding },
-            { l: "Welding",  d: p.detail_welding,  m: p.t_mulai_welding,  s: p.t_selesai_welding },
+            { l: "Welding", d: p.detail_welding, m: p.t_mulai_welding, s: p.t_selesai_welding },
             { l: "Painting", d: p.detail_painting, m: p.t_mulai_painting, s: p.t_selesai_painting },
           ].filter(x => x.d && x.m && x.m !== "00:00").map(x => (
             <div key={x.l} className="mb-3 p-3 bg-slate-50 rounded-lg">
@@ -621,24 +729,24 @@ export default function DetailModal({ isOpen, onClose, formId, formType }: Detai
         <MS title="Bagian 4: Upaya Pencegahan">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8">
             <div>
-              <BF label="Equipment/Tools kondisi baik"      value={p.kondisi_tools_baik} />
-              <BF label="APAR dan Hydrant tersedia"         value={p.tersedia_apar_hydrant} />
-              <BF label="Sensor smoke detector non-aktif"   value={p.sensor_smoke_detector_non_aktif} />
-              <BF label="APD lengkap"                       value={p.apd_lengkap} />
-              <BF label="Tidak ada cairan mudah terbakar"   value={p.tidak_ada_cairan_mudah_terbakar} />
-              <BF label="Lantai bersih"                     value={p.lantai_bersih} />
-              <BF label="Lantai sudah dibasahi"             value={p.lantai_sudah_dibasahi} />
-              <BF label="Cairan mudah terbakar tertutup"    value={p.cairan_mudah_tebakar_tertutup} />
+              <BF label="Equipment/Tools kondisi baik" value={p.kondisi_tools_baik} />
+              <BF label="APAR dan Hydrant tersedia" value={p.tersedia_apar_hydrant} />
+              <BF label="Sensor smoke detector non-aktif" value={p.sensor_smoke_detector_non_aktif} />
+              <BF label="APD lengkap" value={p.apd_lengkap} />
+              <BF label="Tidak ada cairan mudah terbakar" value={p.tidak_ada_cairan_mudah_terbakar} />
+              <BF label="Lantai bersih" value={p.lantai_bersih} />
+              <BF label="Lantai sudah dibasahi" value={p.lantai_sudah_dibasahi} />
+              <BF label="Cairan mudah terbakar tertutup" value={p.cairan_mudah_tebakar_tertutup} />
             </div>
             <div>
-              <BF label="Lembaran dibawah pekerjaan"        value={p.lembaran_dibawah_pekerjaan} />
-              <BF label="Lindungi conveyor dll"             value={p.lindungi_conveyor_dll} />
-              <BF label="Alat telah bersih"                 value={p.alat_telah_bersih} />
-              <BF label="Uap menyala telah dibuang"         value={p.uap_menyala_telah_dibuang} />
-              <BF label="Kerja pada dinding langit"         value={p.kerja_pada_dinding_lagit} />
-              <BF label="Bahan mudah terbakar dipindahkan"  value={p.bahan_mudah_terbakar_dipindahkan_dari_dinding} />
-              <BF label="Fire watch memastikan area aman"   value={p.fire_watch_memastikan_area_aman} />
-              <BF label="Firewatch terlatih"                value={p.firwatch_terlatih} />
+              <BF label="Lembaran dibawah pekerjaan" value={p.lembaran_dibawah_pekerjaan} />
+              <BF label="Lindungi conveyor dll" value={p.lindungi_conveyor_dll} />
+              <BF label="Alat telah bersih" value={p.alat_telah_bersih} />
+              <BF label="Uap menyala telah dibuang" value={p.uap_menyala_telah_dibuang} />
+              <BF label="Kerja pada dinding langit" value={p.kerja_pada_dinding_lagit} />
+              <BF label="Bahan mudah terbakar dipindahkan" value={p.bahan_mudah_terbakar_dipindahkan_dari_dinding} />
+              <BF label="Fire watch memastikan area aman" value={p.fire_watch_memastikan_area_aman} />
+              <BF label="Firewatch terlatih" value={p.firwatch_terlatih} />
             </div>
           </div>
           {p.jumlah_fire_blanket && <div className="mt-3"><F label="Jumlah Fire Blanket" value={p.jumlah_fire_blanket} /></div>}
@@ -649,12 +757,12 @@ export default function DetailModal({ isOpen, onClose, formId, formType }: Detai
             </div>
           )}
         </MS>
-        <MS title="Dokumen JSA (Job Safety Analysis)">
-          <JsaDisplay perluJsa={!!p.perlu_jsa} jsaFileUrl={p.jsa_file_url} jsaData={p.jsa_data} />
-        </MS>
-        {p._parent_id_form && (
-          <MS title="Safety Induction">
-            <SafetyInductionStatusCard safetyInduction={p.safety_induction} parentIdForm={p._parent_id_form} />
+        {isEksternal && p.status === "submitted" && p.current_stage === 1 && !p.kontraktor_signature_url && (
+          <MS title="Tanda Tangan Kontraktor">
+            <ContractorSignatureBlock
+              endpoint={`/form-permit/api/approval/hot-work/${p.id_form}/sign`}
+              onSigned={loadFormData}
+            />
           </MS>
         )}
         <MS title="Bagian 5: Persetujuan & Verifikasi QR">
@@ -664,7 +772,7 @@ export default function DetailModal({ isOpen, onClose, formId, formType }: Detai
         {p.status === "rejected" && (
           <MS title="Informasi Penolakan">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <F label="Ditolak Oleh"      value={p.approved_by} />
+              <F label="Ditolak Oleh" value={p.approved_by} />
               <F label="Tanggal Penolakan" value={formatDate(p.approved_at)} />
             </div>
           </MS>
@@ -672,7 +780,7 @@ export default function DetailModal({ isOpen, onClose, formId, formType }: Detai
         {p.status === "approved" && (
           <MS title="Informasi Approval">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <F label="Disetujui Oleh"   value={p.approved_by} />
+              <F label="Disetujui Oleh" value={p.approved_by} />
               <F label="Tanggal Approval" value={formatDate(p.approved_at)} />
             </div>
           </MS>
@@ -696,17 +804,17 @@ export default function DetailModal({ isOpen, onClose, formId, formType }: Detai
       <>
         <MS title="Bagian 1: Informasi Dasar">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <F label="ID Form"              value={p.id_form} />
-            <F label="Tanggal Pembuatan"    value={formatDate(p.tanggal)} />
-            <F label="Status"               value={p.status} />
-            <F label="Deskripsi Pekerjaan"  value={p.deskripsi_pekerjaan} />
-            <F label="Lokasi"               value={p.lokasi} />
-            <F label="Tanggal Pelaksanaan"  value={formatDate(p.tanggal_pelaksanaan)} />
-            <F label="Waktu Mulai"          value={formatTime(p.waktu_mulai)} />
-            <F label="Waktu Selesai"        value={formatTime(p.waktu_selesai)} />
-            <F label="Pengawas Kontraktor"  value={p.nama_pengawas_kontraktor} />
-            <F label="Pengawas Departemen"  value={p.nama_pengawas_departemen} />
-            <F label="Departemen"           value={p.nama_departemen} />
+            <F label="ID Form" value={p.id_form} />
+            <F label="Tanggal Pembuatan" value={formatDate(p.tanggal)} />
+            <F label="Status" value={p.status} />
+            <F label="Deskripsi Pekerjaan" value={p.deskripsi_pekerjaan} />
+            <F label="Lokasi" value={p.lokasi} />
+            <F label="Tanggal Pelaksanaan" value={formatDate(p.tanggal_pelaksanaan)} />
+            <F label="Waktu Mulai" value={formatTime(p.waktu_mulai)} />
+            <F label="Waktu Selesai" value={formatTime(p.waktu_selesai)} />
+            <F label="Pengawas Kontraktor" value={p.nama_pengawas_kontraktor} />
+            <F label="Pengawas Departemen" value={p.nama_pengawas_departemen} />
+            <F label="Departemen" value={p.nama_departemen} />
           </div>
         </MS>
         <MS title="Bagian 2: Daftar Petugas Ketinggian">
@@ -738,30 +846,30 @@ export default function DetailModal({ isOpen, onClose, formId, formType }: Detai
         <MS title="Bagian 3: Peminjaman APD">
           <div className="space-y-3">
             <BF label="Kunci Pagar Tangga Listrik" value={p.ada_kunci_pagar} />
-            <BF label="Rompi Ketinggian"           value={p.ada_rompi_ketinggian} />
+            <BF label="Rompi Ketinggian" value={p.ada_rompi_ketinggian} />
             {isTruthy(p.ada_rompi_ketinggian) && <F label="No. Rompi" value={p.no_rompi} />}
-            <BF label="Safety Helmet"              value={p.ada_safety_helmet} />
+            <BF label="Safety Helmet" value={p.ada_safety_helmet} />
             {isTruthy(p.ada_safety_helmet) && <F label="Jumlah Safety Helmet" value={p.jumlah_safety_helmet} />}
-            <BF label="Full Body Harness"          value={p.ada_full_body_harmess} />
+            <BF label="Full Body Harness" value={p.ada_full_body_harmess} />
             {isTruthy(p.ada_full_body_harmess) && <F label="Jumlah Full Body Harness" value={p.jumlah_full_body_harness} />}
           </div>
         </MS>
         <MS title="Bagian 4: Keselamatan Kerja Ketinggian">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8">
             <div>
-              <BF label="Area diperiksa & aman"              value={p.area_diperiksa_aman} />
-              <BF label="Paham alat pemadam kebakaran"       value={p.paham_cara_menggunakan_alat_pemadam_kebakaran} />
-              <BF label="Ada pekerjaan listrik"              value={p.ada_kerja_listrik} />
-              <BF label="Prosedur LOTO"                      value={p.prosedur_loto} />
-              <BF label="Menutupi area bawah prisai"         value={p.menutupi_area_bawah_prisai} />
-              <BF label="Safety line tersedia"               value={p.safetyline_tersedia} />
+              <BF label="Area diperiksa & aman" value={p.area_diperiksa_aman} />
+              <BF label="Paham alat pemadam kebakaran" value={p.paham_cara_menggunakan_alat_pemadam_kebakaran} />
+              <BF label="Ada pekerjaan listrik" value={p.ada_kerja_listrik} />
+              <BF label="Prosedur LOTO" value={p.prosedur_loto} />
+              <BF label="Menutupi area bawah prisai" value={p.menutupi_area_bawah_prisai} />
+              <BF label="Safety line tersedia" value={p.safetyline_tersedia} />
             </div>
             <div>
-              <BF label="Alat bantu kerja aman"  value={p.alat_bantu_kerja_aman} />
-              <BF label="Menggunakan rompi"      value={p.menggunakan_rompi} />
-              <BF label="Beban tidak >5kg"       value={p.beban_tidak_5kg} />
-              <BF label="Helm sesuai SOP"        value={p.helm_sesuai_sop} />
-              <BF label="Rambu-rambu tersedia"   value={p.rambu2_tersedia} />
+              <BF label="Alat bantu kerja aman" value={p.alat_bantu_kerja_aman} />
+              <BF label="Menggunakan rompi" value={p.menggunakan_rompi} />
+              <BF label="Beban tidak >5kg" value={p.beban_tidak_5kg} />
+              <BF label="Helm sesuai SOP" value={p.helm_sesuai_sop} />
+              <BF label="Rambu-rambu tersedia" value={p.rambu2_tersedia} />
             </div>
           </div>
         </MS>
@@ -769,26 +877,26 @@ export default function DetailModal({ isOpen, onClose, formId, formType }: Detai
           <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8">
             <div>
               <h5 className="text-xs font-semibold text-slate-600 mb-2">Helm</h5>
-              <BF label="Helm - Kondisi baik"    value={p.helm_kondisi_baik} />
+              <BF label="Helm - Kondisi baik" value={p.helm_kondisi_baik} />
               <h5 className="text-xs font-semibold text-slate-600 mb-2 mt-3">Body Harness</h5>
               <BF label="Webbing - Kondisi baik" value={p.webbing_kondisi_baik} />
-              <BF label="D-Ring - Kondisi baik"  value={p.dring_kondisi_baik} />
-              <BF label="Gesper - Kondisi baik"  value={p.gesper_kondisi_baik} />
+              <BF label="D-Ring - Kondisi baik" value={p.dring_kondisi_baik} />
+              <BF label="Gesper - Kondisi baik" value={p.gesper_kondisi_baik} />
             </div>
             <div>
               <h5 className="text-xs font-semibold text-slate-600 mb-2">Lanyard</h5>
-              <BF label="Absorber & Timbes baik"     value={p.absorter_dan_timbes_kondisi_baik} />
-              <BF label="Snap Hook - Kondisi baik"   value={p.snap_hook_kondisi_baik} />
+              <BF label="Absorber & Timbes baik" value={p.absorter_dan_timbes_kondisi_baik} />
+              <BF label="Snap Hook - Kondisi baik" value={p.snap_hook_kondisi_baik} />
               <BF label="Rope Lanyard - Kondisi baik" value={p.rope_lanyard_kondisi_baik} />
             </div>
           </div>
         </MS>
-        <MS title="Dokumen JSA (Job Safety Analysis)">
-          <JsaDisplay perluJsa={!!p.perlu_jsa} jsaFileUrl={p.jsa_file_url} jsaData={p.jsa_data} />
-        </MS>
-        {p._parent_id_form && (
-          <MS title="Safety Induction">
-            <SafetyInductionStatusCard safetyInduction={p.safety_induction} parentIdForm={p._parent_id_form} />
+        {isEksternal && p.status === "submitted" && p.current_stage === 1 && !p.kontraktor_signature_url && (
+          <MS title="Tanda Tangan Kontraktor">
+            <ContractorSignatureBlock
+              endpoint={`/form-permit/api/approval/height-work/${p.id_form}/sign`}
+              onSigned={loadFormData}
+            />
           </MS>
         )}
         <MS title="Bagian 6: Persetujuan & Verifikasi QR">
@@ -798,7 +906,7 @@ export default function DetailModal({ isOpen, onClose, formId, formType }: Detai
         {p.status === "rejected" && (
           <MS title="Informasi Penolakan">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <F label="Ditolak Oleh"      value={p.approved_by} />
+              <F label="Ditolak Oleh" value={p.approved_by} />
               <F label="Tanggal Penolakan" value={formatDate(p.approved_at)} />
             </div>
           </MS>
@@ -806,7 +914,7 @@ export default function DetailModal({ isOpen, onClose, formId, formType }: Detai
         {p.status === "approved" && (
           <MS title="Informasi Approval">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <F label="Disetujui Oleh"   value={p.approved_by} />
+              <F label="Disetujui Oleh" value={p.approved_by} />
               <F label="Tanggal Approval" value={formatDate(p.approved_at)} />
             </div>
           </MS>
@@ -823,15 +931,15 @@ export default function DetailModal({ isOpen, onClose, formId, formType }: Detai
       <>
         <MS title="Bagian 1: Informasi Dasar">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <F label="ID Form"              value={p.id_form} />
-            <F label="Tanggal Pembuatan"    value={formatDate(p.tanggal)} />
-            <F label="Tanggal Pelaksanaan"  value={formatDate(p.tanggal_pelaksanaan)} />
-            <F label="Status"               value={p.status} />
-            <F label="No. Registrasi"       value={p.no_registrasi} />
+            <F label="ID Form" value={p.id_form} />
+            <F label="Tanggal Pembuatan" value={formatDate(p.tanggal)} />
+            <F label="Tanggal Pelaksanaan" value={formatDate(p.tanggal_pelaksanaan)} />
+            <F label="Status" value={p.status} />
+            <F label="No. Registrasi" value={p.no_registrasi} />
             <F label="Nama Kontraktor / NIK" value={p.nama_kontraktor_nik} />
-            <F label="Nama Pekerja / NIK"   value={p.nama_pekerja_nik} />
-            <F label="Lokasi Pekerjaan"     value={p.lokasi_pekerjaan} />
-            <F label="Waktu Pukul"          value={formatTime(p.waktu_pukul)} />
+            <F label="Nama Pekerja / NIK" value={p.nama_pekerja_nik} />
+            <F label="Lokasi Pekerjaan" value={p.lokasi_pekerjaan} />
+            <F label="Waktu Pukul" value={formatTime(p.waktu_pukul)} />
           </div>
         </MS>
         <MS title="Bagian 2: Fire Watch & Pemberi Izin">
@@ -839,12 +947,12 @@ export default function DetailModal({ isOpen, onClose, formId, formType }: Detai
             <div className="p-3 bg-blue-50 rounded-lg">
               <h4 className="font-bold text-blue-800 text-xs mb-2">Fire Watch</h4>
               <F label="Nama" value={p.nama_fire_watch} />
-              <F label="NIK"  value={p.nik_fire_watch} />
+              <F label="NIK" value={p.nik_fire_watch} />
             </div>
             <div className="p-3 bg-green-50 rounded-lg">
               <h4 className="font-bold text-green-800 text-xs mb-2">Pemberi Izin (SPV)</h4>
               <F label="Jabatan" value={p.jabatan_pemberi_izin} />
-              <F label="NIK"     value={p.nik_pemberi_ijin} />
+              <F label="NIK" value={p.nik_pemberi_ijin} />
             </div>
           </div>
         </MS>
@@ -853,16 +961,16 @@ export default function DetailModal({ isOpen, onClose, formId, formType }: Detai
             <h4 className="font-semibold text-slate-700 text-sm mb-2">Jenis Pekerjaan:</h4>
             <div className="flex flex-wrap gap-2">
               {isTruthy(p.preventive_genset_pump_room) && <span className="px-2 py-1 bg-slate-100 rounded text-xs">✓ Preventive Genset</span>}
-              {isTruthy(p.tangki_solar)                && <span className="px-2 py-1 bg-slate-100 rounded text-xs">✓ Tangki Solar</span>}
-              {isTruthy(p.panel_listrik)               && <span className="px-2 py-1 bg-slate-100 rounded text-xs">✓ Panel Listrik</span>}
-              {isTruthy(p.painting_spray)              && <span className="px-2 py-1 bg-orange-100 rounded text-xs">✓ Painting Spray</span>}
-              {isTruthy(p.painting_non_spray)          && <span className="px-2 py-1 bg-orange-100 rounded text-xs">✓ Painting Non-Spray</span>}
+              {isTruthy(p.tangki_solar) && <span className="px-2 py-1 bg-slate-100 rounded text-xs">✓ Tangki Solar</span>}
+              {isTruthy(p.panel_listrik) && <span className="px-2 py-1 bg-slate-100 rounded text-xs">✓ Panel Listrik</span>}
+              {isTruthy(p.painting_spray) && <span className="px-2 py-1 bg-orange-100 rounded text-xs">✓ Painting Spray</span>}
+              {isTruthy(p.painting_non_spray) && <span className="px-2 py-1 bg-orange-100 rounded text-xs">✓ Painting Non-Spray</span>}
             </div>
           </div>
           {[
-            { l: "Cutting",  d: p.detail_cutting,  m: p.t_mulai_cutting,  s: p.t_selesai_cutting },
+            { l: "Cutting", d: p.detail_cutting, m: p.t_mulai_cutting, s: p.t_selesai_cutting },
             { l: "Grinding", d: p.detail_grinding, m: p.t_mulai_grinding, s: p.t_selesai_grinding },
-            { l: "Welding",  d: p.detail_welding,  m: p.t_mulai_welding,  s: p.t_selesai_welding },
+            { l: "Welding", d: p.detail_welding, m: p.t_mulai_welding, s: p.t_selesai_welding },
             { l: "Painting", d: p.detail_painting, m: p.t_mulai_painting, s: p.t_selesai_painting },
           ].filter(x => x.d && x.m && x.m !== "00:00").map(x => (
             <div key={x.l} className="mb-3 p-3 bg-slate-50 rounded-lg">
@@ -877,24 +985,24 @@ export default function DetailModal({ isOpen, onClose, formId, formType }: Detai
         <MS title="Bagian 4: Upaya Pencegahan">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8">
             <div>
-              <BF label="Equipment/Tools kondisi baik"      value={p.kondisi_tools_baik} />
-              <BF label="APAR dan Hydrant tersedia"         value={p.tersedia_apar_hydrant} />
-              <BF label="Sensor smoke detector non-aktif"   value={p.sensor_smoke_detector_non_aktif} />
-              <BF label="APD lengkap"                       value={p.apd_lengkap} />
-              <BF label="Tidak ada cairan mudah terbakar"   value={p.tidak_ada_cairan_mudah_terbakar} />
-              <BF label="Lantai bersih"                     value={p.lantai_bersih} />
-              <BF label="Lantai sudah dibasahi"             value={p.lantai_sudah_dibasahi} />
-              <BF label="Cairan mudah terbakar tertutup"    value={p.cairan_mudah_tebakar_tertutup} />
+              <BF label="Equipment/Tools kondisi baik" value={p.kondisi_tools_baik} />
+              <BF label="APAR dan Hydrant tersedia" value={p.tersedia_apar_hydrant} />
+              <BF label="Sensor smoke detector non-aktif" value={p.sensor_smoke_detector_non_aktif} />
+              <BF label="APD lengkap" value={p.apd_lengkap} />
+              <BF label="Tidak ada cairan mudah terbakar" value={p.tidak_ada_cairan_mudah_terbakar} />
+              <BF label="Lantai bersih" value={p.lantai_bersih} />
+              <BF label="Lantai sudah dibasahi" value={p.lantai_sudah_dibasahi} />
+              <BF label="Cairan mudah terbakar tertutup" value={p.cairan_mudah_tebakar_tertutup} />
             </div>
             <div>
-              <BF label="Lembaran dibawah pekerjaan"        value={p.lembaran_dibawah_pekerjaan} />
-              <BF label="Lindungi conveyor dll"             value={p.lindungi_conveyor_dll} />
-              <BF label="Alat telah bersih"                 value={p.alat_telah_bersih} />
-              <BF label="Uap menyala telah dibuang"         value={p.uap_menyala_telah_dibuang} />
-              <BF label="Kerja pada dinding langit"         value={p.kerja_pada_dinding_lagit} />
-              <BF label="Bahan mudah terbakar dipindahkan"  value={p.bahan_mudah_terbakar_dipindahkan_dari_dinding} />
-              <BF label="Fire watch memastikan area aman"   value={p.fire_watch_memastikan_area_aman} />
-              <BF label="Firewatch terlatih"                value={p.firwatch_terlatih} />
+              <BF label="Lembaran dibawah pekerjaan" value={p.lembaran_dibawah_pekerjaan} />
+              <BF label="Lindungi conveyor dll" value={p.lindungi_conveyor_dll} />
+              <BF label="Alat telah bersih" value={p.alat_telah_bersih} />
+              <BF label="Uap menyala telah dibuang" value={p.uap_menyala_telah_dibuang} />
+              <BF label="Kerja pada dinding langit" value={p.kerja_pada_dinding_lagit} />
+              <BF label="Bahan mudah terbakar dipindahkan" value={p.bahan_mudah_terbakar_dipindahkan_dari_dinding} />
+              <BF label="Fire watch memastikan area aman" value={p.fire_watch_memastikan_area_aman} />
+              <BF label="Firewatch terlatih" value={p.firwatch_terlatih} />
             </div>
           </div>
           {p.permintaan_tambahan && (
@@ -904,12 +1012,12 @@ export default function DetailModal({ isOpen, onClose, formId, formType }: Detai
             </div>
           )}
         </MS>
-        <MS title="Dokumen JSA (Job Safety Analysis)">
-          <JsaDisplay perluJsa={!!p.perlu_jsa} jsaFileUrl={p.jsa_file_url} jsaData={p.jsa_data} />
-        </MS>
-        {p._parent_id_form && (
-          <MS title="Safety Induction">
-            <SafetyInductionStatusCard safetyInduction={p.safety_induction} parentIdForm={p._parent_id_form} />
+        {isEksternal && p.status === "submitted" && p.current_stage === 1 && !p.kontraktor_signature_url && (
+          <MS title="Tanda Tangan Kontraktor">
+            <ContractorSignatureBlock
+              endpoint={`/form-permit/api/approval/workshop/${p.id_form}/sign`}
+              onSigned={loadFormData}
+            />
           </MS>
         )}
         <MS title="Bagian 5: Persetujuan & Verifikasi QR">
@@ -919,7 +1027,7 @@ export default function DetailModal({ isOpen, onClose, formId, formType }: Detai
         {p.status === "rejected" && (
           <MS title="Informasi Penolakan">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <F label="Ditolak Oleh"      value={p.approved_by} />
+              <F label="Ditolak Oleh" value={p.approved_by} />
               <F label="Tanggal Penolakan" value={formatDate(p.approved_at)} />
             </div>
           </MS>
@@ -927,7 +1035,7 @@ export default function DetailModal({ isOpen, onClose, formId, formType }: Detai
         {p.status === "approved" && (
           <MS title="Informasi Approval">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <F label="Disetujui Oleh"   value={p.approved_by} />
+              <F label="Disetujui Oleh" value={p.approved_by} />
               <F label="Tanggal Approval" value={formatDate(p.approved_at)} />
             </div>
           </MS>
@@ -944,44 +1052,50 @@ export default function DetailModal({ isOpen, onClose, formId, formType }: Detai
       <>
         <MS title="Bagian 1: Informasi Kontraktor/Pekerja">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <F label="ID Form"                    value={p.id_form} />
-            <F label="Tanggal Pembuatan"           value={formatDate(p.tanggal)} />
-            <F label="Status"                      value={p.status} />
-            <F label="Nama Kontraktor/Pekerja"     value={p.nama_kontraktor_pekerja} />
-            <F label="Nama Pengawas/PIC Subkont"   value={p.nama_pengawas_pic_subkont} />
-            <F label="Jumlah Tenaga Kerja"         value={p.jumlah_tenaga_kerja} />
-            <F label="Tanggal Mulai Kerja"         value={formatDate(p.tgl_mulai_kerja)} />
-            <F label="Tanggal Akhir Kerja"         value={formatDate(p.tgl_akhir_kerja_rencana)} />
-            <F label="Waktu Kerja"                 value={formatTime(p.waktu_kerja)} />
+            <F label="ID Form" value={p.id_form} />
+            <F label="Tanggal Pembuatan" value={formatDate(p.tanggal)} />
+            <F label="Status" value={p.status} />
+            <F label="Nama Kontraktor/Pekerja" value={p.nama_kontraktor_pekerja} />
+            <F label="Nama Pengawas/PIC Subkont" value={p.nama_pengawas_pic_subkont} />
+            <F label="Jumlah Tenaga Kerja" value={p.jumlah_tenaga_kerja} />
+            <F label="Tanggal Mulai Kerja" value={formatDate(p.tgl_mulai_kerja)} />
+            <F label="Tanggal Akhir Kerja" value={formatDate(p.tgl_akhir_kerja_rencana)} />
+            <F label="Waktu Kerja" value={formatTime(p.waktu_kerja)} />
           </div>
         </MS>
         <MS title="Bagian 2 & 4: Spesifikasi & Lokasi Pekerjaan">
           <F label="Deskripsi Pekerjaan" value={p.deskripsi_pekerjaan} />
-          <F label="Lokasi Pekerjaan"    value={p.lokasi_pekerjaan} />
+          <F label="Lokasi Pekerjaan" value={p.lokasi_pekerjaan} />
         </MS>
-        <MS title="Bagian 11: Penanggung Jawab">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <F label="Kontraktor PJ"  value={p.kontraktor_pj} />
-            <F label="SPV Terkait PJ" value={p.spv_terkait_pj} />
-          </div>
-        </MS>
-        <MS title="Bagian 4: JSA">
-          <JsaDisplay perluJsa={!!p.perlu_jsa} jsaFileUrl={p.jsa_file_url} jsaData={p.jsa_data} />
-        </MS>
-        <MS title="Safety Induction">
-          <GeneralPermitSafetyInductionCard safetyInduction={p.safety_induction} />
-        </MS>
+
+        {p.status === "submitted" && p.current_stage === 1 && !p.kontraktor_signature_url && (
+          <MS title="Tanda Tangan Kontraktor">
+            <ContractorSignatureBlock
+              endpoint={`/form-permit/api/forms/general-permit/${p.id_form}/sign-kontraktor`}
+              onSigned={loadFormData}
+            />
+          </MS>
+        )}
+
         <MS title="Bagian 12: Form Jenis Pekerjaan Terkait">
-          <LinkedJobFormsSection
-            generalPermitId={p.id_form}
-            onOpenDetail={(jenis, idForm) => {
-              window.dispatchEvent(new CustomEvent("open-form-detail", { detail: { jenis, idForm } }));
-            }}
-            onOpenEdit={(jenis, idForm) => {
-              window.dispatchEvent(new CustomEvent("open-form-edit", { detail: { jenis, idForm } }));
-            }}
-          />
+          {p.kontraktor_signature_url ? (
+            <LinkedJobFormsSection
+              generalPermitId={p.id_form}
+              onOpenDetail={(jenis, idForm) => {
+                window.dispatchEvent(new CustomEvent("open-form-detail", { detail: { jenis, idForm } }));
+              }}
+              onOpenEdit={(jenis, idForm) => {
+                window.dispatchEvent(new CustomEvent("open-form-edit", { detail: { jenis, idForm } }));
+              }}
+            />
+          ) : (
+            <div className="flex items-center gap-3 p-4 bg-amber-50 rounded-lg border border-amber-200">
+              <AlertCircle className="w-5 h-5 text-amber-600 shrink-0" />
+              <p className="text-sm text-amber-800">Tanda tangan Kontraktor pada form induk diperlukan sebelum menambahkan form jenis pekerjaan.</p>
+            </div>
+          )}
         </MS>
+
         <MS title="Bagian 13: Persetujuan & Verifikasi QR">
           <GeneralPermitApprovalGrid p={p} />
         </MS>
@@ -989,7 +1103,7 @@ export default function DetailModal({ isOpen, onClose, formId, formType }: Detai
         {p.status === "rejected" && (
           <MS title="Informasi Penolakan">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <F label="Ditolak Oleh"      value={p.approved_by} />
+              <F label="Ditolak Oleh" value={p.approved_by} />
               <F label="Tanggal Penolakan" value={formatDate(p.approved_at)} />
             </div>
           </MS>
@@ -997,7 +1111,7 @@ export default function DetailModal({ isOpen, onClose, formId, formType }: Detai
         {p.status === "approved" && (
           <MS title="Informasi Approval">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <F label="Disetujui Oleh"   value={p.approved_by} />
+              <F label="Disetujui Oleh" value={p.approved_by} />
               <F label="Tanggal Approval" value={formatDate(p.approved_at)} />
             </div>
           </MS>
@@ -1009,30 +1123,63 @@ export default function DetailModal({ isOpen, onClose, formId, formType }: Detai
   if (!isOpen) return null;
 
   const renderContent = () => {
-    if (formType === "hot-work")       return renderHotWork();
-    if (formType === "height-work")    return renderHeightWork();
+    if (formType === "hot-work") return renderHotWork();
+    if (formType === "height-work") return renderHeightWork();
     if (formType === "general-permit") return renderGeneralPermit();
     return renderWorkshop();
   };
+
+  // Info untuk tombol header — berbeda tergantung formType
+  const showJsaButton = !!data;
+  const showSafetyInductionButton =
+    !!data && (formType === "general-permit" || !!data._parent_id_form);
 
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] flex flex-col">
 
         {/* Sticky header */}
-        <div className="shrink-0 bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between rounded-t-lg">
-          <div>
-            <h2 className="text-xl font-bold text-slate-800">Detail Form</h2>
-            {data && <p className="text-xs text-slate-400 mt-0.5 font-mono">{data.id_form}</p>}
+        <div className="shrink-0 bg-white border-b border-slate-200 px-6 py-4 rounded-t-lg">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-xl font-bold text-slate-800">Detail Form</h2>
+              {data && <p className="text-xs text-slate-400 mt-0.5 font-mono">{data.id_form}</p>}
+            </div>
+            <div className="flex items-center gap-3">
+              {data && !loading && formType !== "general-permit" && (
+                <DownloadPdfButton data={data} formType={formType} />
+              )}
+              <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-lg transition-colors">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
           </div>
-          <div className="flex items-center gap-3">
-            {data && !loading && formType !== "general-permit" && (
-              <DownloadPdfButton data={data} formType={formType} />
-            )}
-            <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-lg transition-colors">
-              <X className="w-5 h-5" />
-            </button>
-          </div>
+
+          {/* Tombol lampiran JSA / Safety Induction */}
+          {(showJsaButton || showSafetyInductionButton) && !loading && (
+            <div className="flex items-center gap-2 mt-3">
+              {showJsaButton && (
+                <button
+                  type="button"
+                  onClick={() => setActiveInfoModal("jsa")}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold
+                             bg-slate-100 hover:bg-orange-100 text-slate-700 hover:text-orange-700 transition-colors"
+                >
+                  <FileText className="w-3.5 h-3.5" /> Lihat JSA
+                </button>
+              )}
+              {showSafetyInductionButton && (
+                <button
+                  type="button"
+                  onClick={() => setActiveInfoModal("safety-induction")}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold
+                             bg-teal-50 hover:bg-teal-100 text-teal-700 transition-colors"
+                >
+                  <ShieldCheck className="w-3.5 h-3.5" /> Lihat Safety Induction
+                </button>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Scrollable body */}
@@ -1050,6 +1197,38 @@ export default function DetailModal({ isOpen, onClose, formId, formType }: Detai
           ) : renderContent()}
         </div>
       </div>
+
+      {/* ── Modal JSA ── */}
+      {activeInfoModal === "jsa" && data && (
+        <InfoModal title="Dokumen JSA (Job Safety Analysis)" onClose={() => setActiveInfoModal(null)}>
+          <JsaDisplay perluJsa={!!data.perlu_jsa} jsaFileUrl={data.jsa_file_url} jsaData={data.jsa_data} />
+        </InfoModal>
+      )}
+
+      {/* ── Modal Safety Induction ── */}
+      {activeInfoModal === "safety-induction" && data && (
+        <InfoModal title="Safety Induction" onClose={() => setActiveInfoModal(null)}>
+          {formType === "general-permit" ? (
+            data.security_approved ? (
+              <GeneralPermitSafetyInductionCard
+                safetyInduction={data.safety_induction}
+                kontraktorSignatureUrl={data.kontraktor_signature_url}
+                securitySignatureUrl={data.security_signature_url}
+              />
+            ) : (
+              <div className="flex items-center gap-3 p-4 bg-slate-50 rounded-lg border border-slate-200">
+                <AlertCircle className="w-5 h-5 text-slate-400 shrink-0" />
+                <p className="text-sm text-slate-500">Safety Induction akan tampil setelah Security menandatangani dan menyetujui.</p>
+              </div>
+            )
+          ) : (
+            <SafetyInductionStatusCard
+              safetyInduction={data.safety_induction}
+              parentIdForm={data._parent_id_form}
+            />
+          )}
+        </InfoModal>
+      )}
     </div>
   );
 }

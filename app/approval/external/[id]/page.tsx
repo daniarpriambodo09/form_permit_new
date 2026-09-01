@@ -1,13 +1,18 @@
+// app/approval/external/[id]/page.tsx
 "use client";
 
-import { use, useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, CheckCircle, AlertCircle, Loader2, FileText, Shield, ClipboardList } from "lucide-react";
+import { use, useEffect, useState } from "react";
+import {
+  ArrowLeft, CheckCircle, AlertCircle, Loader2, FileText,
+  Shield, ClipboardList, XCircle, User, ChevronRight,
+} from "lucide-react";
 import { useApproverAuth } from "@/hooks/useApproverAuth";
 import AuthLoadingSpinner from "@/components/AuthLoadingSpinner";
 import type { JsaData } from "@/components/JsaBuilderSection";
 import JsaApprovalCard from "@/components/JsaApprovalCard";
 import SafetyInductionSection, { createEmptySafetyInduction, type SafetyInductionData } from "@/components/SafetyInductionSection";
+import SignaturePad from "@/components/SignaturePad";
 
 const labels: Record<string, string> = {
   "hot-work": "Hot Work",
@@ -22,6 +27,20 @@ const statusConfig: Record<string, { label: string; cls: string }> = {
   rejected: { label: "Ditolak", cls: "bg-red-100 text-red-700" },
 };
 
+// ── Label & role per stage (form_ijin_kerja) ────────────────
+const STAGE_LABEL: Record<number, string> = {
+  1: "Kontraktor",
+  2: "SPV",
+  3: "Security",
+  4: "SFO",
+  5: "SMR / PGA Manager",
+};
+const STAGE_ROLE: Record<number, string> = {
+  2: "spv",
+  4: "sfo",
+  5: "smr",
+};
+
 export default function ExternalApprovalPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const { user, loading: authLoading } = useApproverAuth();
@@ -31,6 +50,13 @@ export default function ExternalApprovalPage({ params }: { params: Promise<{ id:
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [safetyInduction, setSafetyInduction] = useState<SafetyInductionData>(createEmptySafetyInduction);
+
+  // ── Reject modal state (SPV/SFO/SMR) ────────────────────────
+  const [showReject, setShowReject] = useState(false);
+  const [catatan, setCatatan] = useState("");
+
+  // ── Signature pad state (Security) ──────────────────────────
+  const [signSubmitting, setSignSubmitting] = useState(false);
 
   const isSecurity = user?.role === "security";
   const isAdmin = user?.role === "admin";
@@ -91,7 +117,7 @@ export default function ExternalApprovalPage({ params }: { params: Promise<{ id:
     setActionLoading(false);
   };
 
-  // ── Simpan Safety Induction ───────────────────────────────────
+  // ── Simpan Safety Induction (draft, tanpa approve) ─────────────
   const saveSafetyInduction = async (submit: boolean) => {
     const response = await fetch(`/form-permit/api/approval/external/${id}/safety-induction`, {
       method: "PATCH", credentials: "include", headers: { "Content-Type": "application/json" },
@@ -101,11 +127,68 @@ export default function ExternalApprovalPage({ params }: { params: Promise<{ id:
     if (!response.ok) throw new Error(result.error || "Safety Induction gagal disimpan");
     setSafetyInduction(result.data);
     setMessage(submit ? "Safety Induction berhasil disetujui." : "Safety Induction berhasil disimpan sebagai draft.");
-    // Refresh data
     const refreshed = await fetch(`/form-permit/api/approval/external/${id}`, { credentials: "include" });
     if (refreshed.ok) {
       const refreshedData = (await refreshed.json()).data;
       setData(refreshedData);
+    }
+  };
+
+  // ── Tanda tangan Security + approve final Safety Induction ─────
+  const signAndApproveSafetyInduction = async (dataUrl: string) => {
+    setSignSubmitting(true);
+    setError("");
+    try {
+      const blob = await (await fetch(dataUrl)).blob();
+      const fd = new FormData();
+      fd.append("file", blob, `signature-${id}.png`);
+      fd.append("context", `security-${id}`);
+      const uploadRes = await fetch("/form-permit/api/upload/signature", { method: "POST", body: fd });
+      const uploadJson = await uploadRes.json();
+      if (!uploadRes.ok) throw new Error(uploadJson.error || "Upload tanda tangan gagal");
+
+      const res = await fetch(`/form-permit/api/approval/external/${id}/safety-induction/sign`, {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ safetyInduction, signatureUrl: uploadJson.url }),
+      });
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.error || "Gagal menyimpan tanda tangan");
+      setMessage("Safety Induction berhasil ditandatangani & disetujui. Menunggu SFO.");
+      loadData();
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setSignSubmitting(false);
+    }
+  };
+
+  // ── SPV / SFO / SMR: approve / reject form induk ────────────────
+  const handleGeneralPermitAction = async (action: "approve" | "reject") => {
+    if (action === "reject" && !catatan.trim()) {
+      setError("Catatan alasan penolakan wajib diisi.");
+      return;
+    }
+    setActionLoading(true);
+    setError("");
+    try {
+      const res = await fetch(`/form-permit/api/approval/general-permit/${id}`, {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action, catatan_reject: catatan }),
+      });
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.error || "Gagal memproses approval");
+      setMessage(action === "approve" ? "Form berhasil disetujui." : "Form berhasil ditolak.");
+      setShowReject(false);
+      setCatatan("");
+      loadData();
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setActionLoading(false);
     }
   };
 
@@ -122,10 +205,16 @@ export default function ExternalApprovalPage({ params }: { params: Promise<{ id:
     : null;
   const canApproveJsa = Boolean(jsaApproval && jsaApproval.status === "submitted" && (user?.role === jsaRole || isAdmin));
 
-  // Status Safety Induction
   const siStatus = general.safety_induction?.status;
   const siApproved = siStatus === "approved";
   const siHasData = general.safety_induction?.namaSubcont;
+
+  const currentStage: number = general.current_stage ?? 1;
+  const isMyStageRole = STAGE_ROLE[currentStage] === user.role || isAdmin;
+  const canActOnGeneralPermit =
+    general.status === "submitted" &&
+    (currentStage === 2 || currentStage === 4 || currentStage === 5) &&
+    isMyStageRole;
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -140,7 +229,6 @@ export default function ExternalApprovalPage({ params }: { params: Promise<{ id:
               {isSecurity ? "Form Safety Induction untuk diisi" : "Form induk dan seluruh lampiran pekerjaan"}
             </p>
           </div>
-          {/* Role badge */}
           <span className={`ml-auto text-xs font-semibold px-2.5 py-1 rounded-full ${isSecurity ? "bg-teal-100 text-teal-700" : "bg-blue-100 text-blue-700"
             }`}>
             {isSecurity ? "🛡️ Security" : `👤 ${user.role}`}
@@ -157,7 +245,18 @@ export default function ExternalApprovalPage({ params }: { params: Promise<{ id:
           <div className="flex items-center gap-2 mb-4">
             <ClipboardList className="w-5 h-5 text-orange-600" />
             <h2 className="font-bold text-slate-800">Form Ijin Kerja Eksternal</h2>
+            <span className={`ml-auto text-xs font-semibold px-2.5 py-1 rounded-full ${statusConfig[general.status]?.cls || "bg-slate-100 text-slate-600"}`}>
+              {statusConfig[general.status]?.label || general.status}
+            </span>
           </div>
+          {general.status === "submitted" && (
+            <div className="mb-4 flex items-center gap-2 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2.5">
+              <Shield className="w-4 h-4 text-blue-600 shrink-0" />
+              <p className="text-sm text-blue-700">
+                Tahap saat ini: <strong>{STAGE_LABEL[currentStage] ?? currentStage}</strong>
+              </p>
+            </div>
+          )}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
             <div><span className="text-xs text-slate-400">ID Form</span><p className="font-semibold font-mono">{general.id_form}</p></div>
             <div><span className="text-xs text-slate-400">Kontraktor/Pekerja</span><p className="font-semibold">{general.nama_kontraktor_pekerja || "-"}</p></div>
@@ -165,28 +264,99 @@ export default function ExternalApprovalPage({ params }: { params: Promise<{ id:
             <div><span className="text-xs text-slate-400">Lokasi</span><p className="font-semibold">{general.lokasi_pekerjaan || "-"}</p></div>
             <div><span className="text-xs text-slate-400">Nama Pengawas/PIC</span><p className="font-semibold">{general.nama_pengawas_pic_subkont || "-"}</p></div>
             <div><span className="text-xs text-slate-400">Deskripsi Pekerjaan</span><p className="font-semibold">{general.deskripsi_pekerjaan || "-"}</p></div>
-            <div><span className="text-xs text-slate-400">Status Form</span>
-              <span className={`inline-block mt-0.5 text-xs font-semibold px-2 py-0.5 rounded-full ${statusConfig[general.status]?.cls || "bg-slate-100 text-slate-600"}`}>
-                {statusConfig[general.status]?.label || general.status}
-              </span>
-            </div>
             <div><span className="text-xs text-slate-400">Departemen Pembuat</span><p className="font-semibold">{general.pembuat_departmen || "-"}</p></div>
           </div>
+          {general.kontraktor_signature_url && (
+            <div className="mt-4 pt-4 border-t border-slate-100">
+              <span className="text-xs text-slate-400 uppercase font-medium">Tanda Tangan Kontraktor</span>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={general.kontraktor_signature_url} alt="TTD Kontraktor" className="h-16 mt-1 border border-slate-100 rounded bg-white" />
+            </div>
+          )}
+          {general.catatan_reject && general.status === "rejected" && (
+            <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+              <span className="font-semibold">Alasan ditolak: </span>{general.catatan_reject}
+            </div>
+          )}
         </section>
 
+        {/* === PANEL AKSI SPV / SFO / SMR (klik approve/reject) === */}
+        {canActOnGeneralPermit && (
+          <section className="bg-white rounded-xl border-2 border-orange-200 p-5">
+            <h2 className="font-bold text-slate-800 mb-1">Keputusan Approval — {STAGE_LABEL[currentStage]}</h2>
+            <p className="text-xs text-slate-500 mb-4">
+              Anda login sebagai <strong>{user.nama}</strong> ({user.role})
+            </p>
+
+            {showReject && (
+              <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+                <label className="block text-sm font-bold text-red-700 mb-2">
+                  Catatan Alasan Penolakan <span className="text-red-500">*</span>
+                </label>
+                <textarea
+                  rows={3}
+                  value={catatan}
+                  onChange={(e) => setCatatan(e.target.value)}
+                  placeholder="Jelaskan alasan penolakan secara spesifik..."
+                  className="w-full px-3 py-2 border border-red-300 rounded-lg text-sm focus:ring-2 focus:ring-red-400 focus:border-transparent text-black resize-none"
+                />
+              </div>
+            )}
+
+            <div className="flex items-center gap-3 flex-wrap">
+              {!showReject && (
+                <button
+                  type="button"
+                  onClick={() => handleGeneralPermitAction("approve")}
+                  disabled={actionLoading}
+                  className="flex items-center gap-2 px-6 py-3 bg-green-600 hover:bg-green-700 disabled:bg-green-300 text-white rounded-xl font-semibold text-sm transition-colors shadow-sm"
+                >
+                  {actionLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
+                  Setujui ({STAGE_LABEL[currentStage]})
+                </button>
+              )}
+              {!showReject ? (
+                <button
+                  type="button"
+                  onClick={() => setShowReject(true)}
+                  className="flex items-center gap-2 px-6 py-3 border-2 border-red-300 text-red-600 hover:bg-red-50 rounded-xl font-semibold text-sm transition-colors"
+                >
+                  <XCircle className="w-4 h-4" /> Tolak Form
+                </button>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleGeneralPermitAction("reject")}
+                    disabled={actionLoading || !catatan.trim()}
+                    className="flex items-center gap-2 px-5 py-3 bg-red-600 hover:bg-red-700 disabled:bg-red-300 text-white rounded-xl font-semibold text-sm transition-colors"
+                  >
+                    {actionLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <XCircle className="w-4 h-4" />}
+                    Konfirmasi Tolak
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setShowReject(false); setCatatan(""); setError(""); }}
+                    className="px-4 py-3 border border-slate-300 text-slate-600 hover:bg-slate-100 rounded-xl text-sm font-medium transition-colors"
+                  >
+                    Batal
+                  </button>
+                </div>
+              )}
+            </div>
+          </section>
+        )}
+
         {/* === SAFETY INDUCTION SECTION === */}
-        {/* Untuk semua role: tampilkan Safety Induction */}
-        {/* Security & admin: bisa edit/submit. Role lain: read-only */}
         <section className="rounded-xl border-2 border-teal-200 bg-teal-50 overflow-hidden">
           <div className="px-5 py-3 bg-teal-600 flex items-center gap-3">
             <Shield className="w-5 h-5 text-white" />
             <div>
               <h2 className="font-bold text-white">Form Safety Induction</h2>
               <p className="text-xs text-teal-100">
-                {isSecurity ? "Isi dan setujui form Safety Induction ini" : "Diisi oleh Security berdasarkan Ijin Kerja Eksternal"}
+                {isSecurity ? "Isi dan tanda tangani form Safety Induction ini" : "Diisi oleh Security berdasarkan Ijin Kerja Eksternal"}
               </p>
             </div>
-            {/* Status badge */}
             <span className={`ml-auto text-xs font-bold px-3 py-1 rounded-full ${siApproved ? "bg-green-100 text-green-800" :
               siHasData ? "bg-yellow-100 text-yellow-800" :
                 "bg-white/80 text-teal-800"
@@ -196,7 +366,6 @@ export default function ExternalApprovalPage({ params }: { params: Promise<{ id:
           </div>
           <div className="bg-white p-5">
             {siApproved && !isSecurity && !isAdmin ? (
-              // Role lain, SI sudah approved → tampilkan ringkasan
               <div className="space-y-3">
                 <div className="flex items-center gap-2 p-3 bg-green-50 border border-green-200 rounded-lg">
                   <CheckCircle className="w-4 h-4 text-green-600 shrink-0" />
@@ -209,21 +378,52 @@ export default function ExternalApprovalPage({ params }: { params: Promise<{ id:
                   <div><span className="text-xs text-slate-500">Nama Subcont</span><p className="font-semibold">{general.safety_induction?.namaSubcont || "-"}</p></div>
                   <div><span className="text-xs text-slate-500">Aktivitas</span><p className="font-semibold">{general.safety_induction?.aktivitasPekerjaan || "-"}</p></div>
                 </div>
+                {general.security_signature_url && (
+                  <div>
+                    <span className="text-xs text-slate-500">Tanda Tangan Security</span>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={general.security_signature_url} alt="TTD Security" className="h-16 mt-1 border border-slate-100 rounded bg-white" />
+                  </div>
+                )}
               </div>
             ) : (
-              // Security/admin: bisa edit, atau belum approved
-              <SafetyInductionSection
-                value={safetyInduction}
-                setValue={setSafetyInduction}
-                readOnly={!isSecurity && !isAdmin}
-                onSave={isSecurity || isAdmin ? saveSafetyInduction : undefined}
-              />
+              <div className="space-y-4">
+                <SafetyInductionSection
+                  value={safetyInduction}
+                  setValue={setSafetyInduction}
+                  readOnly={!isSecurity && !isAdmin}
+                  onSave={isSecurity || isAdmin ? saveSafetyInduction : undefined}
+                  kontraktorSignatureUrl={general.kontraktor_signature_url}
+                />
+                {(isSecurity || isAdmin) && currentStage === 3 && !siApproved && (
+                  <div className="border-t border-teal-200 pt-4">
+                    <div className="flex items-start gap-2 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2.5 mb-3">
+                      <User className="w-4 h-4 text-blue-500 shrink-0 mt-0.5" />
+                      <p className="text-xs text-blue-700">
+                        Setelah tanda tangan dikonfirmasi, Safety Induction otomatis disetujui dan form akan lanjut ke SFO.
+                      </p>
+                    </div>
+                    <SignaturePad
+                      onConfirm={signAndApproveSafetyInduction}
+                      disabled={signSubmitting}
+                      confirmLabel={signSubmitting ? "Menyimpan..." : "Tanda Tangan & Setujui"}
+                    />
+                  </div>
+                )}
+                {(isSecurity || isAdmin) && currentStage !== 3 && !siApproved && (
+                  <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2.5">
+                    <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+                    <p className="text-xs text-amber-700">
+                      Belum giliran Security — form ini masih menunggu tahap <strong>{STAGE_LABEL[currentStage] ?? currentStage}</strong>.
+                    </p>
+                  </div>
+                )}
+              </div>
             )}
           </div>
         </section>
 
         {/* === JSA SECTION === */}
-        {/* Security hanya lihat sebagai referensi, tidak bisa approve JSA */}
         <section className="bg-white rounded-xl border border-slate-200 p-5">
           <div className="flex items-center gap-2 mb-4">
             <FileText className="w-5 h-5 text-orange-600" />
@@ -269,7 +469,6 @@ export default function ExternalApprovalPage({ params }: { params: Promise<{ id:
                   </tbody>
                 </table>
               </div>
-              {/* JSA Approval — hanya tampilkan untuk non-security */}
               {!isSecurity && (
                 <>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
@@ -290,14 +489,14 @@ export default function ExternalApprovalPage({ params }: { params: Promise<{ id:
           )}
         </section>
 
-        {/* === LAMPIRAN FORM JENIS PEKERJAAN === */}
+        {/* === LAMPIRAN FORM JENIS PEKERJAAN — bisa dibuka === */}
         <section className="bg-white rounded-xl border border-slate-200 p-5">
           <div className="flex items-center gap-2 mb-4">
             <ClipboardList className="w-5 h-5 text-orange-600" />
             <h2 className="font-bold text-slate-800">Lampiran Jenis Pekerjaan</h2>
-            {isSecurity && (
-              <span className="ml-auto text-xs text-slate-500 bg-slate-100 px-2 py-0.5 rounded">Referensi</span>
-            )}
+            <span className="ml-auto text-xs text-slate-500 bg-slate-100 px-2 py-0.5 rounded">
+              Klik untuk membuka detail & approval
+            </span>
           </div>
           {data.attachments.length === 0 ? (
             <p className="text-sm text-slate-500 italic">Belum ada form jenis pekerjaan yang terkait.</p>
@@ -306,7 +505,12 @@ export default function ExternalApprovalPage({ params }: { params: Promise<{ id:
               {data.attachments.map((attachment) => {
                 const sc = statusConfig[attachment.status] || statusConfig.draft;
                 return (
-                  <div key={attachment.id_form} className="flex items-center justify-between gap-3 p-3 bg-slate-50 rounded-lg border border-slate-100">
+                  <Link
+                    key={attachment.id_form}
+                    href={`/approval/${attachment.jenis_form}/${attachment.id_form}`}
+                    className="flex items-center justify-between gap-3 p-3 bg-slate-50 hover:bg-orange-50
+                               rounded-lg border border-slate-100 hover:border-orange-200 transition-colors"
+                  >
                     <div className="min-w-0">
                       <p className="font-semibold text-sm text-slate-800">
                         {labels[attachment.jenis_form] || attachment.jenis_form}
@@ -320,17 +524,19 @@ export default function ExternalApprovalPage({ params }: { params: Promise<{ id:
                         {attachment.tipe_perusahaan && ` · ${attachment.tipe_perusahaan}`}
                       </p>
                     </div>
-                    <span className={`text-xs font-semibold px-2 py-0.5 rounded-full shrink-0 ${sc.cls}`}>
-                      {sc.label}
-                    </span>
-                  </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${sc.cls}`}>
+                        {sc.label}
+                      </span>
+                      <ChevronRight className="w-4 h-4 text-slate-400" />
+                    </div>
+                  </Link>
                 );
               })}
             </div>
           )}
         </section>
 
-        {/* Tombol Approve Lampiran — hanya untuk non-security */}
         {!isSecurity && (
           <div className="flex justify-end pb-8">
             <button
@@ -345,7 +551,6 @@ export default function ExternalApprovalPage({ params }: { params: Promise<{ id:
           </div>
         )}
 
-        {/* Padding bawah untuk security */}
         {isSecurity && <div className="pb-8" />}
       </main>
     </div>

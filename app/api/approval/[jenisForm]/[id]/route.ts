@@ -1,33 +1,4 @@
 // app/api/approval/[jenisForm]/[id]/route.ts
-// UPDATED: Simpan NIK approver dan timestamp per-role saat melakukan approval.
-// REFACTOR: Role 'pga' diganti menjadi 'smr'.
-//           Kolom DB mr_pga_approved, mr_pga_approved_by, mr_pga_approved_at, mr_pga_nik
-//           TIDAK diubah — tetap digunakan untuk kompatibilitas data lama.
-//
-// ADDED: SPV hanya bisa melihat & approve form dari departemen yang sama dengan pembuatnya.
-//        Filter diterapkan di GET (fetch detail) dan PATCH (approve/reject).
-//        Role lain (admin, admin_k3, sfo, smr, kontraktor) tidak terpengaruh.
-//
-// ADDED: Email notification setelah approve (ke approver berikutnya)
-//        dan setelah reject (ke pembuat form).
-//        Email dikirim secara fire-and-forget — tidak memblokir response.
-//
-// ADDED: Height-work — Pengecekan Helm, Body Harness & Lanyard (Bagian 5) TIDAK LAGI
-//        diisi oleh worker/administrator departemen di form pembuatan.
-//        Checklist ini sekarang diisi oleh role "admin_k3" pada saat approve,
-//        dikirim via body.harness_checklist. Kolom yang diupdate:
-//          helm_kondisi_baik,
-//          webbing_kondisi_baik, dring_kondisi_baik, gesper_kondisi_baik,
-//          absorter_dan_timbes_kondisi_baik, snap_hook_kondisi_baik,
-//          rope_lanyard_kondisi_baik
-//        Hanya berlaku untuk formType === 'height-work' && userRole === 'admin_k3'
-//        && action === 'approve'. Role lain tidak dapat mengubah kolom ini.
-//
-// WORKFLOW — stage dimulai dari 1:
-//   Hot-work & Workshop INTERNAL:  1=spv → 2=admin_k3 → 3=sfo → 4=smr
-//   Hot-work & Workshop EKSTERNAL: 1=kontraktor → 2=spv → 3=admin_k3 → 4=sfo → 5=smr
-//   Height-work INTERNAL:          1=spv → 2=admin_k3 → 3=sfo → 4=smr
-//   Height-work EKSTERNAL:         1=kontraktor → 2=spv → 3=admin_k3 → 4=sfo → 5=smr
 
 import { NextRequest, NextResponse } from 'next/server';
 import { query, queryOne } from '@/lib/db';
@@ -41,28 +12,28 @@ function getUser(req: NextRequest) {
 }
 
 const FORM_CONFIG: Record<FormType, {
-  table:      string;
-  idColumn:   string;
+  table: string;
+  idColumn: string;
   pgaApprCol: string;
-  pgaByCol:   string;
+  pgaByCol: string;
 }> = {
   'hot-work': {
-    table:      'form_kerja_panas',
-    idColumn:   'id_form',
+    table: 'form_kerja_panas',
+    idColumn: 'id_form',
     pgaApprCol: 'mr_pga_approved',
-    pgaByCol:   'mr_pga_approved_by',
+    pgaByCol: 'mr_pga_approved_by',
   },
   'workshop': {
-    table:      'form_kerja_workshop',
-    idColumn:   'id_form',
+    table: 'form_kerja_workshop',
+    idColumn: 'id_form',
     pgaApprCol: 'mr_pga_approved',
-    pgaByCol:   'mr_pga_approved_by',
+    pgaByCol: 'mr_pga_approved_by',
   },
   'height-work': {
-    table:      'form_kerja_ketinggian',
-    idColumn:   'id_form',
+    table: 'form_kerja_ketinggian',
+    idColumn: 'id_form',
     pgaApprCol: 'mr_pga_approved',
-    pgaByCol:   'mr_pga_approved_by',
+    pgaByCol: 'mr_pga_approved_by',
   },
 };
 
@@ -100,50 +71,50 @@ async function getSpvDepartmen(userId: number, role: UserRole): Promise<string |
 
 // ── Mapping role → kolom DB (approved, approved_by, approved_at, nik) ──
 function getRoleApprovalColumns(role: UserRole, formType: FormType, isLastStage: boolean): {
-  approvedCol:    string;
-  approvedByCol:  string;
-  approvedAtCol:  string;
+  approvedCol: string;
+  approvedByCol: string;
+  approvedAtCol: string;
   approvedNikCol: string;
 } | null {
   const config = FORM_CONFIG[formType];
 
   if (isLastStage) {
     return {
-      approvedCol:    config.pgaApprCol,
-      approvedByCol:  config.pgaByCol,
-      approvedAtCol:  'mr_pga_approved_at',
+      approvedCol: config.pgaApprCol,
+      approvedByCol: config.pgaByCol,
+      approvedAtCol: 'mr_pga_approved_at',
       approvedNikCol: 'mr_pga_nik',
     };
   }
 
   const map: Partial<Record<UserRole, {
-    approvedCol:    string;
-    approvedByCol:  string;
-    approvedAtCol:  string;
+    approvedCol: string;
+    approvedByCol: string;
+    approvedAtCol: string;
     approvedNikCol: string;
   }>> = {
     kontraktor: {
-      approvedCol:    'kontraktor_approved',
-      approvedByCol:  'kontraktor_approved_by',
-      approvedAtCol:  'kontraktor_approved_at',
+      approvedCol: 'kontraktor_approved',
+      approvedByCol: 'kontraktor_approved_by',
+      approvedAtCol: 'kontraktor_approved_at',
       approvedNikCol: 'kontraktor_nik',
     },
     spv: {
-      approvedCol:    'spv_approved',
-      approvedByCol:  'spv_approved_by',
-      approvedAtCol:  'spv_approved_at',
+      approvedCol: 'spv_approved',
+      approvedByCol: 'spv_approved_by',
+      approvedAtCol: 'spv_approved_at',
       approvedNikCol: 'spv_nik',
     },
     admin_k3: {
-      approvedCol:    'admin_k3_approved',
-      approvedByCol:  'admin_k3_approved_by',
-      approvedAtCol:  'admin_k3_approved_at',
+      approvedCol: 'admin_k3_approved',
+      approvedByCol: 'admin_k3_approved_by',
+      approvedAtCol: 'admin_k3_approved_at',
       approvedNikCol: 'admin_k3_nik',
     },
     sfo: {
-      approvedCol:    'sfo_approved',
-      approvedByCol:  'sfo_approved_by',
-      approvedAtCol:  'sfo_approved_at',
+      approvedCol: 'sfo_approved',
+      approvedByCol: 'sfo_approved_by',
+      approvedAtCol: 'sfo_approved_at',
       approvedNikCol: 'sfo_nik',
     },
   };
@@ -161,7 +132,7 @@ export async function GET(
 
   const { jenisForm, id } = await params;
   const formType = jenisForm as FormType;
-  const config   = FORM_CONFIG[formType];
+  const config = FORM_CONFIG[formType];
   if (!config) return NextResponse.json({ error: 'Jenis form tidak valid' }, { status: 400 });
 
   try {
@@ -216,7 +187,7 @@ export async function PATCH(
 
   const { jenisForm, id } = await params;
   const formType = jenisForm as FormType;
-  const config   = FORM_CONFIG[formType];
+  const config = FORM_CONFIG[formType];
   if (!config) return NextResponse.json({ error: 'Jenis form tidak valid' }, { status: 400 });
 
   const userRole = user.role as UserRole;
@@ -229,7 +200,7 @@ export async function PATCH(
   }
 
   try {
-    const body   = await req.json();
+    const body = await req.json();
     const action = body.action as 'approve' | 'reject';
     const catatanReject = body.catatan_reject ?? '';
 
@@ -246,12 +217,12 @@ export async function PATCH(
 
     // Fetch form (dengan atau tanpa filter departemen)
     let form: {
-      id_form:         string;
-      status:          string;
-      current_stage:   number;
+      id_form: string;
+      status: string;
+      current_stage: number;
       tipe_perusahaan: string;
-      user_id:         number | null;
-      tanggal:         string;
+      user_id: number | null;
+      tanggal: string;
     } | null;
 
     if (spvDepartmen !== null) {
@@ -289,11 +260,11 @@ export async function PATCH(
     }
 
     const tipePerusahaan = form.tipe_perusahaan;
-    const currentStage   = form.current_stage;
+    const currentStage = form.current_stage;
 
     const canApprove = userRole === 'admin' || canUserApproveAtStage(userRole, currentStage, formType, tipePerusahaan);
     if (!canApprove) {
-      const stageMap   = getStageToRoleMap(formType, tipePerusahaan);
+      const stageMap = getStageToRoleMap(formType, tipePerusahaan);
       const neededRole = stageMap[currentStage] ?? '?';
       return NextResponse.json(
         { error: `Stage ini membutuhkan role "${neededRole}". Anda adalah "${userRole}".` },
@@ -301,9 +272,9 @@ export async function PATCH(
       );
     }
 
-    const now      = new Date().toISOString();
+    const now = new Date().toISOString();
     const userName = user.nama || user.username;
-    const userNik  = (user as any).nik ?? null;
+    const userNik = (user as any).nik ?? null;
 
     // ── REJECT ───────────────────────────────────────────────
     if (action === 'reject') {
@@ -320,9 +291,9 @@ export async function PATCH(
       // ── Email: kirim notifikasi reject ke pembuat form (fire-and-forget) ──
       notifyFormRejected({
         formType,
-        idForm:        id,
-        userId:        form.user_id,
-        namaApprover:  userName,
+        idForm: id,
+        userId: form.user_id,
+        namaApprover: userName,
         catatanReject,
       }).catch((err) => {
         console.error(`[EMAIL] Background rejection email error for ${id}:`, err);
@@ -333,9 +304,9 @@ export async function PATCH(
 
     // ── APPROVE ──────────────────────────────────────────────
     const stageConfig = getStageConfig(formType, tipePerusahaan);
-    const maxStage    = stageConfig.totalStages;
+    const maxStage = stageConfig.totalStages;
     const isLastStage = currentStage === maxStage;
-    const nextStage   = currentStage + 1;
+    const nextStage = currentStage + 1;
 
     const cols = getRoleApprovalColumns(userRole, formType, isLastStage);
     if (!cols && userRole !== 'admin') {
@@ -343,8 +314,8 @@ export async function PATCH(
     }
 
     const setClauses: string[] = [];
-    const queryParams: any[]   = [];
-    let   paramIdx             = 1;
+    const queryParams: any[] = [];
+    let paramIdx = 1;
 
     if (cols) {
       setClauses.push(`${cols.approvedCol}    = $${paramIdx++}`); queryParams.push(true);
@@ -396,12 +367,12 @@ export async function PATCH(
       ).then((makerRow) => {
         notifyNextApprover({
           formType,
-          idForm:         id,
+          idForm: id,
           tipePerusahaan,
           nextStage,
-          userId:         form!.user_id,
-          namaPemohon:    makerRow?.nama ?? '-',
-          tanggal:        form!.tanggal,
+          userId: form!.user_id,
+          namaPemohon: makerRow?.nama ?? '-',
+          tanggal: form!.tanggal,
         }).catch((err) => {
           console.error(`[EMAIL] Background approval email error for ${id}:`, err);
         });
@@ -411,10 +382,10 @@ export async function PATCH(
     }
 
     return NextResponse.json({
-      success:      true,
-      action:       'approved',
-      id_form:      id,
-      next_stage:   isLastStage ? null : nextStage,
+      success: true,
+      action: 'approved',
+      id_form: id,
+      next_stage: isLastStage ? null : nextStage,
       is_completed: isLastStage,
     });
 

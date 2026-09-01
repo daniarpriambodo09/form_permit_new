@@ -1,13 +1,5 @@
 // app/approval/page.tsx
-// REFACTOR: Role 'pga' diganti 'smr' di seluruh label, mapping stage, dan roleLabelMap.
-//           Kolom DB mr_pga_approved tetap digunakan (tidak diubah).
-// SECURITY: Auth guard via useApproverAuth — panggil /api/auth/me setiap load.
-//           SessionStorage hanya untuk tampilan nama, bukan sumber kebenaran auth.
-// ADDED: Tombol "Download Excel (Workshop)" — hanya tampil untuk role admin.
-//        Mengunduh rekap form Workshop sesuai tab status yang sedang aktif.
-// ADDED: Tombol "Routing Email Admin K3" — hanya tampil untuk role admin.
-//        Menuju halaman pengaturan email Admin K3 per jenis form
-//        (hot-work/height-work → user tertentu, workshop → user lain).
+
 "use client";
 import { useState, useEffect } from "react";
 import Link from "next/link";
@@ -57,27 +49,29 @@ const formatDate = (d?: string) => {
 };
 
 const jenisLabel: Record<string, string> = {
-  "hot-work":    "Hot Work Permit",
-  "workshop":    "Workshop Permit",
+  "hot-work": "Hot Work Permit",
+  "workshop": "Workshop Permit",
   "height-work": "Kerja Ketinggian",
   "external-permit": "Safety Induction",
+  "general-permit": "Ijin Kerja Eksternal",
 };
 
 const jenisBadge: Record<string, string> = {
-  "hot-work":         "bg-red-100 text-red-700",
-  "workshop":         "bg-purple-100 text-purple-700",
-  "height-work":      "bg-orange-100 text-orange-700",
-  "external-permit":  "bg-teal-100 text-teal-700",
+  "hot-work": "bg-red-100 text-red-700",
+  "workshop": "bg-purple-100 text-purple-700",
+  "height-work": "bg-orange-100 text-orange-700",
+  "external-permit": "bg-teal-100 text-teal-700",
+  "general-permit": "bg-indigo-100 text-indigo-700",
 };
 
 const roleLabelMap: Record<string, string> = {
-  firewatch:  "Fire Watch",
-  spv:        "SPV",
+  firewatch: "Fire Watch",
+  spv: "SPV",
   kontraktor: "Kontraktor",
-  admin_k3:   "Admin K3",
-  sfo:        "SFO",
-  smr:        "SMR",
-  admin:      "Admin",
+  admin_k3: "Admin K3",
+  sfo: "SFO",
+  smr: "SMR",
+  admin: "Admin",
 };
 
 function getStageLabelForForm(form: FormItem): string {
@@ -108,42 +102,42 @@ function getApprovalStages(form: FormItem): { key: keyof FormItem; label: string
     if (isEksternal) {
       return [
         { key: "kontraktor_approved", label: "Kontraktor" },
-        { key: "spv_approved",        label: "SPV" },
-        { key: "admin_k3_approved",   label: "Admin K3" },
-        { key: "sfo_approved",        label: "SFO" },
-        { key: "mr_pga_approved",     label: "SMR" },
+        { key: "spv_approved", label: "SPV" },
+        { key: "admin_k3_approved", label: "Admin K3" },
+        { key: "sfo_approved", label: "SFO" },
+        { key: "mr_pga_approved", label: "SMR" },
       ];
     }
     return [
-      { key: "spv_approved",      label: "SPV" },
+      { key: "spv_approved", label: "SPV" },
       { key: "admin_k3_approved", label: "Admin K3" },
-      { key: "sfo_approved",      label: "SFO" },
-      { key: "mr_pga_approved",   label: "SMR" },
+      { key: "sfo_approved", label: "SFO" },
+      { key: "mr_pga_approved", label: "SMR" },
     ];
   }
 
   if (isEksternal) {
     return [
       { key: "kontraktor_approved", label: "Kontraktor" },
-      { key: "spv_approved",        label: "SPV" },
-      { key: "admin_k3_approved",   label: "Admin K3" },
-      { key: "sfo_approved",        label: "SFO" },
-      { key: "mr_pga_approved",     label: "SMR" },
+      { key: "spv_approved", label: "SPV" },
+      { key: "admin_k3_approved", label: "Admin K3" },
+      { key: "sfo_approved", label: "SFO" },
+      { key: "mr_pga_approved", label: "SMR" },
     ];
   }
 
   return [
-    { key: "spv_approved",      label: "SPV" },
+    { key: "spv_approved", label: "SPV" },
     { key: "admin_k3_approved", label: "Admin K3" },
-    { key: "sfo_approved",      label: "SFO" },
-    { key: "mr_pga_approved",   label: "SMR" },
+    { key: "sfo_approved", label: "SFO" },
+    { key: "mr_pga_approved", label: "SMR" },
   ];
 }
 
 const statusTabs = [
-  { key: "submitted", label: "Belum Disetujui", icon: Clock,        color: "text-blue-600",  bg: "bg-blue-50",  border: "border-blue-500" },
-  { key: "approved",  label: "Sudah Disetujui", icon: CheckCircle,  color: "text-green-600", bg: "bg-green-50", border: "border-green-500" },
-  { key: "rejected",  label: "Ditolak",         icon: XCircle,      color: "text-red-600",   bg: "bg-red-50",   border: "border-red-500" },
+  { key: "submitted", label: "Belum Disetujui", icon: Clock, color: "text-blue-600", bg: "bg-blue-50", border: "border-blue-500" },
+  { key: "approved", label: "Sudah Disetujui", icon: CheckCircle, color: "text-green-600", bg: "bg-green-50", border: "border-green-500" },
+  { key: "rejected", label: "Ditolak", icon: XCircle, color: "text-red-600", bg: "bg-red-50", border: "border-red-500" },
 ];
 
 // ── Page ──────────────────────────────────────────────────────
@@ -155,11 +149,11 @@ export default function ApprovalPage() {
   // Render halaman hanya setelah loading selesai & user valid.
   const { user, loading: authLoading } = useApproverAuth();
 
-  const [forms, setForms]             = useState<FormItem[]>([]);
-  const [loading, setLoading]         = useState(true);
-  const [activeTab, setActiveTab]     = useState("submitted");
+  const [forms, setForms] = useState<FormItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState("submitted");
   const [filterJenis, setFilterJenis] = useState("all");
-  const [formCounts, setFormCounts]   = useState<FormCounts>({ submitted: 0, approved: 0, rejected: 0 });
+  const [formCounts, setFormCounts] = useState<FormCounts>({ submitted: 0, approved: 0, rejected: 0 });
   const [exportLoading, setExportLoading] = useState(false); // ADDED: loading state download excel
 
   // Muat data hanya setelah auth selesai & berhasil
@@ -225,9 +219,9 @@ export default function ApprovalPage() {
         return;
       }
       const blob = await res.blob();
-      const url  = window.URL.createObjectURL(blob);
-      const a    = document.createElement("a");
-      a.href     = url;
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
       a.download = `Rekap_Workshop_${activeTab}_${new Date().toISOString().slice(0, 10)}.xlsx`;
       document.body.appendChild(a);
       a.click();
@@ -246,7 +240,7 @@ export default function ApprovalPage() {
   if (authLoading || !user) return <AuthLoadingSpinner />;
 
   const filtered = forms.filter(f => filterJenis === "all" || f.jenis_form === filterJenis);
-  const isAdmin    = user.role === "admin";
+  const isAdmin = user.role === "admin";
   const isSecurity = user.role === "security";
 
   return (
@@ -329,9 +323,8 @@ export default function ApprovalPage() {
             const Icon = tab.icon;
             return (
               <button key={tab.key} onClick={() => handleTabChange(tab.key)}
-                className={`bg-white rounded-xl p-4 border-2 transition-all text-left ${
-                  activeTab === tab.key ? `${tab.border} shadow-md` : "border-slate-200 hover:border-slate-300"
-                }`}>
+                className={`bg-white rounded-xl p-4 border-2 transition-all text-left ${activeTab === tab.key ? `${tab.border} shadow-md` : "border-slate-200 hover:border-slate-300"
+                  }`}>
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">{tab.label}</span>
                   <Icon className={`w-4 h-4 ${tab.color}`} />
@@ -348,11 +341,10 @@ export default function ApprovalPage() {
         <div className="bg-white rounded-xl border border-slate-200 p-4 flex items-center gap-2 flex-wrap justify-between">
           <div className="flex items-center gap-2 flex-wrap">
             <span className="text-xs font-semibold text-slate-500 mr-1">Filter:</span>
-            {["all", "hot-work", "workshop", "height-work", ...(isSecurity || isAdmin ? ["external-permit"] : [])].map(type => (
+            {["all", "hot-work", "workshop", "height-work", "general-permit", ...(isSecurity || isAdmin ? ["external-permit"] : [])].map(type => (
               <button key={type} onClick={() => setFilterJenis(type)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                  filterJenis === type ? "bg-orange-600 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                }`}>
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${filterJenis === type ? "bg-orange-600 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                  }`}>
                 {type === "all" ? "Semua" : jenisLabel[type]}
               </button>
             ))}
@@ -399,7 +391,7 @@ export default function ApprovalPage() {
             <p className="font-semibold text-slate-600">
               {activeTab === "submitted" ? "Tidak ada form yang menunggu approval Anda"
                 : activeTab === "approved" ? "Anda belum menyetujui form apapun"
-                : "Tidak ada form yang ditolak"}
+                  : "Tidak ada form yang ditolak"}
             </p>
             {activeTab === "submitted" && (
               <p className="text-slate-400 text-sm mt-1">Form akan muncul di sini ketika mencapai tahap approval Anda</p>
@@ -408,11 +400,11 @@ export default function ApprovalPage() {
         ) : (
           <div className="space-y-3">
             {filtered.map(form => {
-              const stageLabel     = getStageLabelForForm(form);
+              const stageLabel = getStageLabelForForm(form);
               const approvalStages = getApprovalStages(form);
-              const isHeightWork   = form.jenis_form === "height-work";
-              const isFwForm       = form.jenis_form === "hot-work" || form.jenis_form === "workshop";
-              const isEksternal    = form.tipe_perusahaan === "eksternal";
+              const isHeightWork = form.jenis_form === "height-work";
+              const isFwForm = form.jenis_form === "hot-work" || form.jenis_form === "workshop";
+              const isEksternal = form.tipe_perusahaan === "eksternal";
 
               return (
                 <div key={form.id_form}
@@ -425,9 +417,8 @@ export default function ApprovalPage() {
                           {jenisLabel[form.jenis_form] || form.jenis_form}
                         </span>
                         {form.tipe_perusahaan && (
-                          <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
-                            isEksternal ? "bg-purple-100 text-purple-700" : "bg-blue-100 text-blue-700"
-                          }`}>
+                          <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${isEksternal ? "bg-purple-100 text-purple-700" : "bg-blue-100 text-blue-700"
+                            }`}>
                             {isEksternal ? "Eksternal" : "Internal"}
                           </span>
                         )}
@@ -468,11 +459,10 @@ export default function ApprovalPage() {
                           const isApproved = Boolean((form as any)[stage.key]);
                           return (
                             <span key={stage.key}
-                              className={`text-xs px-2 py-0.5 rounded-full border ${
-                                isApproved
-                                  ? "bg-green-100 text-green-700 border-green-200"
-                                  : "bg-slate-100 text-slate-500 border-slate-200"
-                              }`}>
+                              className={`text-xs px-2 py-0.5 rounded-full border ${isApproved
+                                ? "bg-green-100 text-green-700 border-green-200"
+                                : "bg-slate-100 text-slate-500 border-slate-200"
+                                }`}>
                               {isApproved ? "✓" : "○"} {stage.label}
                             </span>
                           );
@@ -511,10 +501,13 @@ export default function ApprovalPage() {
                       // external-permit: selalu ke /approval/external/[id]
                       form.jenis_form === "external-permit"
                         ? `/approval/external/${form.id_form}`
-                        // Form yang terkait ke Ijin Kerja Eksternal: ke halaman external parent
-                        : form.id_ijin_kerja
-                          ? `/approval/external/${form.id_ijin_kerja}`
-                          : `/approval/${form.jenis_form}/${form.id_form}`
+                        // general-permit: SPV/SFO/SMR review form induk juga di halaman external
+                        : form.jenis_form === "general-permit"
+                          ? `/approval/external/${form.id_form}`
+                          // Form yang terkait ke Ijin Kerja Eksternal: ke halaman external parent
+                          : form.id_ijin_kerja
+                            ? `/approval/external/${form.id_ijin_kerja}`
+                            : `/approval/${form.jenis_form}/${form.id_form}`
                     }
                       className="shrink-0 flex items-center gap-1.5 px-4 py-2.5
                                  bg-orange-600 hover:bg-orange-700 text-white

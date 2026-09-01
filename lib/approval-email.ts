@@ -1,13 +1,4 @@
 // lib/approval-email.ts
-// Helper untuk email notification workflow approval.
-// Menentukan approver berikutnya, mencari email mereka dari DB,
-// lalu memanggil fungsi sendEmail dari lib/email.ts.
-//
-// UPDATED: Saat approverRole === 'admin_k3' dan formType termasuk
-// hot-work/height-work/workshop, email SEKARANG dicek dulu ke tabel
-// admin_k3_email_routing (diatur lewat halaman /admin/admin-k3-routing).
-// Jika belum diatur untuk jenis form tsb, fallback ke perilaku lama
-// (kirim ke semua user role='admin_k3').
 
 import { queryOne, query } from '@/lib/db';
 import {
@@ -27,10 +18,10 @@ import { getAdminK3ApproverForForm, JenisFormK3 } from '@/lib/admin-k3-routing';
 export type FormType = 'hot-work' | 'workshop' | 'height-work';
 
 interface UserRow {
-  id:        number;
-  nama:      string;
-  email:     string | null;
-  role:      string;
+  id: number;
+  nama: string;
+  email: string | null;
+  role: string;
   departmen: string | null;
 }
 
@@ -40,8 +31,8 @@ const ROUTABLE_FORM_TYPES: FormType[] = ['hot-work', 'height-work', 'workshop'];
 
 function getFormLabel(formType: FormType): string {
   const map: Record<FormType, string> = {
-    'hot-work':    'Hot Work',
-    'workshop':    'Workshop',
+    'hot-work': 'Hot Work',
+    'workshop': 'Workshop',
     'height-work': 'Height Work',
   };
   return map[formType];
@@ -53,9 +44,9 @@ function formatTanggal(dateStr: string): string {
   try {
     const d = new Date(dateStr);
     return d.toLocaleDateString('id-ID', {
-      day:   '2-digit',
+      day: '2-digit',
       month: 'long',
-      year:  'numeric',
+      year: 'numeric',
     });
   } catch {
     return dateStr;
@@ -65,12 +56,12 @@ function formatTanggal(dateStr: string): string {
 // ── getNextApprover: role approver pada stage berikutnya ─────
 
 export function getNextApprover(
-  formType:        FormType,
-  tipePerusahaan:  string,
-  currentStage:    number,
+  formType: FormType,
+  tipePerusahaan: string,
+  currentStage: number,
 ): UserRole | null {
   const stageConfig = getStageConfig(formType, tipePerusahaan);
-  const nextStage   = currentStage + 1;
+  const nextStage = currentStage + 1;
 
   if (nextStage > stageConfig.totalStages) return null;
 
@@ -84,8 +75,8 @@ export function getNextApprover(
 // Untuk role lain: ambil semua user aktif dengan role tersebut.
 
 export async function getApproverEmails(
-  role:              UserRole,
-  makerDepartmen?:   string | null,
+  role: UserRole,
+  makerDepartmen?: string | null,
 ): Promise<UserRow[]> {
   if (role === 'spv' && makerDepartmen) {
     const rows = await query<UserRow>(
@@ -135,19 +126,19 @@ async function getMakerUser(userId: number | null): Promise<UserRow | null> {
 // ── notifyNextApprover: kirim email setelah approval ─────────
 
 export async function notifyNextApprover(params: {
-  formType:        FormType;
-  idForm:          string;
-  tipePerusahaan:  string;
-  nextStage:       number;
-  userId:          number | null;
-  namaPemohon:     string;
-  tanggal:         string;
+  formType: FormType;
+  idForm: string;
+  tipePerusahaan: string;
+  nextStage: number;
+  userId: number | null;
+  namaPemohon: string;
+  tanggal: string;
 }): Promise<void> {
   const { formType, idForm, tipePerusahaan, nextStage, userId, namaPemohon, tanggal } = params;
 
   try {
-    const stageMap      = getStageToRoleMap(formType, tipePerusahaan);
-    const approverRole  = stageMap[nextStage] as UserRole | undefined;
+    const stageMap = getStageToRoleMap(formType, tipePerusahaan);
+    const approverRole = stageMap[nextStage] as UserRole | undefined;
 
     if (!approverRole) {
       console.log(`[EMAIL] No approver role found for stage ${nextStage} — skipping.`);
@@ -163,10 +154,10 @@ export async function notifyNextApprover(params: {
       if (routed?.email) {
         await sendApprovalNotification({
           idForm,
-          jenisForm:     getFormLabel(formType),
+          jenisForm: getFormLabel(formType),
           namaPemohon,
-          tanggal:       formatTanggal(tanggal),
-          approverName:  routed.nama,
+          tanggal: formatTanggal(tanggal),
+          approverName: routed.nama,
           approverEmail: routed.email,
         });
         console.log(`[EMAIL] Admin K3 routing aktif untuk ${formType} → dikirim ke ${routed.nama} (${routed.email})`);
@@ -190,10 +181,10 @@ export async function notifyNextApprover(params: {
 
       await sendApprovalNotification({
         idForm,
-        jenisForm:     getFormLabel(formType),
+        jenisForm: getFormLabel(formType),
         namaPemohon,
-        tanggal:       formatTanggal(tanggal),
-        approverName:  approver.nama,
+        tanggal: formatTanggal(tanggal),
+        approverName: approver.nama,
         approverEmail: approver.email,
       });
     }
@@ -206,12 +197,12 @@ export async function notifyNextApprover(params: {
 // ── notifyFirstApprover ───────────────────────────────────────
 
 export async function notifyFirstApprover(params: {
-  formType:       FormType;
-  idForm:         string;
+  formType: FormType;
+  idForm: string;
   tipePerusahaan: string;
-  userId:         number | null;
-  namaPemohon:    string;
-  tanggal:        string;
+  userId: number | null;
+  namaPemohon: string;
+  tanggal: string;
 }): Promise<void> {
   const { formType, idForm, tipePerusahaan, userId, namaPemohon, tanggal } = params;
 
@@ -229,10 +220,10 @@ export async function notifyFirstApprover(params: {
 // ── notifyFormRejected ────────────────────────────────────────
 
 export async function notifyFormRejected(params: {
-  formType:      FormType;
-  idForm:        string;
-  userId:        number | null;
-  namaApprover:  string;
+  formType: FormType;
+  idForm: string;
+  userId: number | null;
+  namaApprover: string;
   catatanReject: string;
 }): Promise<void> {
   const { formType, idForm, userId, namaApprover, catatanReject } = params;
@@ -252,15 +243,52 @@ export async function notifyFormRejected(params: {
 
     await sendRejectionNotification({
       idForm,
-      jenisForm:     getFormLabel(formType),
+      jenisForm: getFormLabel(formType),
       namaApprover,
       catatanReject,
-      pembuatEmail:  maker.email,
-      pembuatName:   maker.nama,
+      pembuatEmail: maker.email,
+      pembuatName: maker.nama,
     });
 
   } catch (err) {
     console.error(`[EMAIL] Failed to send rejection notification for ${idForm}:`, err);
+  }
+}
+
+// ── ADDED: notifyGeneralPermitRejected ───────────────────────
+
+export async function notifyGeneralPermitRejected(params: {
+  idForm: string;
+  userId: number | null;
+  namaApprover: string;
+  catatanReject: string;
+}): Promise<void> {
+  const { idForm, userId, namaApprover, catatanReject } = params;
+
+  try {
+    if (!userId) {
+      console.log(`[EMAIL] Form ${idForm} has no user_id — rejection email not sent.`);
+      return;
+    }
+
+    const maker = await getMakerUser(userId);
+
+    if (!maker || !maker.email) {
+      console.log(`[EMAIL] Pembuat form ${idForm} tidak memiliki email — rejection email not sent.`);
+      return;
+    }
+
+    await sendRejectionNotification({
+      idForm,
+      jenisForm: 'Ijin Kerja Eksternal',
+      namaApprover,
+      catatanReject,
+      pembuatEmail: maker.email,
+      pembuatName: maker.nama,
+    });
+
+  } catch (err) {
+    console.error(`[EMAIL] Failed to send general-permit rejection notification for ${idForm}:`, err);
   }
 }
 
@@ -287,5 +315,70 @@ export async function notifyExternalPermit(params: {
     }
   } catch (err) {
     console.error(`[EMAIL] Failed to send external permit notification for ${params.idForm}:`, err);
+  }
+}
+
+// ── ADDED: notifyGeneralPermitNextApprover ────────────────────
+// Notifikasi email untuk alur approval Ijin Kerja Eksternal
+// (form_ijin_kerja). Stage map:
+//   1 = Kontraktor (TTD di tablet — tidak perlu email)
+//   2 = SPV        (klik approve — email ke SPV departemen pembuat form)
+//   3 = Security   (TTD di /approval — tidak perlu email, security sudah
+//                   memantau dashboard /approval secara berkala)
+//   4 = SFO        (klik approve — email ke semua user role sfo)
+//   5 = SMR/PGA    (klik approve — email ke semua user role smr)
+//
+// Dipanggil setelah:
+//   - Kontraktor menandatangani form induk (nextStage = 2)
+//   - Security menandatangani & menyetujui Safety Induction (nextStage = 4)
+//   - SPV/SFO meng-approve lewat /api/approval/general-permit/[id] (nextStage = stage+1)
+
+const GP_STAGE_ROLE: Partial<Record<number, UserRole>> = {
+  2: 'spv',
+  4: 'sfo',
+  5: 'smr',
+};
+
+export async function notifyGeneralPermitNextApprover(params: {
+  idForm: string;
+  nextStage: number;
+  userId: number | null;
+  namaPemohon: string;
+  tanggal: string;
+}): Promise<void> {
+  const { idForm, nextStage, userId, namaPemohon, tanggal } = params;
+
+  try {
+    const approverRole = GP_STAGE_ROLE[nextStage];
+
+    if (!approverRole) {
+      console.log(`[EMAIL] Stage ${nextStage} pada Ijin Kerja Eksternal tidak memerlukan notifikasi email — skipping.`);
+      return;
+    }
+
+    const makerDepartmen = await getMakerDepartmen(userId);
+    const approvers = await getApproverEmails(approverRole, makerDepartmen);
+
+    if (approvers.length === 0) {
+      console.log(`[EMAIL] Tidak ada approver dengan role "${approverRole}" untuk Ijin Kerja Eksternal ${idForm} — email tidak dikirim.`);
+      return;
+    }
+
+    for (const approver of approvers) {
+      if (!approver.email) continue;
+
+      await sendExternalApprovalNotification({
+        idForm,
+        namaPemohon,
+        tanggal: formatTanggal(tanggal),
+        approverName: approver.nama,
+        approverEmail: approver.email,
+        attachmentCount: 0,
+      });
+    }
+
+    console.log(`[EMAIL] Notifikasi Ijin Kerja Eksternal ${idForm} terkirim ke role "${approverRole}" (${approvers.length} penerima).`);
+  } catch (err) {
+    console.error(`[EMAIL] Failed to send general-permit approval notification for ${idForm}:`, err);
   }
 }

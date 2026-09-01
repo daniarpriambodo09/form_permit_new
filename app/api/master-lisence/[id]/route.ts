@@ -82,9 +82,6 @@ export async function PUT(req: NextRequest, context: RouteContext) {
     if (!departemen || !String(departemen).trim()) {
       return NextResponse.json({ error: "Departemen wajib dipilih" }, { status: 400 });
     }
-    if (!tanggalExp) {
-      return NextResponse.json({ error: "Tanggal exp lisence wajib diisi" }, { status: 400 });
-    }
     if (fileUrl && !["pdf", "image"].includes(fileType)) {
       return NextResponse.json({ error: "Tipe file lisence tidak valid" }, { status: 400 });
     }
@@ -105,7 +102,7 @@ export async function PUT(req: NextRequest, context: RouteContext) {
         String(nama).trim(),
         String(nik).trim(),
         String(departemen).trim(),
-        tanggalExp,
+        tanggalExp || null,
         fileUrl ?? null,
         fileType ?? null,
         fileName ?? null,

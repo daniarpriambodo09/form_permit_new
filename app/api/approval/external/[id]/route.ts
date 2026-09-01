@@ -1,3 +1,5 @@
+// app/api/approval/external/[id]/route.ts
+
 import { NextRequest, NextResponse } from "next/server";
 import { query, queryOne } from "@/lib/db";
 import { verifyToken, COOKIE_NAME } from "@/lib/auth";
