@@ -20,6 +20,7 @@ import {
   CheckCircle, AlertCircle, Flame, AlertTriangle, FileText,
   Upload, BadgeCheck, CalendarClock, Check,
 } from "lucide-react";
+import Sidebar from "@/components/Sidebar";
 
 // ── Types ─────────────────────────────────────────────────────────────────
 type JenisKerja = "hot_work" | "height_work" | "workshop";
@@ -1022,6 +1023,8 @@ export default function MasterLisencePage() {
 
   return (
     <div className="min-h-screen bg-slate-50">
+    <Sidebar />
+    <div style={{ paddingLeft: "var(--sidebar-width, 0px)" }} className="transition-[padding] duration-300">
       {/* Header */}
       <header className="bg-white border-b border-slate-200 sticky top-0 z-30">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-5 flex items-center justify-between gap-4">
@@ -1221,6 +1224,7 @@ export default function MasterLisencePage() {
           )}
         </div>
       </main>
+    </div>
 
       {showAddModal && (
         <AddLisenceModal

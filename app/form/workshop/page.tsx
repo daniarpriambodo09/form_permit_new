@@ -4,7 +4,8 @@ import { useState, useEffect, Suspense } from "react";
 import Link from "next/link";
 import { ChevronDown, ChevronUp, Home, Flame, Save, Send, AlertCircle, Lock } from "lucide-react";
 import { getFireWatchByDept } from "@/lib/firewatch";
-import JsaUploadSection, { type JsaFileInfo, type JsaUploadStatus as JsaStatus } from "@/components/JsaUploadSection";
+import JsaMethodSection, { type JsaMode } from "@/components/JsaMethodSection";
+import { type JsaFileInfo, type JsaUploadStatus as JsaStatus } from "@/components/JsaUploadSection";
 import LinkedJsaSection from "@/components/LinkedJsaSection";
 import { createEmptyJsa } from "@/components/JsaBuilderSection";
 import type { JsaData } from "@/components/JsaBuilderSection";
@@ -40,6 +41,7 @@ interface FormData {
     firewatch_ada: string; firewatch_pelatihan: string;
     permintaan_tambahan: string;
   };
+  checklistPencegahan: Record<string, boolean>;
   persetujuan: { spvNama: string; kontraktorNama: string; sfoNama: string; pgaNama: string };
 }
 
@@ -105,6 +107,11 @@ const defaultForm = (): FormData => ({
     firewatch_ada: "tidak", firewatch_pelatihan: "tidak",
     permintaan_tambahan: "",
   },
+  checklistPencegahan: {
+    equipment: false, apar: false, flammableNearby: false, b3Stored: false,
+    cleanFloor: false, metalShield: false, completePpe: false, cleanMaterial: false,
+    returnEquipment: false, disposeWaste: false, firewatchSafety: false, firewatchTraining: false,
+  },
   persetujuan: { spvNama: "", kontraktorNama: "", sfoNama: "", pgaNama: "" },
 });
 
@@ -118,6 +125,8 @@ function WorkshopPermitFormInner() {
   const [expanded, setExpanded] = useState({ bagian1: true, bagian2: true, bagian3: true, bagian4: true });
   const [user, setUser] = useState<any>(null);
   const [fireWatchList, setFireWatchList] = useState<Array<{ nama: string; nik: string }>>([]);
+  const [spvOptions, setSpvOptions] = useState<Array<{ id: number; nama: string; nik: string | null; jabatan: string | null; departmen: string | null }>>([]);
+  const [spvPemberiIzin, setSpvPemberiIzin] = useState<{ nama: string; nik: string; jabatan: string }>({ nama: "", nik: "", jabatan: "" });
   const [validationError, setValidationError] = useState<string>("");
 
   // ── JSA state ──────────────────────────────────────────────
@@ -126,6 +135,7 @@ function WorkshopPermitFormInner() {
   const [jsaUploadStatus, setJsaUploadStatus] = useState<JsaStatus>("idle");
   const [jsaUploadError, setJsaUploadError] = useState("");
   const [jsaData, setJsaData] = useState<JsaData>(createEmptyJsa());
+  const [jsaMode, setJsaMode] = useState<JsaMode>("upload");
 
   const searchParams = useSearchParams();
   const idIjinKerja = searchParams.get("id_ijin_kerja");
@@ -140,12 +150,37 @@ function WorkshopPermitFormInner() {
     const fetchUser = async () => {
       try {
         const res = await fetch("/form-permit/api/auth/me");
-        if (res.ok) {
-          const data = await res.json();
-          setUser(data.user);
-          if (data.user.departmen) {
-            const fwList = getFireWatchByDept(data.user.departmen);
-            setFireWatchList(fwList);
+        if (!res.ok) return;
+
+        const data = await res.json();
+        setUser(data.user);
+
+        // ── Auto-isi Sect/Dept JSA dari departemen user (Internal) ──
+        if (data.user.departmen) {
+          setJsaData((prev) => ({ ...prev, sectDept: data.user.departmen }));
+        }
+
+        if (data.user.departmen) {
+          const fwList = getFireWatchByDept(data.user.departmen);
+          setFireWatchList(fwList);
+
+          const spvRes = await fetch("/form-permit/api/admin-users/approvers");
+          if (spvRes.ok) {
+            const spvData = await spvRes.json();
+            const options = (spvData.users ?? []).filter((u: any) => {
+              if (u.role !== "spv") return false;
+              if (!u.departmen) return true;
+              return u.departmen === data.user.departmen;
+            });
+            setSpvOptions(options);
+            if (options.length > 0) {
+              const defaultSpv = options[0];
+              setSpvPemberiIzin({
+                nama: defaultSpv.nama ?? "",
+                nik: defaultSpv.nik ?? "",
+                jabatan: defaultSpv.jabatan ?? "",
+              });
+            }
           }
         }
       } catch (err) {
@@ -173,13 +208,17 @@ function WorkshopPermitFormInner() {
       setValidationError("Fire Watch wajib dipilih");
       return;
     }
+    if (!spvPemberiIzin.nama || !spvPemberiIzin.nik) {
+      setValidationError("SPV / Pemberi Izin wajib dipilih");
+      return;
+    }
     if (!formData.namaPekerja.trim() || !formData.nikPekerja.trim()) {
       setValidationError("Nama Pekerja dan NIK wajib diisi");
       return;
     }
 
     // ── Validasi JSA ──────────────────────────────────────────
-    if (idIjinKerja && perluJsa && (!jsaData.area.trim() || !jsaData.jenisPekerjaan.trim() || !jsaData.pic.trim() || !jsaData.petugas.some((name) => name.trim()))) {
+    if ((idIjinKerja || jsaMode === "build") && perluJsa && (!jsaData.area.trim() || !jsaData.jenisPekerjaan.trim() || !jsaData.pic.trim() || !jsaData.petugas.some((name) => name.trim()))) {
       setValidationError("Area, Jenis Pekerjaan, PIC, dan minimal satu Petugas pada JSA wajib diisi");
       return;
     }
@@ -212,7 +251,8 @@ function WorkshopPermitFormInner() {
           isSubmit,
           perluJsa,
           jsaFileUrl: jsaFile?.url ?? null,
-          ...(idIjinKerja ? { jsaData } : {}),
+          spvPemberiIzin,
+          ...(idIjinKerja || jsaMode === "build" ? { jsaData } : {}),
           idIjinKerja,
         }),
       });
@@ -300,12 +340,12 @@ function WorkshopPermitFormInner() {
                   { value: "eksternal", label: "Eksternal / Subkontraktor", desc: "Alur: Kontraktor → SPV → Admin K3 → SFO → SMR" },
                 ].map(opt => (
                   <label key={opt.value}
-                    className={`flex flex-col gap-1 p-3 rounded-xl border-2 cursor-pointer transition-all ${formData.tipePerusahaan === opt.value ? "border-orange-400 bg-orange-50" : "border-slate-200 hover:border-orange-200"}`}>
+                    className={`flex flex-col gap-1 p-3 rounded-xl border-2 transition-all ${opt.value === "eksternal" ? "cursor-not-allowed opacity-60" : "cursor-pointer"} ${formData.tipePerusahaan === opt.value ? "border-orange-400 bg-orange-50" : "border-slate-200 hover:border-orange-200"}`}>
                     <div className="flex items-center gap-2">
                       <input type="radio" name="tipePerusahaan" value={opt.value}
                         checked={formData.tipePerusahaan === opt.value}
                         onChange={() => setFormData(p => ({ ...p, tipePerusahaan: opt.value as any }))}
-                        disabled={!!idIjinKerja}
+                        disabled={opt.value === "eksternal" || !!idIjinKerja}
                         className="text-orange-500" />
                       <span className="text-sm font-semibold text-slate-800">{opt.label}</span>
                     </div>
@@ -338,16 +378,53 @@ function WorkshopPermitFormInner() {
               />
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2">Nama Pekerja *</label>
-                <input type="text" value={formData.namaPekerja} onChange={e => setFormData(p => ({ ...p, namaPekerja: e.target.value }))} className={inputCls} placeholder="Nama pekerja" />
+            {isInternal && fireWatchList.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-2">Nama Pekerja / NIK *</label>
+                  <select
+                    value={formData.namaPekerja && formData.nikPekerja ? `${formData.namaPekerja} / ${formData.nikPekerja}` : ""}
+                    onChange={(e) => {
+                      const selected = fireWatchList.find((fw) => `${fw.nama} / ${fw.nik}` === e.target.value);
+                      setFormData((p) => ({
+                        ...p,
+                        namaPekerja: selected?.nama ?? "",
+                        nikPekerja: selected?.nik ?? "",
+                      }));
+                      setValidationError("");
+                    }}
+                    className={inputCls}
+                  >
+                    <option value="">-- Pilih Nama / NIK --</option>
+                    {fireWatchList.map((fw) => (
+                      <option key={`${fw.nama}-${fw.nik}`} value={`${fw.nama} / ${fw.nik}`}>
+                        {`${fw.nama} / ${fw.nik}`}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-2">NIK Pekerja</label>
+                  <input
+                    type="text"
+                    value={formData.nikPekerja}
+                    readOnly
+                    className="w-full px-4 py-2.5 border border-slate-300 rounded-lg bg-slate-100 text-slate-600 text-sm"
+                  />
+                </div>
               </div>
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2">NIK *</label>
-                <input type="text" value={formData.nikPekerja} onChange={e => setFormData(p => ({ ...p, nikPekerja: e.target.value }))} className={inputCls} placeholder="NIK pekerja" />
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-2">Nama Pekerja *</label>
+                  <input type="text" value={formData.namaPekerja} onChange={e => setFormData(p => ({ ...p, namaPekerja: e.target.value }))} className={inputCls} placeholder="Nama pekerja" />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-2">NIK *</label>
+                  <input type="text" value={formData.nikPekerja} onChange={e => setFormData(p => ({ ...p, nikPekerja: e.target.value }))} className={inputCls} placeholder="NIK pekerja" />
+                </div>
               </div>
-            </div>
+            )}
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
@@ -376,9 +453,7 @@ function WorkshopPermitFormInner() {
               </div>
               <div className="flex items-start gap-2 bg-blue-100 border border-blue-300 rounded-lg px-3 py-2.5 mb-4">
                 <AlertCircle className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
-                <p className="text-xs text-blue-700">
-                  Pilih Fire Watch dari departemen Anda. Fire Watch dipilih saat membuat form dan tidak lagi menjadi approver.
-                </p>
+                <p className="text-xs text-blue-700">Input manual nama dan NIK Fire Watch sesuai data yang benar.</p>
               </div>
               {validationError && (
                 <div className="bg-red-100 border border-red-300 rounded-lg px-3 py-2.5 mb-4">
@@ -388,32 +463,22 @@ function WorkshopPermitFormInner() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-semibold text-slate-700 mb-2">Nama Fire Watch <span className="text-red-500">*</span></label>
-                  <select
+                  <input
+                    type="text"
                     value={formData.namaFireWatch}
-                    onChange={(e) => {
-                      const nama = e.target.value;
-                      setFormData(p => ({ ...p, namaFireWatch: nama }));
-                      const fw = fireWatchList.find(f => f.nama === nama);
-                      if (fw) {
-                        setFormData(p => ({ ...p, nikFireWatch: fw.nik }));
-                      }
-                      setValidationError("");
-                    }}
-                    className={`w-full px-4 py-2.5 border ${formData.namaFireWatch ? 'border-slate-300' : 'border-red-300 bg-red-50'} rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent text-black`}
-                  >
-                    <option value="">-- Pilih Fire Watch --</option>
-                    {fireWatchList.map((fw) => (
-                      <option key={fw.nik} value={fw.nama}>{fw.nama}</option>
-                    ))}
-                  </select>
+                    onChange={(e) => setFormData((p) => ({ ...p, namaFireWatch: e.target.value }))}
+                    className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent text-black"
+                    placeholder="Masukkan nama Fire Watch"
+                  />
                 </div>
                 <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-2">NIK Fire Watch (Readonly)</label>
+                  <label className="block text-sm font-semibold text-slate-700 mb-2">NIK Fire Watch <span className="text-red-500">*</span></label>
                   <input
                     type="text"
                     value={formData.nikFireWatch}
-                    readOnly
-                    className="w-full px-4 py-2.5 border border-slate-300 rounded-lg bg-slate-100 text-slate-600 text-sm"
+                    onChange={(e) => setFormData((p) => ({ ...p, nikFireWatch: e.target.value }))}
+                    className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent text-black"
+                    placeholder="Masukkan NIK Fire Watch"
                   />
                 </div>
               </div>
@@ -426,11 +491,38 @@ function WorkshopPermitFormInner() {
               </div>
               <div className="flex items-start gap-2 bg-green-100 border border-green-300 rounded-lg px-3 py-2.5 mb-4">
                 <AlertCircle className="w-4 h-4 text-green-600 shrink-0 mt-0.5" />
-                <p className="text-xs text-green-700">Jabatan dan NIK Pemberi Izin akan <strong>terisi otomatis</strong> dari profil SPV saat approval.</p>
+                <p className="text-xs text-green-700">Pilih SPV yang sesuai dari departemen Anda. NIK dan jabatan akan muncul otomatis.</p>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div> <label className="block text-sm font-semibold text-slate-400 mb-2">Jabatan Pemberi Izin</label> <DisabledField placeholder="Diisi otomatis oleh SPV" /> </div>
-                <div> <label className="block text-sm font-semibold text-slate-400 mb-2">Nama / NIK Pemberi Izin</label> <DisabledField placeholder="Diisi otomatis oleh SPV" /> </div>
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-2">Nama SPV / Pemberi Izin <span className="text-red-500">*</span></label>
+                  <select
+                    value={spvPemberiIzin.nama}
+                    onChange={(e) => {
+                      const selected = spvOptions.find((spv) => spv.nama === e.target.value);
+                      setSpvPemberiIzin({
+                        nama: selected?.nama ?? "",
+                        nik: selected?.nik ?? "",
+                        jabatan: selected?.jabatan ?? "",
+                      });
+                    }}
+                    className={`w-full px-4 py-2.5 border ${spvPemberiIzin.nama ? 'border-slate-300' : 'border-red-300 bg-red-50'} rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent text-black`}
+                  >
+                    <option value="">-- Pilih SPV --</option>
+                    {spvOptions.map((spv) => (
+                      <option key={spv.id} value={spv.nama}>{spv.nama}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-2">NIK SPV</label>
+                  <input
+                    type="text"
+                    value={spvPemberiIzin.nik}
+                    readOnly
+                    className="w-full px-4 py-2.5 border border-slate-300 rounded-lg bg-slate-100 text-slate-600 text-sm"
+                  />
+                </div>
               </div>
             </div>
           </div>
@@ -530,39 +622,47 @@ function WorkshopPermitFormInner() {
         {/* ── BAGIAN 3 ── */}
         <Section title="BAGIAN 3: HAL-HAL YANG PERLU DIPERHATIKAN SEBAGAI UPAYA PENCEGAHAN"
           section="bagian3" description="Checklist keselamatan" expanded={expanded} toggle={toggle}>
-          <div className="space-y-6">
-            {[
-              { t: "1. UMUM", items: [{ k: "equipment", l: "Equipment / Tools kondisi baik" }, { k: "apar", l: "Alat pemadam api tersedia" }, { k: "sensor", l: "Sensor Smoke Detector non-aktif" }, { k: "apd", l: "APD lengkap dipakai" }] },
-              { t: "2. DAERAH 11 METER", items: [{ k: "meter11_cairan", l: "Tidak ada cairan mudah terbakar" }, { k: "lantai", l: "Lantai bersih" }, { k: "lantaiBasah", l: "Lantai dibasahi" }, { k: "cairan_diproteksi", l: "Cairan mudah terbakar diproteksi" }, { k: "lembaran", l: "Lembaran di bawah pekerjaan" }, { k: "lindungi_conveyor", l: "Lindungi conveyor dan kabel" }] },
-              { t: "3. RUANGAN TERTUTUP", items: [{ k: "ruang_tertutup_dibersihkan", l: "Alat dibersihkan dari bahan mudah terbakar" }, { k: "uap_dibuang", l: "Uap menyala dibuang dari ruangan" }] },
-              { t: "4. DINDING / LANGIT-LANGIT", items: [{ k: "dinding_konstruksi", l: "Konstruksi tidak mudah terbakar" }, { k: "bahan_dipindahkan", l: "Bahan mudah terbakar dipindahkan" }] },
-            ].map(group => (
-              <div key={group.t} className="border border-slate-200 rounded-lg p-4">
-                <h4 className="font-bold text-slate-900 text-sm mb-4">{group.t}</h4>
-                <div className="space-y-3">
-                  {group.items.map(item => <YesNoRow key={item.k} label={item.l} fieldKey={item.k} pencegahan={formData.pencegahan} setPencegahan={setP} />)}
-                </div>
+          <div className="space-y-4">
+            <div className="border border-slate-200 rounded-lg overflow-hidden">
+              <div className="grid grid-cols-[3.5rem_1fr] bg-slate-100 border-b border-slate-300">
+                <span className="px-3 py-2.5 text-xs font-bold text-slate-600 text-center">NO.</span>
+                <span className="px-3 py-2.5 text-xs font-bold text-slate-600">ITEM CHECK LIST</span>
               </div>
-            ))}
-
-            <div className="border border-blue-200 rounded-lg p-4 bg-blue-50">
-              <h4 className="font-bold text-blue-900 text-sm mb-4">5. PERAN API (FIRE WATCH)</h4>
-              <div className="space-y-3">
-                {[{ k: "firewatch_ada", l: "Fire Watch ada memastikan area aman selama proses dan 30 menit setelahnya" }, { k: "firewatch_pelatihan", l: "Fire Watch sudah mendapat pelatihan menggunakan alat pemadam kebakaran" }]
-                  .map(item => (
-                    <div key={item.k} className="flex items-center justify-between p-3 bg-white rounded-lg">
-                      <span className="text-sm text-slate-700 flex-1 mr-4">{item.l}</span>
-                      <div className="flex gap-4 shrink-0">
-                        {["ya", "tidak"].map(v => (
-                          <label key={v} className="flex items-center gap-1.5 cursor-pointer">
-                            <input type="radio" name={item.k} value={v} checked={formData.pencegahan[item.k as keyof typeof formData.pencegahan] === v} onChange={() => setP({ [item.k]: v })} className="w-4 h-4 text-orange-600" />
-                            <span className="text-sm">{v === "ya" ? "YA" : "TIDAK"}</span>
-                          </label>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-              </div>
+              {[
+                ["equipment", "Equipment/tool/mesin berfungsi dengan baik"],
+                ["apar", "APAR tersedia dekat area kerja"],
+                ["flammableNearby", "Tidak ada cairan mudah terbakar dekat area kerja panas"],
+                ["b3Stored", "B3 & cairan mudah terbakar disimpan di lemari khusus"],
+                ["cleanFloor", "Lantai bersih dari benda mudah terbakar"],
+                ["metalShield", "Lantai ditutup dengan perisai metal untuk menampung bunga api"],
+                ["completePpe", "Memakai APD lengkap sesuai OS APD"],
+                ["cleanMaterial", "Membersihkan sisa material, serpihan logam, atau sampah"],
+                ["returnEquipment", "Mengembalikan Equipment/tool/mesin ke tempat penyimpanan semula"],
+                ["disposeWaste", "Membuang sampah sesuai jenisnya (organik, anorganik, dan B3)"],
+                ["firewatchSafety", "Fire watch memastikan kondisi aman selama dan setelah proses kerja"],
+                ["firewatchTraining", "Fire watch terlatih Pemakaian APAR"],
+              ].map(([key, label], index) => (
+                <label key={key} className="grid grid-cols-[3.5rem_1fr] border-b border-slate-200 last:border-0 cursor-pointer hover:bg-orange-50">
+                  <span className="px-3 py-2.5 text-sm text-slate-600 text-center border-r border-slate-200">{index + 1}</span>
+                  <span className="flex items-center justify-between gap-3 px-3 py-2.5 text-sm text-slate-700">
+                    <span>{label}</span>
+                    <span className="flex items-center gap-3 shrink-0">
+                      {[true, false].map((value) => (
+                        <label key={String(value)} className="flex items-center gap-1.5 cursor-pointer text-xs font-semibold">
+                          <input
+                            type="radio"
+                            name={`checklist-${key}`}
+                            checked={formData.checklistPencegahan[key] === value}
+                            onChange={() => setFormData((prev) => ({ ...prev, checklistPencegahan: { ...prev.checklistPencegahan, [key]: value } }))}
+                            className="w-4 h-4 text-orange-600 border-slate-300"
+                          />
+                          {value ? "YA" : "TIDAK"}
+                        </label>
+                      ))}
+                    </span>
+                  </span>
+                </label>
+              ))}
             </div>
 
             <div className="border border-slate-200 rounded-lg p-4">
@@ -604,7 +704,9 @@ function WorkshopPermitFormInner() {
           setEnabled={setPerluJsa}
           value={jsaData}
           setValue={setJsaData}
-        /> : <JsaUploadSection
+        /> : <JsaMethodSection
+          mode={jsaMode}
+          setMode={setJsaMode}
           perluJsa={perluJsa}
           setPerluJsa={setPerluJsa}
           jsaFile={jsaFile}
@@ -613,6 +715,8 @@ function WorkshopPermitFormInner() {
           setJsaUploadStatus={setJsaUploadStatus}
           jsaUploadError={jsaUploadError}
           setJsaUploadError={setJsaUploadError}
+          jsaData={jsaData}
+          setJsaData={setJsaData}
           sectionTitle="BAGIAN 5: UPLOAD JSA"
           sectionStyle="workshop"
         />}

@@ -47,9 +47,12 @@ export const ROLE_ORDER: Record<UserRole, number> = {
 };
 
 // ── Stage maps HOT-WORK & WORKSHOP ───────────────────────────
-// Stage dimulai dari 1 (tidak ada stage 0 untuk firewatch lagi).
-// Internal:  1=spv, 2=admin_k3, 3=sfo, 4=smr
-// Eksternal: 1=kontraktor, 2=spv, 3=admin_k3, 4=sfo, 5=smr
+// Stage dimulai dari 1.
+// REFACTOR: Kontraktor dikeluarkan dari alur approval bertahap.
+// Kontraktor sekarang tanda tangan bebas kapan saja (endpoint sign
+// terpisah, lihat /api/approval/[jenisForm]/[id]/sign) dan tidak lagi
+// menempati sebuah "stage" maupun menggeser current_stage.
+// Internal & Eksternal sekarang sama-sama:  1=spv, 2=admin_k3, 3=sfo, 4=smr
 export const STAGE_TO_ROLE_FW_INTERNAL: Record<number, UserRole> = {
   1: 'spv',
   2: 'admin_k3',
@@ -58,16 +61,15 @@ export const STAGE_TO_ROLE_FW_INTERNAL: Record<number, UserRole> = {
 };
 
 export const STAGE_TO_ROLE_FW_EKSTERNAL: Record<number, UserRole> = {
-  1: 'kontraktor',
-  2: 'spv',
-  3: 'admin_k3',
-  4: 'sfo',
-  5: 'smr',       // sebelumnya: 'pga'
+  1: 'spv',
+  2: 'admin_k3',
+  3: 'sfo',
+  4: 'smr',       // sebelumnya: 'pga'
 };
 
 // ── Stage maps HEIGHT-WORK ────────────────────────────────────
-// Internal:  1=spv, 2=admin_k3, 3=sfo, 4=smr
-// Eksternal: 1=kontraktor, 2=spv, 3=admin_k3, 4=sfo, 5=smr
+// REFACTOR: sama seperti di atas — kontraktor dikeluarkan dari stage.
+// Internal & Eksternal sekarang sama-sama:  1=spv, 2=admin_k3, 3=sfo, 4=smr
 export const STAGE_TO_ROLE_HW_INTERNAL: Record<number, UserRole> = {
   1: 'spv',
   2: 'admin_k3',
@@ -76,11 +78,10 @@ export const STAGE_TO_ROLE_HW_INTERNAL: Record<number, UserRole> = {
 };
 
 export const STAGE_TO_ROLE_HW_EKSTERNAL: Record<number, UserRole> = {
-  1: 'kontraktor',
-  2: 'spv',
-  3: 'admin_k3',
-  4: 'sfo',
-  5: 'smr',       // sebelumnya: 'pga'
+  1: 'spv',
+  2: 'admin_k3',
+  3: 'sfo',
+  4: 'smr',       // sebelumnya: 'pga'
 };
 
 // ── STAGE_TO_ROLE default (backward-compat, dipakai getStageToRoleMap) ───
@@ -96,7 +97,7 @@ export const ROLE_TO_STAGE: Record<UserRole, number> = {
   firewatch:  -1,  // TIDAK punya stage approval
   security:   -1,
   spv:         1,
-  kontraktor:  1,  // stage 1 di alur eksternal
+  kontraktor: -1,  // REFACTOR: kontraktor tidak lagi punya stage approval — tanda tangan bebas via endpoint sign
   admin_k3:    2,
   sfo:         3,
   smr:         4,  // sebelumnya: pga: 4
@@ -119,6 +120,7 @@ export interface JWTPayload {
   nama:     string;
   jabatan:  string;
   role:     UserRole;
+  nik?:     string | null;
 }
 
 export function signToken(payload: JWTPayload): string {
@@ -191,6 +193,10 @@ export function canUserApproveAtStage(
 
 // ── Helper: stage config per form type ───────────────────────
 // startStage selalu 1 (tidak ada stage 0 untuk firewatch).
+// REFACTOR: Kontraktor dikeluarkan dari stage — internal & eksternal
+// sekarang punya jumlah & urutan stage yang sama (4 stage: spv → admin_k3
+// → sfo → smr). tipePerusahaan tetap jadi parameter untuk kompatibilitas
+// pemanggil, tapi tidak lagi mengubah hasilnya.
 export function getStageConfig(
   formType: string,
   tipePerusahaan?: string
@@ -200,13 +206,6 @@ export function getStageConfig(
   startStage: number;
 } {
   if (formType === 'height-work') {
-    if (tipePerusahaan === 'eksternal') {
-      return {
-        totalStages: 5,
-        startStage:  1,
-        stages: ['kontraktor', 'spv', 'admin_k3', 'sfo', 'smr'], // sebelumnya: 'mr_pga'
-      };
-    }
     return {
       totalStages: 4,
       startStage:  1,
@@ -214,13 +213,6 @@ export function getStageConfig(
     };
   }
   // hot-work & workshop
-  if (tipePerusahaan === 'eksternal') {
-    return {
-      totalStages: 5,
-      startStage:  1,
-      stages: ['kontraktor', 'spv', 'admin_k3', 'sfo', 'smr'], // sebelumnya: 'mr_pga'
-    };
-  }
   return {
     totalStages: 4,
     startStage:  1,

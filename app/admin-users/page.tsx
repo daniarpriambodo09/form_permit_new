@@ -30,6 +30,7 @@ import {
   Building2, Mail, Phone, Calendar, BadgeCheck, BadgeX,
   Trash2,
 } from "lucide-react";
+import Sidebar from "@/components/Sidebar";
 
 // ── Types ──────────────────────────────────────────────────────
 interface AdminUser {
@@ -604,505 +605,507 @@ export default function AdminUsersPage() {
   // ── Render ────────────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-slate-50">
-
-      {/* ── Header ── */}
-      <header className="bg-white border-b border-slate-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="w-10 h-10 bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl flex items-center justify-center shadow-md">
-                <Shield className="w-5 h-5 text-white" />
+      <Sidebar />
+      <div style={{ paddingLeft: "var(--sidebar-width, 0px)" }} className="transition-[padding] duration-300">
+        {/* ── Header ── */}
+        <header className="bg-white border-b border-slate-200">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="w-10 h-10 bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl flex items-center justify-center shadow-md">
+                  <Shield className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <h1 className="text-lg font-bold text-slate-900 leading-tight">
+                    PT. JATIM AUTOCOMP INDONESIA
+                  </h1>
+                  <p className="text-xs text-slate-500">WIRING HARNESS MANUFACTURER</p>
+                </div>
               </div>
-              <div>
-                <h1 className="text-lg font-bold text-slate-900 leading-tight">
-                  PT. JATIM AUTOCOMP INDONESIA
-                </h1>
-                <p className="text-xs text-slate-500">WIRING HARNESS MANUFACTURER</p>
+              <Link href="/home"
+                className="flex items-center gap-1.5 px-3 py-2 text-sm text-slate-600
+                          hover:bg-slate-100 rounded-lg transition-colors">
+                <ChevronLeft className="w-4 h-4" /> Kembali
+              </Link>
+            </div>
+          </div>
+        </header>
+
+        {/* ── Main ── */}
+        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+
+          {/* Page title + CTA */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <Users className="w-5 h-5 text-orange-500" />
+                <h2 className="text-2xl font-bold text-slate-900">
+                  {pageMode === "spv" ? spvPageTitle : "Manajemen Pengguna"}
+                </h2>
               </div>
+              <p className="text-sm text-slate-500">
+                {pageMode === "spv"
+                  ? `Kelola akun yang bertugas membuat Form Permit di departemen ${spvDepartmen ?? "Anda"}.`
+                  : "Kelola akun administrator departemen dan approver sistem izin kerja."}
+              </p>
             </div>
-            <Link href="/home"
-              className="flex items-center gap-1.5 px-3 py-2 text-sm text-slate-600
-                         hover:bg-slate-100 rounded-lg transition-colors">
-              <ChevronLeft className="w-4 h-4" /> Kembali
-            </Link>
-          </div>
-        </div>
-      </header>
-
-      {/* ── Main ── */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-
-        {/* Page title + CTA */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-          <div>
-            <div className="flex items-center gap-2 mb-1">
-              <Users className="w-5 h-5 text-orange-500" />
-              <h2 className="text-2xl font-bold text-slate-900">
-                {pageMode === "spv" ? spvPageTitle : "Manajemen Pengguna"}
-              </h2>
-            </div>
-            <p className="text-sm text-slate-500">
-              {pageMode === "spv"
-                ? `Kelola akun yang bertugas membuat Form Permit di departemen ${spvDepartmen ?? "Anda"}.`
-                : "Kelola akun administrator departemen dan approver sistem izin kerja."}
-            </p>
-          </div>
-          <button onClick={openModal}
-            className="inline-flex items-center gap-2 px-5 py-2.5 bg-orange-600 hover:bg-orange-500
-                       text-white font-semibold rounded-xl text-sm transition-colors
-                       shadow-md shadow-orange-600/20 whitespace-nowrap self-start sm:self-auto">
-            <UserPlus className="w-4 h-4" />
-            {ctaLabel}
-          </button>
-        </div>
-
-        {/* Tab Switch — hanya untuk admin */}
-        {pageMode === "admin" && (
-          <div className="flex gap-1 bg-slate-100 rounded-xl p-1 mb-6 w-fit">
-            <button onClick={() => switchTab("admin")}
-              className={`px-5 py-2 rounded-lg text-sm font-semibold transition-all duration-200 ${
-                isAdminTab
-                  ? "bg-white text-slate-900 shadow-sm"
-                  : "text-slate-500 hover:text-slate-700"
-              }`}>
-              Administrator Departemen
-            </button>
-            <button onClick={() => switchTab("approver")}
-              className={`px-5 py-2 rounded-lg text-sm font-semibold transition-all duration-200 ${
-                isApproverTab
-                  ? "bg-white text-slate-900 shadow-sm"
-                  : "text-slate-500 hover:text-slate-700"
-              }`}>
-              Approver
+            <button onClick={openModal}
+              className="inline-flex items-center gap-2 px-5 py-2.5 bg-orange-600 hover:bg-orange-500
+                        text-white font-semibold rounded-xl text-sm transition-colors
+                        shadow-md shadow-orange-600/20 whitespace-nowrap self-start sm:self-auto">
+              <UserPlus className="w-4 h-4" />
+              {ctaLabel}
             </button>
           </div>
-        )}
 
-        {/* Success / Error toast */}
-        {successMsg && (
-          <div className={`flex items-center gap-2 border rounded-xl px-4 py-3 mb-5
-            ${isErrorMsg ? "bg-red-50 border-red-200" : "bg-green-50 border-green-200"}`}>
-            {isErrorMsg
-              ? <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
-              : <CheckCircle className="w-4 h-4 text-green-600 shrink-0" />}
-            <p className={`text-sm font-medium ${isErrorMsg ? "text-red-700" : "text-green-700"}`}>
-              {isErrorMsg ? successMsg.replace("ERROR: ", "") : successMsg}
-            </p>
-          </div>
-        )}
-
-        {/* Filters */}
-        <div className="flex flex-col sm:flex-row gap-3 mb-5">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-            <input type="text" value={search} onChange={e => setSearch(e.target.value)}
-              placeholder={
-                pageMode === "spv" || isAdminTab
-                  ? "Cari nama, username, perusahaan, email..."
-                  : "Cari nama, username, email..."
-              }
-              className="w-full pl-9 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm
-                         text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-2
-                         focus:ring-orange-400 focus:border-transparent transition-colors"
-            />
-          </div>
-          {/* Filter departmen: hanya admin yang perlu, SPV sudah auto-filter dari backend */}
+          {/* Tab Switch — hanya untuk admin */}
           {pageMode === "admin" && (
-            <div className="relative">
-              <select value={filterDept} onChange={e => setFilterDept(e.target.value)}
-                className="pl-4 pr-8 py-2.5 bg-white border border-slate-200 rounded-xl text-sm
-                           text-slate-700 focus:outline-none focus:ring-2 focus:ring-orange-400
-                           focus:border-transparent transition-colors appearance-none cursor-pointer">
-                <option value="">Semua Departemen</option>
-                {DEPARTMENT_OPTIONS.map(d => (
-                  <option key={d} value={d}>{d}</option>
-                ))}
-              </select>
-              <div className="pointer-events-none absolute inset-y-0 right-2.5 flex items-center">
-                <svg className="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                </svg>
-              </div>
+            <div className="flex gap-1 bg-slate-100 rounded-xl p-1 mb-6 w-fit">
+              <button onClick={() => switchTab("admin")}
+                className={`px-5 py-2 rounded-lg text-sm font-semibold transition-all duration-200 ${
+                  isAdminTab
+                    ? "bg-white text-slate-900 shadow-sm"
+                    : "text-slate-500 hover:text-slate-700"
+                }`}>
+                Administrator Departemen
+              </button>
+              <button onClick={() => switchTab("approver")}
+                className={`px-5 py-2 rounded-lg text-sm font-semibold transition-all duration-200 ${
+                  isApproverTab
+                    ? "bg-white text-slate-900 shadow-sm"
+                    : "text-slate-500 hover:text-slate-700"
+                }`}>
+                Approver
+              </button>
             </div>
           )}
-        </div>
 
-        {/* ── Tabel Administrator Departemen ── */}
-        {/* Tampil jika: mode SPV (selalu), atau mode admin dengan tab "admin" */}
-        {(pageMode === "spv" || (pageMode === "admin" && isAdminTab)) && (
-          <>
-            <p className="text-xs text-slate-400 mb-3">
-              {adminLoading
-                ? "Memuat data…"
-                : `Menampilkan ${filteredAdmin.length} dari ${adminUsers.length} akun`}
-            </p>
-            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-              {adminError ? (
-                <div className="flex items-center gap-2 p-6 text-red-600">
-                  <AlertCircle className="w-4 h-4 shrink-0" />
-                  <span className="text-sm">{adminError}</span>
-                </div>
-              ) : adminLoading ? (
-                <div className="space-y-0 divide-y divide-slate-100">
-                  {[...Array(5)].map((_, i) => (
-                    <div key={i} className="flex gap-4 px-6 py-4">
-                      <div className="w-36 h-4 bg-slate-100 animate-pulse rounded" />
-                      <div className="w-24 h-4 bg-slate-100 animate-pulse rounded" />
-                      <div className="w-20 h-4 bg-slate-100 animate-pulse rounded" />
-                    </div>
+          {/* Success / Error toast */}
+          {successMsg && (
+            <div className={`flex items-center gap-2 border rounded-xl px-4 py-3 mb-5
+              ${isErrorMsg ? "bg-red-50 border-red-200" : "bg-green-50 border-green-200"}`}>
+              {isErrorMsg
+                ? <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
+                : <CheckCircle className="w-4 h-4 text-green-600 shrink-0" />}
+              <p className={`text-sm font-medium ${isErrorMsg ? "text-red-700" : "text-green-700"}`}>
+                {isErrorMsg ? successMsg.replace("ERROR: ", "") : successMsg}
+              </p>
+            </div>
+          )}
+
+          {/* Filters */}
+          <div className="flex flex-col sm:flex-row gap-3 mb-5">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+              <input type="text" value={search} onChange={e => setSearch(e.target.value)}
+                placeholder={
+                  pageMode === "spv" || isAdminTab
+                    ? "Cari nama, username, perusahaan, email..."
+                    : "Cari nama, username, email..."
+                }
+                className="w-full pl-9 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm
+                          text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-2
+                          focus:ring-orange-400 focus:border-transparent transition-colors"
+              />
+            </div>
+            {/* Filter departmen: hanya admin yang perlu, SPV sudah auto-filter dari backend */}
+            {pageMode === "admin" && (
+              <div className="relative">
+                <select value={filterDept} onChange={e => setFilterDept(e.target.value)}
+                  className="pl-4 pr-8 py-2.5 bg-white border border-slate-200 rounded-xl text-sm
+                            text-slate-700 focus:outline-none focus:ring-2 focus:ring-orange-400
+                            focus:border-transparent transition-colors appearance-none cursor-pointer">
+                  <option value="">Semua Departemen</option>
+                  {DEPARTMENT_OPTIONS.map(d => (
+                    <option key={d} value={d}>{d}</option>
                   ))}
+                </select>
+                <div className="pointer-events-none absolute inset-y-0 right-2.5 flex items-center">
+                  <svg className="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
                 </div>
-              ) : filteredAdmin.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-16 text-slate-400">
-                  <Users className="w-10 h-10 mb-3 opacity-40" />
-                  <p className="text-sm font-medium">Belum ada data administrator</p>
-                  <p className="text-xs mt-1">
-                    {pageMode === "spv"
-                      ? `Klik "Tambah Akun" untuk membuat akun baru di departemen ${spvDepartmen ?? "Anda"}.`
-                      : `Klik "Tambah Administrator" untuk membuat akun baru.`}
-                  </p>
-                </div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="bg-slate-50 border-b border-slate-200">
-                        <th className="text-left px-6 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Nama</th>
-                        <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Username</th>
-                        <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">NIK</th>
-                        <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Departemen</th>
-                        <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Perusahaan</th>
-                        <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Email</th>
-                        <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">No. Telepon</th>
-                        <th className="text-center px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Status</th>
-                        <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Dibuat Pada</th>
-                        <th className="text-center px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Password</th>
-                        <th className="text-center px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Aksi</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {filteredAdmin.map(user => (
-                        <tr key={user.id} className="hover:bg-slate-50 transition-colors group">
-                          <td className="px-6 py-4">
-                            <p className="font-semibold text-slate-800">{user.nama}</p>
-                          </td>
-                          <td className="px-4 py-4">
-                            <code className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded font-mono">
-                              {user.username}
-                            </code>
-                          </td>
-                          <td className="px-4 py-4">
-                            {user.nik ? (
+              </div>
+            )}
+          </div>
+
+          {/* ── Tabel Administrator Departemen ── */}
+          {/* Tampil jika: mode SPV (selalu), atau mode admin dengan tab "admin" */}
+          {(pageMode === "spv" || (pageMode === "admin" && isAdminTab)) && (
+            <>
+              <p className="text-xs text-slate-400 mb-3">
+                {adminLoading
+                  ? "Memuat data…"
+                  : `Menampilkan ${filteredAdmin.length} dari ${adminUsers.length} akun`}
+              </p>
+              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                {adminError ? (
+                  <div className="flex items-center gap-2 p-6 text-red-600">
+                    <AlertCircle className="w-4 h-4 shrink-0" />
+                    <span className="text-sm">{adminError}</span>
+                  </div>
+                ) : adminLoading ? (
+                  <div className="space-y-0 divide-y divide-slate-100">
+                    {[...Array(5)].map((_, i) => (
+                      <div key={i} className="flex gap-4 px-6 py-4">
+                        <div className="w-36 h-4 bg-slate-100 animate-pulse rounded" />
+                        <div className="w-24 h-4 bg-slate-100 animate-pulse rounded" />
+                        <div className="w-20 h-4 bg-slate-100 animate-pulse rounded" />
+                      </div>
+                    ))}
+                  </div>
+                ) : filteredAdmin.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-16 text-slate-400">
+                    <Users className="w-10 h-10 mb-3 opacity-40" />
+                    <p className="text-sm font-medium">Belum ada data administrator</p>
+                    <p className="text-xs mt-1">
+                      {pageMode === "spv"
+                        ? `Klik "Tambah Akun" untuk membuat akun baru di departemen ${spvDepartmen ?? "Anda"}.`
+                        : `Klik "Tambah Administrator" untuk membuat akun baru.`}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="bg-slate-50 border-b border-slate-200">
+                          <th className="text-left px-6 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Nama</th>
+                          <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Username</th>
+                          <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">NIK</th>
+                          <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Departemen</th>
+                          <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Perusahaan</th>
+                          <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Email</th>
+                          <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">No. Telepon</th>
+                          <th className="text-center px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Status</th>
+                          <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Dibuat Pada</th>
+                          <th className="text-center px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Password</th>
+                          <th className="text-center px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Aksi</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {filteredAdmin.map(user => (
+                          <tr key={user.id} className="hover:bg-slate-50 transition-colors group">
+                            <td className="px-6 py-4">
+                              <p className="font-semibold text-slate-800">{user.nama}</p>
+                            </td>
+                            <td className="px-4 py-4">
                               <code className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded font-mono">
-                                {user.nik}
+                                {user.username}
                               </code>
-                            ) : (
-                              <span className="text-slate-400 text-xs">—</span>
-                            )}
-                          </td>
-                          <td className="px-4 py-4">
-                            {user.departmen ? (
-                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-orange-50 text-orange-700 border border-orange-200">
-                                {user.departmen}
-                              </span>
-                            ) : (
-                              <span className="text-slate-400 text-xs">—</span>
-                            )}
-                          </td>
-                          <td className="px-4 py-4">
-                            <div className="flex items-center gap-1.5 text-slate-600">
-                              <Building2 className="w-3.5 h-3.5 shrink-0 text-slate-400" />
-                              <span className="truncate max-w-[140px]">{user.perusahaan ?? "—"}</span>
-                            </div>
-                          </td>
-                          <td className="px-4 py-4">
-                            {user.email ? (
+                            </td>
+                            <td className="px-4 py-4">
+                              {user.nik ? (
+                                <code className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded font-mono">
+                                  {user.nik}
+                                </code>
+                              ) : (
+                                <span className="text-slate-400 text-xs">—</span>
+                              )}
+                            </td>
+                            <td className="px-4 py-4">
+                              {user.departmen ? (
+                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-orange-50 text-orange-700 border border-orange-200">
+                                  {user.departmen}
+                                </span>
+                              ) : (
+                                <span className="text-slate-400 text-xs">—</span>
+                              )}
+                            </td>
+                            <td className="px-4 py-4">
                               <div className="flex items-center gap-1.5 text-slate-600">
-                                <Mail className="w-3.5 h-3.5 shrink-0 text-slate-400" />
-                                <span className="truncate max-w-[160px]">{user.email}</span>
+                                <Building2 className="w-3.5 h-3.5 shrink-0 text-slate-400" />
+                                <span className="truncate max-w-[140px]">{user.perusahaan ?? "—"}</span>
                               </div>
-                            ) : (
-                              <span className="text-slate-400 text-xs">—</span>
-                            )}
-                          </td>
-                          <td className="px-4 py-4">
-                            {user.no_telp ? (
-                              <div className="flex items-center gap-1.5 text-slate-600">
-                                <Phone className="w-3.5 h-3.5 shrink-0 text-slate-400" />
-                                <span>{user.no_telp}</span>
+                            </td>
+                            <td className="px-4 py-4">
+                              {user.email ? (
+                                <div className="flex items-center gap-1.5 text-slate-600">
+                                  <Mail className="w-3.5 h-3.5 shrink-0 text-slate-400" />
+                                  <span className="truncate max-w-[160px]">{user.email}</span>
+                                </div>
+                              ) : (
+                                <span className="text-slate-400 text-xs">—</span>
+                              )}
+                            </td>
+                            <td className="px-4 py-4">
+                              {user.no_telp ? (
+                                <div className="flex items-center gap-1.5 text-slate-600">
+                                  <Phone className="w-3.5 h-3.5 shrink-0 text-slate-400" />
+                                  <span>{user.no_telp}</span>
+                                </div>
+                              ) : (
+                                <span className="text-slate-400 text-xs">—</span>
+                              )}
+                            </td>
+                            <td className="px-4 py-4 text-center">
+                              {user.is_active ? (
+                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-green-50 text-green-700 border border-green-200">
+                                  <BadgeCheck className="w-3 h-3" /> Aktif
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-500 border border-slate-200">
+                                  <BadgeX className="w-3 h-3" /> Nonaktif
+                                </span>
+                              )}
+                            </td>
+                            <td className="px-4 py-4">
+                              <div className="flex items-center gap-1.5 text-slate-500">
+                                <Calendar className="w-3.5 h-3.5 shrink-0" />
+                                <span className="text-xs">{formatDate(user.created_at)}</span>
                               </div>
-                            ) : (
-                              <span className="text-slate-400 text-xs">—</span>
-                            )}
-                          </td>
-                          <td className="px-4 py-4 text-center">
-                            {user.is_active ? (
-                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-green-50 text-green-700 border border-green-200">
-                                <BadgeCheck className="w-3 h-3" /> Aktif
-                              </span>
-                            ) : (
-                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-500 border border-slate-200">
-                                <BadgeX className="w-3 h-3" /> Nonaktif
-                              </span>
-                            )}
-                          </td>
-                          <td className="px-4 py-4">
-                            <div className="flex items-center gap-1.5 text-slate-500">
-                              <Calendar className="w-3.5 h-3.5 shrink-0" />
-                              <span className="text-xs">{formatDate(user.created_at)}</span>
-                            </div>
-                          </td>
-                          {/* ── Kolom Password ── */}
-                          <td className="px-4 py-4 text-center">
-                            {(() => {
-                              const ps = getPassState(user.id);
-                              return (
-                                <div className="flex items-center gap-2 justify-center min-w-[120px]">
-                                  {ps.loading ? (
-                                    <span className="w-4 h-4 border-2 border-slate-300 border-t-orange-500 rounded-full animate-spin inline-block" />
-                                  ) : ps.error ? (
-                                    <span
-                                      title={ps.error}
-                                      className="text-xs text-red-500 truncate max-w-[100px]"
-                                    >
-                                      {ps.error.includes("sebelum fitur") ? "Belum tersedia" : ps.error}
-                                    </span>
-                                  ) : ps.visible && ps.password ? (
-                                    <>
-                                      <code className="text-xs font-mono bg-yellow-50 text-yellow-800 border border-yellow-200 px-2 py-0.5 rounded select-all">
-                                        {ps.password}
-                                      </code>
+                            </td>
+                            {/* ── Kolom Password ── */}
+                            <td className="px-4 py-4 text-center">
+                              {(() => {
+                                const ps = getPassState(user.id);
+                                return (
+                                  <div className="flex items-center gap-2 justify-center min-w-[120px]">
+                                    {ps.loading ? (
+                                      <span className="w-4 h-4 border-2 border-slate-300 border-t-orange-500 rounded-full animate-spin inline-block" />
+                                    ) : ps.error ? (
+                                      <span
+                                        title={ps.error}
+                                        className="text-xs text-red-500 truncate max-w-[100px]"
+                                      >
+                                        {ps.error.includes("sebelum fitur") ? "Belum tersedia" : ps.error}
+                                      </span>
+                                    ) : ps.visible && ps.password ? (
+                                      <>
+                                        <code className="text-xs font-mono bg-yellow-50 text-yellow-800 border border-yellow-200 px-2 py-0.5 rounded select-all">
+                                          {ps.password}
+                                        </code>
+                                        <button
+                                          onClick={() => handleTogglePassword(user.id)}
+                                          title="Sembunyikan password"
+                                          className="p-1 text-slate-400 hover:text-slate-600 transition-colors flex-shrink-0"
+                                        >
+                                          <EyeOff className="w-3.5 h-3.5" />
+                                        </button>
+                                      </>
+                                    ) : (
                                       <button
                                         onClick={() => handleTogglePassword(user.id)}
-                                        title="Sembunyikan password"
-                                        className="p-1 text-slate-400 hover:text-slate-600 transition-colors flex-shrink-0"
+                                        title="Lihat password"
+                                        className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium
+                                                  text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg
+                                                  transition-colors border border-slate-200"
                                       >
-                                        <EyeOff className="w-3.5 h-3.5" />
+                                        <Eye className="w-3.5 h-3.5" />
+                                        Lihat
                                       </button>
-                                    </>
-                                  ) : (
-                                    <button
-                                      onClick={() => handleTogglePassword(user.id)}
-                                      title="Lihat password"
-                                      className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium
-                                                 text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg
-                                                 transition-colors border border-slate-200"
-                                    >
-                                      <Eye className="w-3.5 h-3.5" />
-                                      Lihat
-                                    </button>
-                                  )}
-                                </div>
-                              );
-                            })()}
-                          </td>
-                          <td className="px-4 py-4 text-center">
-                            <button
-                              onClick={() => setDeleteTarget({
-                                id: user.id, nama: user.nama,
-                                username: user.username, role: "worker",
-                              })}
-                              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold
-                                         text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors
-                                         border border-red-200">
-                              <Trash2 className="w-3.5 h-3.5" /> Hapus
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-          </>
-        )}
+                                    )}
+                                  </div>
+                                );
+                              })()}
+                            </td>
+                            <td className="px-4 py-4 text-center">
+                              <button
+                                onClick={() => setDeleteTarget({
+                                  id: user.id, nama: user.nama,
+                                  username: user.username, role: "worker",
+                                })}
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold
+                                          text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors
+                                          border border-red-200">
+                                <Trash2 className="w-3.5 h-3.5" /> Hapus
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </>
+          )}
 
-        {/* ── TAB: Approver — hanya untuk admin ── */}
-        {pageMode === "admin" && isApproverTab && (
-          <>
-            <p className="text-xs text-slate-400 mb-3">
-              {approverLoading
-                ? "Memuat data…"
-                : `Menampilkan ${filteredApprovers.length} dari ${approverUsers.length} akun`}
-            </p>
-            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-              {approverError ? (
-                <div className="flex items-center gap-2 p-6 text-red-600">
-                  <AlertCircle className="w-4 h-4 shrink-0" />
-                  <span className="text-sm">{approverError}</span>
-                </div>
-              ) : approverLoading ? (
-                <div className="space-y-0 divide-y divide-slate-100">
-                  {[...Array(5)].map((_, i) => (
-                    <div key={i} className="flex gap-4 px-6 py-4">
-                      <div className="w-36 h-4 bg-slate-100 animate-pulse rounded" />
-                      <div className="w-24 h-4 bg-slate-100 animate-pulse rounded" />
-                      <div className="w-20 h-4 bg-slate-100 animate-pulse rounded" />
-                    </div>
-                  ))}
-                </div>
-              ) : filteredApprovers.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-16 text-slate-400">
-                  <Users className="w-10 h-10 mb-3 opacity-40" />
-                  <p className="text-sm font-medium">Belum ada data approver</p>
-                  <p className="text-xs mt-1">Klik &quot;Tambah Approver&quot; untuk membuat akun baru.</p>
-                </div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="bg-slate-50 border-b border-slate-200">
-                        <th className="text-left px-6 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Nama</th>
-                        <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Username</th>
-                        <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">NIK</th>
-                        <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Role</th>
-                        <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Departemen</th>
-                        <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Email</th>
-                        <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">No. Telepon</th>
-                        <th className="text-center px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Status</th>
-                        <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Dibuat Pada</th>
-                        <th className="text-center px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Password</th>
-                        <th className="text-center px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Aksi</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {filteredApprovers.map(user => (
-                        <tr key={user.id} className="hover:bg-slate-50 transition-colors group">
-                          <td className="px-6 py-4">
-                            <p className="font-semibold text-slate-800">{user.nama}</p>
-                          </td>
-                          <td className="px-4 py-4">
-                            <code className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded font-mono">
-                              {user.username}
-                            </code>
-                          </td>
-                          <td className="px-4 py-4">
-                            {user.nik ? (
+          {/* ── TAB: Approver — hanya untuk admin ── */}
+          {pageMode === "admin" && isApproverTab && (
+            <>
+              <p className="text-xs text-slate-400 mb-3">
+                {approverLoading
+                  ? "Memuat data…"
+                  : `Menampilkan ${filteredApprovers.length} dari ${approverUsers.length} akun`}
+              </p>
+              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                {approverError ? (
+                  <div className="flex items-center gap-2 p-6 text-red-600">
+                    <AlertCircle className="w-4 h-4 shrink-0" />
+                    <span className="text-sm">{approverError}</span>
+                  </div>
+                ) : approverLoading ? (
+                  <div className="space-y-0 divide-y divide-slate-100">
+                    {[...Array(5)].map((_, i) => (
+                      <div key={i} className="flex gap-4 px-6 py-4">
+                        <div className="w-36 h-4 bg-slate-100 animate-pulse rounded" />
+                        <div className="w-24 h-4 bg-slate-100 animate-pulse rounded" />
+                        <div className="w-20 h-4 bg-slate-100 animate-pulse rounded" />
+                      </div>
+                    ))}
+                  </div>
+                ) : filteredApprovers.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-16 text-slate-400">
+                    <Users className="w-10 h-10 mb-3 opacity-40" />
+                    <p className="text-sm font-medium">Belum ada data approver</p>
+                    <p className="text-xs mt-1">Klik &quot;Tambah Approver&quot; untuk membuat akun baru.</p>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="bg-slate-50 border-b border-slate-200">
+                          <th className="text-left px-6 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Nama</th>
+                          <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Username</th>
+                          <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">NIK</th>
+                          <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Role</th>
+                          <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Departemen</th>
+                          <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Email</th>
+                          <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">No. Telepon</th>
+                          <th className="text-center px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Status</th>
+                          <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Dibuat Pada</th>
+                          <th className="text-center px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Password</th>
+                          <th className="text-center px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Aksi</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {filteredApprovers.map(user => (
+                          <tr key={user.id} className="hover:bg-slate-50 transition-colors group">
+                            <td className="px-6 py-4">
+                              <p className="font-semibold text-slate-800">{user.nama}</p>
+                            </td>
+                            <td className="px-4 py-4">
                               <code className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded font-mono">
-                                {user.nik}
+                                {user.username}
                               </code>
-                            ) : (
-                              <span className="text-slate-400 text-xs">—</span>
-                            )}
-                          </td>
-                          <td className="px-4 py-4">
-                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border ${ROLE_COLOR[user.role] ?? "bg-slate-100 text-slate-600 border-slate-200"}`}>
-                              {ROLE_LABEL[user.role] ?? user.role}
-                            </span>
-                          </td>
-                          <td className="px-4 py-4">
-                            {user.departmen && user.departmen !== "Unknown" ? (
-                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-orange-50 text-orange-700 border border-orange-200">
-                                {user.departmen}
+                            </td>
+                            <td className="px-4 py-4">
+                              {user.nik ? (
+                                <code className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded font-mono">
+                                  {user.nik}
+                                </code>
+                              ) : (
+                                <span className="text-slate-400 text-xs">—</span>
+                              )}
+                            </td>
+                            <td className="px-4 py-4">
+                              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border ${ROLE_COLOR[user.role] ?? "bg-slate-100 text-slate-600 border-slate-200"}`}>
+                                {ROLE_LABEL[user.role] ?? user.role}
                               </span>
-                            ) : (
-                              <span className="text-slate-400 text-xs">—</span>
-                            )}
-                          </td>
-                          <td className="px-4 py-4">
-                            {user.email ? (
-                              <div className="flex items-center gap-1.5 text-slate-600">
-                                <Mail className="w-3.5 h-3.5 shrink-0 text-slate-400" />
-                                <span className="truncate max-w-[160px]">{user.email}</span>
+                            </td>
+                            <td className="px-4 py-4">
+                              {user.departmen && user.departmen !== "Unknown" ? (
+                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-orange-50 text-orange-700 border border-orange-200">
+                                  {user.departmen}
+                                </span>
+                              ) : (
+                                <span className="text-slate-400 text-xs">—</span>
+                              )}
+                            </td>
+                            <td className="px-4 py-4">
+                              {user.email ? (
+                                <div className="flex items-center gap-1.5 text-slate-600">
+                                  <Mail className="w-3.5 h-3.5 shrink-0 text-slate-400" />
+                                  <span className="truncate max-w-[160px]">{user.email}</span>
+                                </div>
+                              ) : (
+                                <span className="text-slate-400 text-xs">—</span>
+                              )}
+                            </td>
+                            <td className="px-4 py-4">
+                              {user.no_telp ? (
+                                <div className="flex items-center gap-1.5 text-slate-600">
+                                  <Phone className="w-3.5 h-3.5 shrink-0 text-slate-400" />
+                                  <span>{user.no_telp}</span>
+                                </div>
+                              ) : (
+                                <span className="text-slate-400 text-xs">—</span>
+                              )}
+                            </td>
+                            <td className="px-4 py-4 text-center">
+                              {user.is_active ? (
+                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-green-50 text-green-700 border border-green-200">
+                                  <BadgeCheck className="w-3 h-3" /> Aktif
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-500 border border-slate-200">
+                                  <BadgeX className="w-3 h-3" /> Nonaktif
+                                </span>
+                              )}
+                            </td>
+                            <td className="px-4 py-4">
+                              <div className="flex items-center gap-1.5 text-slate-500">
+                                <Calendar className="w-3.5 h-3.5 shrink-0" />
+                                <span className="text-xs">{formatDate(user.created_at)}</span>
                               </div>
-                            ) : (
-                              <span className="text-slate-400 text-xs">—</span>
-                            )}
-                          </td>
-                          <td className="px-4 py-4">
-                            {user.no_telp ? (
-                              <div className="flex items-center gap-1.5 text-slate-600">
-                                <Phone className="w-3.5 h-3.5 shrink-0 text-slate-400" />
-                                <span>{user.no_telp}</span>
-                              </div>
-                            ) : (
-                              <span className="text-slate-400 text-xs">—</span>
-                            )}
-                          </td>
-                          <td className="px-4 py-4 text-center">
-                            {user.is_active ? (
-                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-green-50 text-green-700 border border-green-200">
-                                <BadgeCheck className="w-3 h-3" /> Aktif
-                              </span>
-                            ) : (
-                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-500 border border-slate-200">
-                                <BadgeX className="w-3 h-3" /> Nonaktif
-                              </span>
-                            )}
-                          </td>
-                          <td className="px-4 py-4">
-                            <div className="flex items-center gap-1.5 text-slate-500">
-                              <Calendar className="w-3.5 h-3.5 shrink-0" />
-                              <span className="text-xs">{formatDate(user.created_at)}</span>
-                            </div>
-                          </td>
-                          {/* ── Kolom Password (hanya admin) ── */}
-                          <td className="px-4 py-4 text-center">
-                            {(() => {
-                              const ps = getPassState(user.id);
-                              return (
-                                <div className="flex items-center gap-2 justify-center min-w-[120px]">
-                                  {ps.loading ? (
-                                    <span className="w-4 h-4 border-2 border-slate-300 border-t-orange-500 rounded-full animate-spin inline-block" />
-                                  ) : ps.error ? (
-                                    <span
-                                      title={ps.error}
-                                      className="text-xs text-red-500 truncate max-w-[100px]"
-                                    >
-                                      {ps.error.includes("sebelum fitur") ? "Belum tersedia" : ps.error}
-                                    </span>
-                                  ) : ps.visible && ps.password ? (
-                                    <>
-                                      <code className="text-xs font-mono bg-yellow-50 text-yellow-800 border border-yellow-200 px-2 py-0.5 rounded select-all">
-                                        {ps.password}
-                                      </code>
+                            </td>
+                            {/* ── Kolom Password (hanya admin) ── */}
+                            <td className="px-4 py-4 text-center">
+                              {(() => {
+                                const ps = getPassState(user.id);
+                                return (
+                                  <div className="flex items-center gap-2 justify-center min-w-[120px]">
+                                    {ps.loading ? (
+                                      <span className="w-4 h-4 border-2 border-slate-300 border-t-orange-500 rounded-full animate-spin inline-block" />
+                                    ) : ps.error ? (
+                                      <span
+                                        title={ps.error}
+                                        className="text-xs text-red-500 truncate max-w-[100px]"
+                                      >
+                                        {ps.error.includes("sebelum fitur") ? "Belum tersedia" : ps.error}
+                                      </span>
+                                    ) : ps.visible && ps.password ? (
+                                      <>
+                                        <code className="text-xs font-mono bg-yellow-50 text-yellow-800 border border-yellow-200 px-2 py-0.5 rounded select-all">
+                                          {ps.password}
+                                        </code>
+                                        <button
+                                          onClick={() => handleTogglePassword(user.id)}
+                                          title="Sembunyikan password"
+                                          className="p-1 text-slate-400 hover:text-slate-600 transition-colors flex-shrink-0"
+                                        >
+                                          <EyeOff className="w-3.5 h-3.5" />
+                                        </button>
+                                      </>
+                                    ) : (
                                       <button
                                         onClick={() => handleTogglePassword(user.id)}
-                                        title="Sembunyikan password"
-                                        className="p-1 text-slate-400 hover:text-slate-600 transition-colors flex-shrink-0"
+                                        title="Lihat password"
+                                        className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium
+                                                  text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg
+                                                  transition-colors border border-slate-200"
                                       >
-                                        <EyeOff className="w-3.5 h-3.5" />
+                                        <Eye className="w-3.5 h-3.5" />
+                                        Lihat
                                       </button>
-                                    </>
-                                  ) : (
-                                    <button
-                                      onClick={() => handleTogglePassword(user.id)}
-                                      title="Lihat password"
-                                      className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium
-                                                 text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg
-                                                 transition-colors border border-slate-200"
-                                    >
-                                      <Eye className="w-3.5 h-3.5" />
-                                      Lihat
-                                    </button>
-                                  )}
-                                </div>
-                              );
-                            })()}
-                          </td>
-                          <td className="px-4 py-4 text-center">
-                            <button
-                              onClick={() => setDeleteTarget({
-                                id: user.id, nama: user.nama,
-                                username: user.username, role: user.role,
-                              })}
-                              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold
-                                         text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors
-                                         border border-red-200">
-                              <Trash2 className="w-3.5 h-3.5" /> Hapus
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-          </>
-        )}
-      </main>
+                                    )}
+                                  </div>
+                                );
+                              })()}
+                            </td>
+                            <td className="px-4 py-4 text-center">
+                              <button
+                                onClick={() => setDeleteTarget({
+                                  id: user.id, nama: user.nama,
+                                  username: user.username, role: user.role,
+                                })}
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold
+                                          text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors
+                                          border border-red-200">
+                                <Trash2 className="w-3.5 h-3.5" /> Hapus
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+        </main>
+      </div>
 
       {/* ══════════════════════════════════════════════════════════
           Modal Register

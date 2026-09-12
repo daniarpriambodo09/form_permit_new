@@ -275,7 +275,7 @@ export async function POST(req: NextRequest) {
         [
           idHw, now, toIso(f.tanggalPelaksanaan),
           status, 'eksternal', 1,
-          f.noRegistrasi || null, gp.namaKontraktorPekerja || null, f.namaPekerjaNIK || null,
+          idHw, gp.namaKontraktorPekerja || null, f.namaPekerjaNIK || null,
           f.lokasi || gp.lokasiPekerjaan || null, f.waktuPukul || null,
           f.namaFireWatch || null, f.nikFireWatch || null, '',
           null, null,
@@ -488,7 +488,7 @@ export async function POST(req: NextRequest) {
         )`,
         [
           idWs, now, toIso(f.tanggalPelaksanaan), status, 'eksternal', 1,
-          f.noRegistrasi || null, gp.namaKontraktorPekerja || null, namaPekerjaNik, pekerjaNik,
+          idWs, gp.namaKontraktorPekerja || null, namaPekerjaNik, pekerjaNik,
           f.lokasi || gp.lokasiPekerjaan || null, f.waktuPukul || null,
           f.namaFireWatch || null, f.nikFireWatch || null,
           null, null,

@@ -97,6 +97,7 @@ export async function PUT(
       kerja_pada_dinding_lagit, bahan_mudah_terbakar_dipindahkan_dari_dinding,
       fire_watch_memastikan_area_aman, firwatch_terlatih,
       permintaan_tambahan,
+      checklist_pencegahan,
       spv_terkait, kontraktor, sfo, pga,
       status,
     } = body;
@@ -128,7 +129,7 @@ export async function PUT(
 
     await query(
       `UPDATE form_kerja_workshop SET
-        no_registrasi = $1,
+        no_registrasi = COALESCE(NULLIF($1, ''), id_form),
         nama_kontraktor_nik = $2,
         nama_pekerja_nik = $3,
         nik_pekerja = $4,
@@ -187,11 +188,12 @@ export async function PUT(
         sfo = $56,
         pga = $57,
         status = $58,
+        checklist_pencegahan = COALESCE($59, checklist_pencegahan),
         catatan_reject = NULL,
         approved_by = NULL,
         approved_at = NULL,
-        updated_at = $59
-       WHERE id_form = $60
+        updated_at = $60
+             WHERE id_form = $61
        RETURNING id_form, status`,
       [
         no_registrasi,
@@ -248,6 +250,7 @@ export async function PUT(
         fire_watch_memastikan_area_aman,
         firwatch_terlatih,
         permintaan_tambahan,
+        checklist_pencegahan ? JSON.stringify(checklist_pencegahan) : null,
         spv_terkait,
         kontraktor,
         sfo,

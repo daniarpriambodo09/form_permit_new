@@ -98,6 +98,9 @@ export async function POST(req: NextRequest) {
 
     // ── Relasi Ijin Kerja Eksternal (opsional) ───────────────────────────
     const idIjinKerja: string | null = formData.idIjinKerja || null;
+    if (formData.tipePerusahaan === 'eksternal' && !idIjinKerja) {
+      return NextResponse.json({ error: 'Form eksternal harus dibuat melalui Ijin Kerja Eksternal.' }, { status: 400 });
+    }
     let tipePerusahaan: 'internal' | 'eksternal' =
       formData.tipePerusahaan === 'eksternal' ? 'eksternal' : 'internal';
 
@@ -131,6 +134,7 @@ export async function POST(req: NextRequest) {
 
     const perluJsa   = formData.perluJsa === true;
     const jsaFileUrl = perluJsa ? (formData.jsaFileUrl || null) : null;
+    const jsaData = formData.jsaData && typeof formData.jsaData === 'object' ? formData.jsaData : null;
     const linkedJsaData = idIjinKerja && formData.jsaData && typeof formData.jsaData === 'object' ? formData.jsaData : null;
     if (idIjinKerja && isSubmit && perluJsa && (!linkedJsaData || !String(linkedJsaData.area || '').trim() || !String(linkedJsaData.jenisPekerjaan || '').trim() || !String(linkedJsaData.pic || '').trim() || !Array.isArray(linkedJsaData.petugas) || !linkedJsaData.petugas.some((name: unknown) => typeof name === 'string' && name.trim()))) {
       return NextResponse.json({ error: 'JSA terhubung harus memiliki Area, Jenis Pekerjaan, PIC, dan minimal satu Petugas.' }, { status: 400 });
@@ -165,7 +169,7 @@ export async function POST(req: NextRequest) {
         helm_kondisi_baik,
         spv_terkait, nama_kontraktor, sfo, mr_pga_mgr,
         perlu_jsa, jsa_file_url,
-        user_id, id_ijin_kerja
+        user_id, id_ijin_kerja, jsa_data
       ) VALUES (
         $1,  $2,  $3,  $4,
         $5,  $6,
@@ -189,7 +193,7 @@ export async function POST(req: NextRequest) {
         $68,
         $69, $70, $71, $72,
         $73, $74,
-        $75, $76
+        $75, $76, $77
       )`,
       [
         idForm, now, pelaksanaan, status,
@@ -236,9 +240,9 @@ export async function POST(req: NextRequest) {
         formData.lanyardSnapHook       ?? false,
         formData.lanyardRope           ?? false,
         formData.helmKondisiBaik       ?? false,
-        null, null, null, null,
+        formData.spv_terkait || null, null, null, null,
         perluJsa, jsaFileUrl,
-        userId, idIjinKerja,
+        userId, idIjinKerja, jsaData ? JSON.stringify(jsaData) : null,
       ]
     );
 

@@ -366,11 +366,16 @@ export async function GET(req: NextRequest) {
 
     // ── SPV ──────────────────────────────────────────────────────
     if (userRole === 'spv') {
-      const spvRow = await queryOne<{ departmen: string | null }>(
-        `SELECT departmen FROM users WHERE id = $1`,
+      const spvRow = await queryOne<{ departmen: string | null; nama: string | null }>(
+        `SELECT departmen, nama FROM users WHERE id = $1`,
         [user.userId]
       );
       const spvDepartmen = spvRow?.departmen ?? null;
+      const spvNama = spvRow?.nama ?? null;
+      const spvAssignment = spvNama
+        ? ` AND LOWER(TRIM(spv_terkait)) = LOWER(TRIM($4))`
+        : '';
+      const withSpvAssignment = (params: any[]) => spvNama ? [...params, spvNama] : params;
       if (spvDepartmen === null) {
         return NextResponse.json({ data: [], total: 0 });
       }
@@ -378,10 +383,10 @@ export async function GET(req: NextRequest) {
       if (countOnly) {
         const [subm, appr, rej] = await Promise.all([
           Promise.all([
-            ...FW_FORMS.map(f => countByQuery(f, `status = $1 AND current_stage = $2 AND (${TIPE_EXPR_FW}) = $3`, ['submitted', 1, 'internal'], spvDepartmen)),
-            ...FW_FORMS.map(f => countByQuery(f, `status = $1 AND current_stage = $2 AND (${TIPE_EXPR_FW}) = $3`, ['submitted', 2, 'eksternal'], spvDepartmen)),
-            countByQuery('height-work', `status = $1 AND current_stage = $2 AND (${TIPE_EXPR}) = $3`, ['submitted', 1, 'internal'], spvDepartmen),
-            countByQuery('height-work', `status = $1 AND current_stage = $2 AND (${TIPE_EXPR}) = $3`, ['submitted', 2, 'eksternal'], spvDepartmen),
+            ...FW_FORMS.map(f => countByQuery(f, `status = $1 AND current_stage = $2 AND (${TIPE_EXPR_FW}) = $3${spvAssignment}`, withSpvAssignment(['submitted', 1, 'internal']), spvDepartmen)),
+            ...FW_FORMS.map(f => countByQuery(f, `status = $1 AND current_stage = $2 AND (${TIPE_EXPR_FW}) = $3${spvAssignment}`, withSpvAssignment(['submitted', 2, 'eksternal']), spvDepartmen)),
+            countByQuery('height-work', `status = $1 AND current_stage = $2 AND (${TIPE_EXPR}) = $3${spvAssignment}`, withSpvAssignment(['submitted', 1, 'internal']), spvDepartmen),
+            countByQuery('height-work', `status = $1 AND current_stage = $2 AND (${TIPE_EXPR}) = $3${spvAssignment}`, withSpvAssignment(['submitted', 2, 'eksternal']), spvDepartmen),
             countGeneralPermitByStage(2, spvDepartmen),
           ]),
           Promise.all([
@@ -396,10 +401,10 @@ export async function GET(req: NextRequest) {
       }
       if (statusFilter === 'submitted') {
         const results = await Promise.all([
-          ...FW_FORMS.map(f => query(...buildSelectQuery(f, `status = $1 AND current_stage = $2 AND (${TIPE_EXPR_FW}) = $3`, ['submitted', 1, 'internal'], spvDepartmen))),
-          ...FW_FORMS.map(f => query(...buildSelectQuery(f, `status = $1 AND current_stage = $2 AND (${TIPE_EXPR_FW}) = $3`, ['submitted', 2, 'eksternal'], spvDepartmen))),
-          query(...buildSelectQuery('height-work', `status = $1 AND current_stage = $2 AND (${TIPE_EXPR}) = $3`, ['submitted', 1, 'internal'], spvDepartmen)),
-          query(...buildSelectQuery('height-work', `status = $1 AND current_stage = $2 AND (${TIPE_EXPR}) = $3`, ['submitted', 2, 'eksternal'], spvDepartmen)),
+          ...FW_FORMS.map(f => query(...buildSelectQuery(f, `status = $1 AND current_stage = $2 AND (${TIPE_EXPR_FW}) = $3${spvAssignment}`, withSpvAssignment(['submitted', 1, 'internal']), spvDepartmen))),
+          ...FW_FORMS.map(f => query(...buildSelectQuery(f, `status = $1 AND current_stage = $2 AND (${TIPE_EXPR_FW}) = $3${spvAssignment}`, withSpvAssignment(['submitted', 2, 'eksternal']), spvDepartmen))),
+          query(...buildSelectQuery('height-work', `status = $1 AND current_stage = $2 AND (${TIPE_EXPR}) = $3${spvAssignment}`, withSpvAssignment(['submitted', 1, 'internal']), spvDepartmen)),
+          query(...buildSelectQuery('height-work', `status = $1 AND current_stage = $2 AND (${TIPE_EXPR}) = $3${spvAssignment}`, withSpvAssignment(['submitted', 2, 'eksternal']), spvDepartmen)),
           queryGeneralPermitByStage(2, spvDepartmen),
         ]);
         return NextResponse.json({ data: results.flat(), total: results.flat().length });

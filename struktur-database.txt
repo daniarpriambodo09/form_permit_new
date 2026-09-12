@@ -33,6 +33,9 @@ Indexes:
     "idx_departemen_nama" btree (nama_departemen)
 
 
+jai_permit_db=#
+
+
 jai_permit_db=# \d form_ijin_kerja
                                                   Table "public.form_ijin_kerja"
               Column              |           Type           | Collation | Nullable |                   Default
@@ -181,6 +184,13 @@ jai_permit_db=# \d form_ijin_kerja
  jsa_data                         | jsonb                    |           |          |
  izin_kerja_tanggal_dari          | date                     |           |          |
  izin_kerja_tanggal_sampai        | date                     |           |          |
+ safety_induction                 | jsonb                    |           |          |
+ kontraktor_signature_url         | text                     |           |          |
+ security_signature_url           | text                     |           |          |
+ spv_approved                     | boolean                  |           | not null | false
+ spv_approved_by                  | character varying(255)   |           |          |
+ spv_approved_at                  | timestamp with time zone |           |          |
+ spv_nik                          | character varying(100)   |           |          |
 Indexes:
     "form_ijin_kerja_pkey" PRIMARY KEY, btree (id)
     "form_ijin_kerja_edit_token_key" UNIQUE CONSTRAINT, btree (edit_token)
@@ -308,6 +318,8 @@ jai_permit_db=# \d form_kerja_ketinggian
  mr_pga_nik                                    | character varying(100)   |           |          |
  helm_kondisi_baik                             | boolean                  |           | not null | false
  id_ijin_kerja                                 | character varying(20)    |           |          |
+ kontraktor_signature_url                      | text                     |           |          |
+ jsa_data                                      | jsonb                    |           |          |
 Indexes:
     "form_kerja_ketinggian_pkey" PRIMARY KEY, btree (id)
     "form_kerja_ketinggian_edit_token_key" UNIQUE CONSTRAINT, btree (edit_token)
@@ -326,11 +338,6 @@ Triggers:
     trg_ketinggian_updated BEFORE UPDATE ON form_kerja_ketinggian FOR EACH ROW EXECUTE FUNCTION update_updated_at()
 
 
-jai_permit_db=#
-jai_permit_db=#
-jai_permit_db=#
-jai_permit_db=#
-jai_permit_db=#
 jai_permit_db=#
 jai_permit_db=# \d form_kerja_panas
                                                         Table "public.form_kerja_panas"
@@ -440,6 +447,8 @@ jai_permit_db=# \d form_kerja_panas
  sfo_nik                                       | character varying(100)   |           |          |
  mr_pga_nik                                    | character varying(100)   |           |          |
  id_ijin_kerja                                 | character varying(20)    |           |          |
+ kontraktor_signature_url                      | text                     |           |          |
+ jsa_data                                      | jsonb                    |           |          |
 Indexes:
     "form_kerja_panas_pkey" PRIMARY KEY, btree (id)
     "form_kerja_panas_edit_token_key" UNIQUE CONSTRAINT, btree (edit_token)
@@ -457,6 +466,7 @@ Triggers:
     trg_panas_updated BEFORE UPDATE ON form_kerja_panas FOR EACH ROW EXECUTE FUNCTION update_updated_at()
 
 
+jai_permit_db=#
 jai_permit_db=# \d form_kerja_workshop
                                                         Table "public.form_kerja_workshop"
                     Column                     |           Type           | Collation | Nullable |                     Default
@@ -565,6 +575,9 @@ jai_permit_db=# \d form_kerja_workshop
  mr_pga_nik                                    | character varying(100)   |           |          |
  nik_pekerja                                   | character varying(100)   |           |          |
  id_ijin_kerja                                 | character varying(20)    |           |          |
+ kontraktor_signature_url                      | text                     |           |          |
+ checklist_pencegahan                          | jsonb                    |           |          |
+ jsa_data                                      | jsonb                    |           |          |
 Indexes:
     "form_kerja_workshop_pkey" PRIMARY KEY, btree (id)
     "form_kerja_workshop_edit_token_key" UNIQUE CONSTRAINT, btree (edit_token)
@@ -581,6 +594,8 @@ Foreign-key constraints:
 Triggers:
     trg_workshop_updated BEFORE UPDATE ON form_kerja_workshop FOR EACH ROW EXECUTE FUNCTION update_updated_at()
 
+
+jai_permit_db=#
 
 jai_permit_db=# \d smtp_settings
                                         Table "public.smtp_settings"
@@ -628,6 +643,8 @@ Indexes:
     "users_pkey" PRIMARY KEY, btree (id)
     "users_username_key" UNIQUE CONSTRAINT, btree (username)
 Referenced by:
+    TABLE "admin_k3_email_routing" CONSTRAINT "admin_k3_email_routing_updated_by_fkey" FOREIGN KEY (updated_by) REFERENCES users(id)
+    TABLE "admin_k3_email_routing" CONSTRAINT "admin_k3_email_routing_user_id_fkey" FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE RESTRICT
     TABLE "form_ijin_kerja" CONSTRAINT "form_ijin_kerja_user_id_fkey" FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
     TABLE "form_kerja_ketinggian" CONSTRAINT "form_kerja_ketinggian_user_id_fkey" FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
     TABLE "form_kerja_panas" CONSTRAINT "form_kerja_panas_user_id_fkey" FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
@@ -655,6 +672,64 @@ Check constraints:
 Foreign-key constraints:
     "admin_k3_email_routing_updated_by_fkey" FOREIGN KEY (updated_by) REFERENCES users(id)
     "admin_k3_email_routing_user_id_fkey" FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE RESTRICT
+
+
+jai_permit_db=#
+
+jai_permit_db=# \d master_lisence
+                                       Table "public.master_lisence"
+   Column    |           Type           | Collation | Nullable |                  Default
+-------------+--------------------------+-----------+----------+--------------------------------------------
+ id          | integer                  |           | not null | nextval('master_lisence_id_seq'::regclass)
+ nama        | character varying(255)   |           | not null |
+ nik         | character varying(50)    |           | not null |
+ jenis_kerja | character varying(20)    |           | not null |
+ file_url    | text                     |           |          |
+ file_type   | character varying(10)    |           |          |
+ file_name   | character varying(255)   |           |          |
+ tanggal_exp | date                     |           |          |
+ is_active   | boolean                  |           | not null | true
+ created_by  | integer                  |           |          |
+ updated_by  | integer                  |           |          |
+ created_at  | timestamp with time zone |           | not null | now()
+ updated_at  | timestamp with time zone |           | not null | now()
+ departemen  | character varying(50)    |           |          |
+Indexes:
+    "master_lisence_pkey" PRIMARY KEY, btree (id)
+    "idx_master_lisence_departemen" btree (departemen)
+    "idx_master_lisence_exp" btree (tanggal_exp)
+    "idx_master_lisence_jenis_kerja" btree (jenis_kerja)
+    "idx_master_lisence_nama" btree (nama)
+    "idx_master_lisence_nik" btree (nik)
+    "master_lisence_nik_jenis_unique" UNIQUE CONSTRAINT, btree (nik, jenis_kerja)
+Check constraints:
+    "master_lisence_file_type_check" CHECK (file_type::text = ANY (ARRAY['pdf'::character varying, 'image'::character varying]::text[]))
+    "master_lisence_jenis_kerja_check" CHECK (jenis_kerja::text = ANY (ARRAY['hot_work'::character varying, 'height_work'::character varying, 'workshop'::character varying]::text[]))
+Foreign-key constraints:
+    "master_lisence_created_by_fkey" FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
+    "master_lisence_updated_by_fkey" FOREIGN KEY (updated_by) REFERENCES users(id) ON DELETE SET NULL
+Triggers:
+    trg_master_lisence_updated BEFORE UPDATE ON master_lisence FOR EACH ROW EXECUTE FUNCTION update_updated_at()
+
+
+jai_permit_db=#
+
+jai_permit_db=# \d pengawas_departemen
+                                       Table "public.pengawas_departemen"
+   Column   |           Type           | Collation | Nullable |                     Default
+------------+--------------------------+-----------+----------+-------------------------------------------------
+ id         | integer                  |           | not null | nextval('pengawas_departemen_id_seq'::regclass)
+ nama       | character varying(255)   |           | not null |
+ nik        | character varying(50)    |           | not null |
+ departemen | character varying(100)   |           | not null |
+ is_active  | boolean                  |           | not null | true
+ created_at | timestamp with time zone |           | not null | now()
+ updated_at | timestamp with time zone |           | not null | now()
+Indexes:
+    "pengawas_departemen_pkey" PRIMARY KEY, btree (id)
+    "idx_pengawas_departemen_active" btree (is_active)
+    "idx_pengawas_departemen_departemen" btree (departemen)
+    "pengawas_departemen_nama_nik_departemen_key" UNIQUE CONSTRAINT, btree (nama, nik, departemen)
 
 
 jai_permit_db=#

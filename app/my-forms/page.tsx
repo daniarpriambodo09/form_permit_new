@@ -1,4 +1,12 @@
 // app/my-forms/page.tsx
+// UPDATED (lampiran sebagai tombol): job-form (hot-work/height-work/
+// workshop) yang terhubung ke Ijin Kerja Eksternal tidak lagi tampil
+// sebagai card terpisah di list ini — API /api/my-forms sudah menyaringnya
+// keluar dan membawanya lewat field `linked_job_forms` pada card
+// general-permit. Di sini kita render sebagai tombol lampiran (bersama JSA,
+// Safety Induction, dan Form Penilaian Sub Kontraktor) di ruang kosong card
+// general-permit. Approval chain masing-masing job-form tetap ditampilkan,
+// tapi di dalam detail form itu sendiri (DetailModal), bukan di list ini.
 
 "use client";
 import { useState, useEffect } from "react";
@@ -10,9 +18,10 @@ import EditModal from "@/components/EditModal";
 import {
   Home, Plus, FileText, Clock, CheckCircle, XCircle,
   AlertCircle, Eye, Edit, RefreshCw, User, LogOut,
+  Flame, Wrench, ClipboardCheck, ShieldCheck, ClipboardList, Paperclip,
 } from "lucide-react";
 
-// ── Types ─────────────────────────────────────────────────────
+// ── Types ──────────────────────────────────────────────────
 interface ConfirmModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -22,6 +31,13 @@ interface ConfirmModalProps {
   confirmText?: string;
   cancelText?: string;
   isLoading?: boolean;
+}
+
+interface LinkedJobForm {
+  id_form: string;
+  status: string;
+  tipe_perusahaan?: string;
+  jenis_form: "hot-work" | "height-work" | "workshop";
 }
 
 interface FormItem {
@@ -47,6 +63,12 @@ interface FormItem {
   security_approved?: boolean;
   job_forms_count?: number;
   id_ijin_kerja?: string;
+  // ── Lampiran general-permit (tombol, bukan card terpisah) ──
+  linked_job_forms?: LinkedJobForm[];
+  has_jsa?: boolean;
+  has_safety_induction?: boolean;
+  has_penilaian_subkontraktor?: boolean;
+  kontraktor_signature_url?: string | null;
 }
 
 // ── Helpers ───────────────────────────────────────────────────
@@ -64,6 +86,12 @@ const jenisLabel: Record<string, string> = {
   "general-permit":  "Ijin Kerja Eksternal",
 };
 
+const jenisIcon: Record<string, any> = {
+  "hot-work":    Flame,
+  "height-work": AlertCircle,
+  "workshop":    Wrench,
+};
+
 const statusConfig: Record<string, { label: string; icon: any; color: string; bg: string }> = {
   draft:     { label: "Draft",     icon: FileText,    color: "text-slate-600", bg: "bg-slate-100" },
   submitted: { label: "Diajukan",  icon: Clock,       color: "text-blue-600",  bg: "bg-blue-100" },
@@ -71,42 +99,18 @@ const statusConfig: Record<string, { label: string; icon: any; color: string; bg
   rejected:  { label: "Ditolak",   icon: XCircle,     color: "text-red-600",   bg: "bg-red-100" },
 };
 
+// REFACTOR: Kontraktor dikeluarkan dari alur approval bertahap.
+// Kontraktor sekarang tanda tangan bebas kapan saja (lihat
+// renderApprovalProgress di bawah, badge terpisah), bukan lagi salah satu
+// "stage" berurutan di sini. Internal & eksternal sekarang punya urutan
+// stage yang SAMA: SPV → Admin K3 → SFO → SMR, untuk hot-work,
+// height-work, maupun workshop.
 const getApprovalStages = (form: FormItem): { key: keyof FormItem; label: string }[] => {
-  const isEksternal = form.tipe_perusahaan === "eksternal";
-
   if (form.jenis_form === "general-permit") {
     return [
       { key: "security_approved", label: "Security" },
       { key: "sfo_approved",      label: "SFO" },
       { key: "pga_approved",      label: "PGA Manager" },
-    ];
-  }
-
-  if (form.jenis_form === "height-work") {
-    if (isEksternal) {
-      return [
-        { key: "kontraktor_approved", label: "Kontraktor" },
-        { key: "spv_approved",        label: "SPV" },
-        { key: "admin_k3_approved",   label: "Admin K3" },
-        { key: "sfo_approved",        label: "SFO" },
-        { key: "mr_pga_approved",     label: "SMR" },
-      ];
-    }
-    return [
-      { key: "spv_approved",      label: "SPV" },
-      { key: "admin_k3_approved", label: "Admin K3" },
-      { key: "sfo_approved",      label: "SFO" },
-      { key: "mr_pga_approved",   label: "SMR" },
-    ];
-  }
-
-  if (isEksternal) {
-    return [
-      { key: "kontraktor_approved", label: "Kontraktor" },
-      { key: "spv_approved",        label: "SPV" },
-      { key: "admin_k3_approved",   label: "Admin K3" },
-      { key: "sfo_approved",        label: "SFO" },
-      { key: "mr_pga_approved",     label: "SMR" },
     ];
   }
 
@@ -126,10 +130,25 @@ const checkAllApproved = (form: FormItem): boolean => {
 const renderApprovalProgress = (form: FormItem) => {
   const stages = getApprovalStages(form);
   const isEksternal = form.tipe_perusahaan === "eksternal";
+  // Kontraktor hanya relevan untuk form eksternal jenis hot-work/height-work/
+  // workshop, dan sekarang ditampilkan terpisah dari chain stage berurutan
+  // karena bisa ditandatangani kapan saja (tidak menggeser stage lain).
+  const showKontraktorBadge =
+    isEksternal && form.jenis_form !== "general-permit";
 
   return (
     <div className="mt-2">
       <div className="flex flex-wrap gap-1.5">
+        {showKontraktorBadge && (
+          <span
+            className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+              form.kontraktor_approved ? "bg-green-100 text-green-700" : "bg-amber-100 text-amber-700"
+            }`}
+            title="Kontraktor bisa tanda tangan kapan saja, tidak terikat urutan approval"
+          >
+            {form.kontraktor_approved ? "✓" : "○"} Kontraktor (TTD)
+          </span>
+        )}
         {stages.map((stage) => {
           const approved = Boolean(form[stage.key]);
           return (
@@ -143,35 +162,104 @@ const renderApprovalProgress = (form: FormItem) => {
           );
         })}
       </div>
-      {(form.jenis_form === "hot-work" || form.jenis_form === "workshop") && form.tipe_perusahaan && (
+      {(form.jenis_form === "hot-work" || form.jenis_form === "workshop" || form.jenis_form === "height-work") && form.tipe_perusahaan && (
         <p className="text-[10px] text-slate-400 mt-1">
-          Alur: {isEksternal
-            ? "Kontraktor → SPV → Admin K3 → SFO → SMR"
-            : "SPV → Admin K3 → SFO → SMR"
-          }
-        </p>
-      )}
-      {form.jenis_form === "height-work" && form.tipe_perusahaan && (
-        <p className="text-[10px] text-slate-400 mt-1">
-          Alur: {isEksternal
-            ? "Kontraktor → SPV → Admin K3 → SFO → SMR"
-            : "SPV → Admin K3 → SFO → SMR"
-          }
+          Alur: SPV → Admin K3 → SFO → SMR
+          {isEksternal && " (Kontraktor tanda tangan bebas, di luar alur ini)"}
         </p>
       )}
       {form.jenis_form === "general-permit" && (
         <p className="text-[10px] text-slate-400 mt-1">Alur: Security → SFO → PGA Manager</p>
       )}
-      {form.id_ijin_kerja && (
-        <p className="text-[10px] text-purple-600 font-medium mt-1">
-          🔗 Bagian dari Ijin Kerja Eksternal {form.id_ijin_kerja}
-        </p>
-      )}
-      {form.jenis_form === "general-permit" && typeof form.job_forms_count === "number" && (
-        <p className="text-[10px] text-purple-600 font-medium mt-1">
-          {form.job_forms_count} form jenis kerja terkait
-        </p>
-      )}
+    </div>
+  );
+};
+
+// ── Lampiran (tombol) khusus card general-permit ─────────────
+// Menggantikan card job-form terpisah + badge "N form terkait". Job-form
+// yang sudah dibuat dibuka lewat DetailModal-nya sendiri (approval chain-nya
+// tampil di sana). JSA / Safety Induction / Form Penilaian langsung
+// membuka card lampiran yang sesuai di dalam detail general-permit-nya
+// (via `initialAction`), tanpa perlu klik lagi di dalam modal.
+const renderLampiranButtons = (
+  form: FormItem,
+  onOpenJobForm: (jenis: LinkedJobForm["jenis_form"], id: string) => void,
+  onOpenGeneralPermitAction: (action: "jsa" | "safety-induction" | "penilaian-subkontraktor") => void
+) => {
+  const linked = form.linked_job_forms ?? [];
+  const jobTypes: LinkedJobForm["jenis_form"][] = ["hot-work", "height-work", "workshop"];
+
+  return (
+    <div className="mt-3 pt-3 border-t border-slate-100">
+      <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide mb-2 flex items-center gap-1.5">
+        <Paperclip className="w-3 h-3" /> Lampiran
+      </p>
+      <div className="flex flex-wrap gap-2">
+        {jobTypes.map((jenis) => {
+          const found = linked.find((jf) => jf.jenis_form === jenis);
+          const Icon = jenisIcon[jenis];
+          if (found) {
+            const cfg = statusConfig[found.status] || statusConfig.submitted;
+            return (
+              <button
+                key={jenis}
+                onClick={() => onOpenJobForm(jenis, found.id_form)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${cfg.bg} ${cfg.color} border-transparent hover:opacity-80`}
+                title={`${jenisLabel[jenis]} — ${cfg.label}`}
+              >
+                <Icon className="w-3.5 h-3.5" /> {jenisLabel[jenis]}
+                <span className="opacity-70">· {cfg.label}</span>
+              </button>
+            );
+          }
+          return (
+            <Link
+              key={jenis}
+              href={`/form/${jenis}?id_ijin_kerja=${form.id_form}`}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-dashed border-slate-300 text-slate-500 hover:border-orange-300 hover:text-orange-600 transition-colors"
+              title={`Tambah ${jenisLabel[jenis]}`}
+            >
+              <Plus className="w-3.5 h-3.5" /> {jenisLabel[jenis]}
+            </Link>
+          );
+        })}
+
+        <button
+          onClick={() => onOpenGeneralPermitAction("jsa")}
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
+            form.has_jsa
+              ? "bg-blue-100 text-blue-700 border-transparent hover:opacity-80"
+              : "border-dashed border-slate-300 text-slate-400"
+          }`}
+          title="JSA"
+        >
+          <ClipboardList className="w-3.5 h-3.5" /> JSA
+        </button>
+
+        <button
+          onClick={() => onOpenGeneralPermitAction("safety-induction")}
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
+            form.has_safety_induction
+              ? "bg-teal-100 text-teal-700 border-transparent hover:opacity-80"
+              : "border-dashed border-slate-300 text-slate-400"
+          }`}
+          title="Safety Induction"
+        >
+          <ShieldCheck className="w-3.5 h-3.5" /> Safety Induction
+        </button>
+
+        <button
+          onClick={() => onOpenGeneralPermitAction("penilaian-subkontraktor")}
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
+            form.has_penilaian_subkontraktor
+              ? "bg-purple-100 text-purple-700 border-transparent hover:opacity-80"
+              : "border-dashed border-slate-300 text-slate-400"
+          }`}
+          title="Form Penilaian Sub Kontraktor"
+        >
+          <ClipboardCheck className="w-3.5 h-3.5" /> Penilaian Sub Kontraktor
+        </button>
+      </div>
     </div>
   );
 };
@@ -222,7 +310,7 @@ export default function MyFormsPage() {
   const [filterStatus, setFilterStatus] = useState("all");
   const [userName, setUserName]         = useState("");
   const [showFormModal, setShowFormModal] = useState(false);
-  const [detailModal, setDetailModal]   = useState({ isOpen: false, formId: "", formType: "" as any });
+  const [detailModal, setDetailModal]   = useState({ isOpen: false, formId: "", formType: "" as any, action: null as null | "jsa" | "safety-induction" | "penilaian-subkontraktor" });
   const [editModal, setEditModal]       = useState({ isOpen: false, formId: "", formType: "" as any });
   const [cancelModal, setCancelModal]   = useState({
     isOpen: false, formId: "",
@@ -233,7 +321,7 @@ export default function MyFormsPage() {
   useEffect(() => {
     const handler = (e: any) => {
       const { jenis, idForm } = e.detail;
-      setDetailModal({ isOpen: true, formId: idForm, formType: jenis });
+      setDetailModal({ isOpen: true, formId: idForm, formType: jenis, action: null });
     };
     window.addEventListener("open-form-detail", handler);
     return () => window.removeEventListener("open-form-detail", handler);
@@ -247,20 +335,15 @@ export default function MyFormsPage() {
   const loadForms = async () => {
     setLoading(true);
     try {
-      // FIX #1: URL harus menyertakan basePath /form-permit
-      // Sebelumnya: "/api/my-forms" → 404 karena tidak ada handler di sana
-      // Sesudahnya: "/form-permit/api/my-forms" → diterima Next.js dengan benar
       const res = await fetch("/form-permit/api/my-forms", {
         credentials: "include",
       });
 
       if (res.status === 401) {
-        // FIX #2: router.push tidak perlu basePath — Next.js otomatis prepend
         router.replace("/login/worker");
         return;
       }
 
-      // FIX #3: Handle response non-JSON (misal HTML 404 page)
       const contentType = res.headers.get("content-type") || "";
       if (!contentType.includes("application/json")) {
         console.error("[my-forms] Response bukan JSON:", res.status, res.url);
@@ -412,6 +495,7 @@ export default function MyFormsPage() {
               const Icon = cfg.icon;
               const canCancel  = form.status === "submitted" || form.status === "draft";
               const isEksternal = form.tipe_perusahaan === "eksternal";
+              const isGeneralPermit = form.jenis_form === "general-permit";
 
               return (
                 <div key={form.id_form}
@@ -478,9 +562,17 @@ export default function MyFormsPage() {
                       renderApprovalProgress(form)
                     }
 
+                    {isGeneralPermit &&
+                      renderLampiranButtons(
+                        form,
+                        (jenis, id) => setDetailModal({ isOpen: true, formId: id, formType: jenis, action: null }),
+                        (action) => setDetailModal({ isOpen: true, formId: form.id_form, formType: "general-permit", action })
+                      )
+                    }
+
                     <div className="flex items-center gap-2 pt-3 border-t border-slate-100 flex-wrap mt-3">
                       <button
-                        onClick={() => setDetailModal({ isOpen: true, formId: form.id_form, formType: form.jenis_form })}
+                        onClick={() => setDetailModal({ isOpen: true, formId: form.id_form, formType: form.jenis_form, action: null })}
                         className="flex items-center gap-1.5 px-3 py-1.5 text-slate-600
                                    hover:bg-slate-100 rounded-lg text-xs font-medium transition-colors">
                         <Eye className="w-3.5 h-3.5" /> Lihat Detail
@@ -523,6 +615,7 @@ export default function MyFormsPage() {
         onClose={() => setDetailModal({ ...detailModal, isOpen: false })}
         formId={detailModal.formId}
         formType={detailModal.formType}
+        initialAction={detailModal.action}
       />
 
       <EditModal

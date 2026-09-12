@@ -9,7 +9,8 @@ import {
   CheckCircle, Loader2, Camera, Upload, X, ZoomIn, ImageIcon, Lock,
   Eye, FileText, CalendarClock,
 } from "lucide-react";
-import JsaUploadSection, { type JsaFileInfo, type JsaUploadStatus as JsaStatus } from "@/components/JsaUploadSection";
+import JsaMethodSection, { type JsaMode } from "@/components/JsaMethodSection";
+import { type JsaFileInfo, type JsaUploadStatus as JsaStatus } from "@/components/JsaUploadSection";
 import LinkedJsaSection from "@/components/LinkedJsaSection";
 import { createEmptyJsa } from "@/components/JsaBuilderSection";
 import type { JsaData } from "@/components/JsaBuilderSection";
@@ -228,6 +229,8 @@ function HeightWorkFormPageInner() {
   const [namaPengawasKontraktor, setNamaPengawasKontraktor] = useState("");
   const [namaPengawasDepartemen, setNamaPengawasDepartemen] = useState("");
   const [namaDepartemen, setNamaDepartemen] = useState("");
+  const [spvOptions, setSpvOptions] = useState<Array<{ id: number; nama: string; nik: string | null; jabatan: string | null }>>([]);
+  const [spvPemberiIzin, setSpvPemberiIzin] = useState({ nama: "", nik: "", jabatan: "" });
   const [namaPetugas, setNamaPetugas] = useState<string[]>(Array(10).fill(""));
   const [berbadanSehat, setBerbadanSehat] = useState<boolean[]>(Array(10).fill(false));
   const [fotoLisensi, setFotoLisensi] = useState<(string | null)[]>(Array(10).fill(null));
@@ -281,6 +284,7 @@ function HeightWorkFormPageInner() {
   const [jsaUploadStatus, setJsaUploadStatus] = useState<JsaStatus>("idle");
   const [jsaUploadError, setJsaUploadError] = useState("");
   const [jsaData, setJsaData] = useState<JsaData>(createEmptyJsa());
+  const [jsaMode, setJsaMode] = useState<JsaMode>("upload");
 
   // ── Kunci tipePerusahaan ke eksternal jika form ini dibuka dari
   // Ijin Kerja Eksternal (via ?id_ijin_kerja=...) ──────────────────────
@@ -289,6 +293,31 @@ function HeightWorkFormPageInner() {
       setTipePerusahaan("eksternal");
     }
   }, [idIjinKerja]);
+
+  useEffect(() => {
+    fetch("/form-permit/api/admin-users/approvers", { credentials: "include" })
+      .then((r) => (r.ok ? r.json() : { users: [] }))
+      .then((d) => {
+        const options = (d.users ?? []).filter((user: { role: string }) => user.role === "spv");
+        setSpvOptions(options);
+        if (options.length > 0) {
+          const defaultSpv = options[0];
+          setSpvPemberiIzin({
+            nama: defaultSpv.nama ?? "",
+            nik: defaultSpv.nik ?? "",
+            jabatan: defaultSpv.jabatan ?? "",
+          });
+        }
+      })
+      .catch(() => setSpvOptions([]));
+  }, []);
+
+  // ── Auto-isi Sect/Dept JSA dari Nama Departemen yang dipilih (Internal) ──
+  useEffect(() => {
+    if (tipePerusahaan === "internal" && namaDepartemen) {
+      setJsaData((prev) => ({ ...prev, sectDept: namaDepartemen }));
+    }
+  }, [tipePerusahaan, namaDepartemen]);
 
   // ── Reset semua baris Bagian 2 (dipakai saat ganti tipe/departemen) ─────
   const resetPetugasRows = useCallback(() => {
@@ -385,6 +414,8 @@ function HeightWorkFormPageInner() {
   const buildBody = (isSubmit: boolean) => ({
     isSubmit,
     tipePerusahaan,
+    spv_terkait: spvPemberiIzin.nama,
+    spvPemberiIzin,
     deskripsiPekerjaan,
     lokasi,
     tanggalPelaksanaan,
@@ -427,13 +458,17 @@ function HeightWorkFormPageInner() {
     // ── JSA fields ──
     perluJsa,
     jsaFileUrl: jsaFile?.url ?? null,
-    ...(idIjinKerja ? { jsaData } : {}),
+    ...(idIjinKerja || jsaMode === "build" ? { jsaData } : {}),
     // ── Relasi Ijin Kerja Eksternal (kosong/null jika form ini dibuka
     // langsung tanpa lewat halaman Ijin Kerja Eksternal) ────────────────
     idIjinKerja,
   });
 
   const handleSaveDraft = async () => {
+    if (!spvPemberiIzin.nama || !spvPemberiIzin.nik) {
+      setError("SPV / Pemberi Izin wajib dipilih.");
+      return;
+    }
     setSaving(true);
     setError("");
     try {
@@ -456,6 +491,11 @@ function HeightWorkFormPageInner() {
     e.preventDefault();
     setError("");
 
+    if (!spvPemberiIzin.nama || !spvPemberiIzin.nik) {
+      setError("SPV / Pemberi Izin wajib dipilih.");
+      return;
+    }
+
     if (lisensiMissing.length > 0) {
       setError(`Foto lisensi wajib untuk: ${lisensiMissing.map(({ nama, idx }) => `Petugas ${idx + 1} (${nama})`).join(", ")}`);
       document.getElementById("bagian-petugas")?.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -474,7 +514,7 @@ function HeightWorkFormPageInner() {
     }
 
     // ── Validasi JSA ──────────────────────────────────────────
-    if (idIjinKerja && perluJsa && (!jsaData.area.trim() || !jsaData.jenisPekerjaan.trim() || !jsaData.pic.trim() || !jsaData.petugas.some((name) => name.trim()))) {
+    if ((idIjinKerja || jsaMode === "build") && perluJsa && (!jsaData.area.trim() || !jsaData.jenisPekerjaan.trim() || !jsaData.pic.trim() || !jsaData.petugas.some((name) => name.trim()))) {
       setError("Area, Jenis Pekerjaan, PIC, dan minimal satu Petugas wajib diisi pada JSA");
       document.getElementById("bagian-jsa")?.scrollIntoView({ behavior: "smooth", block: "center" });
       return;
@@ -583,14 +623,14 @@ function HeightWorkFormPageInner() {
                     { value: "internal", label: "Internal / Karyawan PT.JAI", desc: "Alur: SPV → Admin K3 → SFO → SMR" },
                     { value: "eksternal", label: "Eksternal / Subkontraktor", desc: "Alur: Kontraktor → SPV → Admin K3 → SFO → SMR" },
                   ].map((opt) => (
-                    <label key={opt.value} className={`flex flex-col gap-1 p-3 rounded-xl border-2 transition-all ${tipePerusahaan === opt.value ? "border-orange-400 bg-orange-50" : "border-slate-200 hover:border-orange-200"} ${idIjinKerja ? "cursor-not-allowed opacity-60" : "cursor-pointer"}`}>
+                    <label key={opt.value} className={`flex flex-col gap-1 p-3 rounded-xl border-2 transition-all ${tipePerusahaan === opt.value ? "border-orange-400 bg-orange-50" : "border-slate-200 hover:border-orange-200"} ${opt.value === "eksternal" || idIjinKerja ? "cursor-not-allowed opacity-60" : "cursor-pointer"}`}>
                       <div className="flex items-center gap-2">
                         <input
                           type="radio"
                           name="tipePerusahaan"
                           value={opt.value}
                           checked={tipePerusahaan === opt.value}
-                          disabled={!!idIjinKerja}
+                          disabled={opt.value === "eksternal" || !!idIjinKerja}
                           onChange={() => {
                             const val = opt.value as "internal" | "eksternal";
                             setTipePerusahaan(val);
@@ -618,6 +658,50 @@ function HeightWorkFormPageInner() {
                 <div className={`mt-3 px-3 py-2 rounded-lg text-xs ${tipePerusahaan === "eksternal" ? "bg-purple-50 text-purple-700 border border-purple-200" : "bg-blue-50 text-blue-700 border border-blue-200"}`}>
                   <strong>Alur approval yang akan diterapkan:</strong>
                   <span className="ml-1">{tipePerusahaan === "eksternal" ? "Kontraktor → SPV → Admin K3 → SFO → SMR / PGA SMGR" : "SPV → Admin K3 → SFO → SMR / PGA SMGR"}</span>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">
+                  Pemberi Izin (SPV) <span className="text-red-500">*</span>
+                </label>
+                <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                  <div className="flex items-start gap-2 bg-green-100 border border-green-300 rounded-lg px-3 py-2.5 mb-4">
+                    <Lock className="w-4 h-4 text-green-600 shrink-0 mt-0.5" />
+                    <p className="text-xs text-green-700">Pilih SPV yang sesuai dari departemen Anda. NIK dan jabatan akan muncul otomatis.</p>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-semibold text-slate-700 mb-2">Nama SPV / Pemberi Izin <span className="text-red-500">*</span></label>
+                      <select
+                        value={spvPemberiIzin.nama}
+                        onChange={(e) => {
+                          const selected = spvOptions.find((spv) => spv.nama === e.target.value);
+                          setSpvPemberiIzin({
+                            nama: selected?.nama ?? "",
+                            nik: selected?.nik ?? "",
+                            jabatan: selected?.jabatan ?? "",
+                          });
+                        }}
+                        required
+                        className={`w-full px-4 py-2.5 border ${spvPemberiIzin.nama ? "border-slate-300" : "border-red-300 bg-red-50"} rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent text-black`}
+                      >
+                        <option value="">-- Pilih SPV --</option>
+                        {spvOptions.map((spv) => (
+                          <option key={spv.id} value={spv.nama}>{spv.nama}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-slate-700 mb-2">NIK SPV</label>
+                      <input
+                        type="text"
+                        value={spvPemberiIzin.nik}
+                        readOnly
+                        className="w-full px-4 py-2.5 border border-slate-300 rounded-lg bg-slate-100 text-slate-600 text-sm"
+                      />
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -664,7 +748,9 @@ function HeightWorkFormPageInner() {
               {/* Nama Departemen & Nama Pengawas Departemen — hanya untuk pekerja INTERNAL.
                   Eksternal cukup pakai Nama Pengawas Kontraktor di atas.
                   Departemen yang dipilih di sini JUGA dipakai untuk memfilter
-                  dropdown pekerja di Bagian 2 (lihat useEffect workerOptions). */}
+                  dropdown pekerja di Bagian 2 (lihat useEffect workerOptions),
+                  dan JUGA otomatis mengisi Sect/Dept pada JSA (lihat useEffect
+                  auto-isi Sect/Dept di atas). */}
               {tipePerusahaan === "internal" && (
                 <>
                   <div>
@@ -1015,7 +1101,9 @@ function HeightWorkFormPageInner() {
               setEnabled={setPerluJsa}
               value={jsaData}
               setValue={setJsaData}
-            /> : <JsaUploadSection
+            /> : <JsaMethodSection
+              mode={jsaMode}
+              setMode={setJsaMode}
               perluJsa={perluJsa}
               setPerluJsa={setPerluJsa}
               jsaFile={jsaFile}
@@ -1024,6 +1112,8 @@ function HeightWorkFormPageInner() {
               setJsaUploadStatus={setJsaUploadStatus}
               jsaUploadError={jsaUploadError}
               setJsaUploadError={setJsaUploadError}
+              jsaData={jsaData}
+              setJsaData={setJsaData}
               sectionTitle="Bagian 6: Upload JSA"
               sectionStyle="height-work"
             />}

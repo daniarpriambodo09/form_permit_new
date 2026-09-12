@@ -11,6 +11,7 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, Legend,
   ResponsiveContainer, Cell,
 } from "recharts";
+import Sidebar from "@/components/Sidebar";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface Permit {
@@ -228,12 +229,16 @@ export default function DashboardPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <RefreshCw className="w-12 h-12 text-orange-500 animate-spin mx-auto mb-4" />
-          <p className="text-gray-600">Memuat data dashboard...</p>
+      <div className="min-h-screen bg-gray-50">
+        <Sidebar />
+        <div style={{ paddingLeft: "var(--sidebar-width, 0px)" }} className="transition-[padding] duration-300 flex items-center justify-center min-h-screen">
+          <div className="text-center">
+            <RefreshCw className="w-12 h-12 text-orange-500 animate-spin mx-auto mb-4" />
+            <p className="text-gray-600">Memuat data dashboard...</p>
+          </div>
         </div>
       </div>
+
     );
   }
 
@@ -241,332 +246,259 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <Sidebar />
       {/* Header */}
-      <header className="bg-white border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              {/* ✅ HOME ICON - Admin ke /home, lainnya ke /approval */}
-              <Link 
-                href={userRole === 'admin' ? '/home' : '/approval'}
-                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-                title="Kembali ke Home"
-              >
-                <Home className="w-5 h-5 text-gray-600" />
-              </Link>
+      <div style={{ paddingLeft: "var(--sidebar-width, 0px)" }} className="transition-[padding] duration-300">
+        <header className="bg-white border-b border-gray-200">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                {/* ✅ HOME ICON - Admin ke /home, lainnya ke /approval */}
+                <Link 
+                  href={userRole === 'admin' ? '/home' : '/approval'}
+                  className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                  title="Kembali ke Home"
+                >
+                  <Home className="w-5 h-5 text-gray-600" />
+                </Link>
+                
+                <div>
+                  <h1 className="text-2xl font-bold text-gray-900">Dashboard Analitik</h1>
+                  <p className="text-sm text-gray-600">
+                    Visualisasi Data Permintaan Izin Kerja — PT Jatim Autocomp Indonesia
+                  </p>
+                </div>
+              </div>
               
-              <div>
-                <h1 className="text-2xl font-bold text-gray-900">Dashboard Analitik</h1>
-                <p className="text-sm text-gray-600">
-                  Visualisasi Data Permintaan Izin Kerja — PT Jatim Autocomp Indonesia
-                </p>
-              </div>
+              <button 
+                onClick={loadPermits} 
+                disabled={loading}
+                className="p-2 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50"
+                title="Refresh data"
+              >
+                <RefreshCw className={`w-5 h-5 text-gray-500 ${loading ? 'animate-spin' : ''}`} />
+              </button>
             </div>
-            
-            <button 
-              onClick={loadPermits} 
-              disabled={loading}
-              className="p-2 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50"
-              title="Refresh data"
-            >
-              <RefreshCw className={`w-5 h-5 text-gray-500 ${loading ? 'animate-spin' : ''}`} />
-            </button>
           </div>
-        </div>
-      </header>
-
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Filter Section */}
-        <div className="bg-white rounded-xl shadow-sm p-6 mb-8 border border-gray-200">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Tahun</label>
-              <div className="relative">
-                <select 
-                  value={selectedYear}
-                  onChange={e => { 
-                    setSelectedYear(e.target.value); 
-                    setSelectedMonth(""); 
-                    setSelectedDay(""); 
-                  }}
-                  className={selCls}
-                >
-                  <option value="">Pilih Tahun</option>
-                  {availableYears.map(y => <option key={y} value={y}>{y}</option>)}
-                </select>
-                <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Periode</label>
-              <div className="relative">
-                <select 
-                  value={period}
-                  onChange={e => { 
-                    setPeriod(e.target.value as Period); 
-                    setSelectedMonth(""); 
-                    setSelectedDay(""); 
-                  }}
-                  className={selCls}
-                >
-                  <option value="daily">Harian (Daily)</option>
-                  <option value="weekly">Mingguan (Weekly)</option>
-                  <option value="monthly">Bulanan (Monthly)</option>
-                  <option value="yearly">Tahunan (Yearly)</option>
-                </select>
-                <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
-              </div>
-            </div>
-
-            {period === "monthly" && (
+        </header>
+        
+        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          {/* Filter Section */}
+          <div className="bg-white rounded-xl shadow-sm p-6 mb-8 border border-gray-200">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Bulan</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Tahun</label>
                 <div className="relative">
                   <select 
-                    value={selectedMonth}
-                    onChange={e => setSelectedMonth(e.target.value)}
+                    value={selectedYear}
+                    onChange={e => { 
+                      setSelectedYear(e.target.value); 
+                      setSelectedMonth(""); 
+                      setSelectedDay(""); 
+                    }}
                     className={selCls}
                   >
-                    <option value="">Semua Bulan</option>
-                    {availableMonths.map(m => (
-                      <option key={m} value={String(m).padStart(2, "0")}>
-                        {monthNames[m - 1]}
-                      </option>
-                    ))}
+                    <option value="">Pilih Tahun</option>
+                    {availableYears.map(y => <option key={y} value={y}>{y}</option>)}
                   </select>
                   <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
                 </div>
               </div>
-            )}
 
-            {period === "daily" && (
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Tanggal</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Periode</label>
                 <div className="relative">
                   <select 
-                    value={selectedDay}
-                    onChange={e => setSelectedDay(e.target.value)}
+                    value={period}
+                    onChange={e => { 
+                      setPeriod(e.target.value as Period); 
+                      setSelectedMonth(""); 
+                      setSelectedDay(""); 
+                    }}
                     className={selCls}
                   >
-                    <option value="">Pilih Tanggal</option>
-                    {availableDays.map(day => (
-                      <option key={day} value={day}>
-                        {new Date(day).toLocaleDateString("id-ID", { 
-                          day: "numeric", 
-                          month: "long", 
-                          year: "numeric" 
-                        })}
-                      </option>
-                    ))}
+                    <option value="daily">Harian (Daily)</option>
+                    <option value="weekly">Mingguan (Weekly)</option>
+                    <option value="monthly">Bulanan (Monthly)</option>
+                    <option value="yearly">Tahunan (Yearly)</option>
                   </select>
                   <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
                 </div>
               </div>
-            )}
-          </div>
-        </div>
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-5 mb-8">
-          <div className="bg-white rounded-xl shadow-sm p-5 border border-gray-200">
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-gray-500 text-xs font-medium mb-2 uppercase tracking-wide">Total Izin</p>
-                <p className="text-3xl font-bold text-gray-900">{filteredForCards.length}</p>
-                <p className="text-xs text-gray-400 mt-1">dari {permits.length} total</p>
-              </div>
-              <div className="p-2.5 bg-red-100 rounded-lg">
-                <TrendingUp className="w-5 h-5 text-red-500" />
-              </div>
-            </div>
-          </div>
-
-          <div 
-            onClick={() => toggleJenis("hot-work")}
-            className={`bg-white rounded-xl shadow-sm p-5 border cursor-pointer transition-all ${
-              selectedJenis === "hot-work" 
-                ? "border-orange-500 ring-2 ring-orange-200 bg-orange-50" 
-                : "border-gray-200 hover:border-orange-300"
-            }`}
-          >
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-gray-500 text-xs font-medium mb-2 uppercase tracking-wide">Hot Work</p>
-                <p className="text-3xl font-bold text-gray-900">
-                  {filteredForCards.filter(p => p.jenisForm === "hot-work").length}
-                </p>
-                <p className="text-xs text-gray-400 mt-1">Pekerjaan panas</p>
-              </div>
-              <div className="p-2.5 bg-orange-100 rounded-lg">
-                <Flame className="w-5 h-5 text-orange-500" />
-              </div>
-            </div>
-          </div>
-          <div 
-            onClick={() => toggleJenis("height-work")}
-            className={`bg-white rounded-xl shadow-sm p-5 border cursor-pointer transition-all ${
-              selectedJenis === "height-work" 
-                ? "border-blue-500 ring-2 ring-blue-200 bg-blue-50" 
-                : "border-gray-200 hover:border-blue-300"
-            }`}
-          >
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-gray-500 text-xs font-medium mb-2 uppercase tracking-wide">Height Work</p>
-                <p className="text-3xl font-bold text-gray-900">
-                  {filteredForCards.filter(p => p.jenisForm === "height-work").length}
-                </p>
-                <p className="text-xs text-gray-400 mt-1">Pekerjaan ketinggian</p>
-              </div>
-              <div className="p-2.5 bg-blue-100 rounded-lg">
-                <AlertTriangle className="w-5 h-5 text-blue-500" />
-              </div>
-            </div>
-          </div>
-
-          <div 
-            onClick={() => toggleJenis("workshop")}
-            className={`bg-white rounded-xl shadow-sm p-5 border cursor-pointer transition-all ${
-              selectedJenis === "workshop" 
-                ? "border-green-500 ring-2 ring-green-200 bg-green-50" 
-                : "border-gray-200 hover:border-green-300"
-            }`}
-          >
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-gray-500 text-xs font-medium mb-2 uppercase tracking-wide">Workshop</p>
-                <p className="text-3xl font-bold text-gray-900">
-                  {filteredForCards.filter(p => p.jenisForm === "workshop").length}
-                </p>
-                <p className="text-xs text-gray-400 mt-1">Workshop</p>
-              </div>
-              <div className="p-2.5 bg-green-100 rounded-lg">
-                <Shield className="w-5 h-5 text-green-500" />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Empty State */}
-        {filtered.length === 0 && (
-          <div className="bg-white rounded-xl border border-gray-200 p-12 text-center mb-8">
-            <BarChart2 className="w-12 h-12 text-gray-200 mx-auto mb-3" />
-            <p className="text-gray-500 font-medium">Tidak ada data untuk filter yang dipilih</p>
-            <p className="text-gray-400 text-sm mt-1">Coba ubah tahun, periode, atau jenis form</p>
-          </div>
-        )}
-
-        {/* Line Chart */}
-        <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-200 mb-6">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-base font-semibold text-gray-900">Tren Permintaan Izin</h3>
-            <span className="text-xs text-gray-400 bg-gray-100 px-2 py-1 rounded-full">
-              berdasarkan tanggal pengisian
-            </span>
-          </div>
-          <div className="h-72">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={lineData} margin={{ bottom: 15, left: 10 }}>
-                <CartesianGrid stroke="#f0f0f0" strokeDasharray="3 3" />
-                <XAxis 
-                  dataKey="name" 
-                  stroke="#999" 
-                  tick={{ fontSize: 11, fill: "#9ca3af" }}
-                  label={{
-                    value: period === "daily" ? "Jam" : period === "weekly" ? "Hari" : period === "monthly" ? "Tanggal" : "Bulan",
-                    position: "insideBottom", 
-                    offset: -10, 
-                    style: { fill: "#9ca3af", fontSize: 12 },
-                  }}
-                />
-                <YAxis 
-                  stroke="#999" 
-                  tick={{ fontSize: 11, fill: "#9ca3af" }} 
-                  allowDecimals={false}
-                  label={{ 
-                    value: "Jumlah Izin", 
-                    angle: -90, 
-                    position: "insideLeft", 
-                    offset: -5, 
-                    style: { fill: "#9ca3af", fontSize: 11 } 
-                  }}
-                />
-                <Tooltip 
-                  contentStyle={{ 
-                    backgroundColor: "#fff", 
-                    border: "1px solid #e5e7eb", 
-                    borderRadius: "8px" 
-                  }} 
-                />
-                <Line 
-                  type="monotone" 
-                  dataKey="jumlah" 
-                  stroke="#f97316" 
-                  strokeWidth={3}
-                  dot={{ r: 4, fill: "#f97316", strokeWidth: 2, stroke: "#fff" }}
-                  activeDot={{ r: 6 }} 
-                  name="Jumlah"
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-
-        {/* Pie + Bar Charts */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-          {/* Pie Chart */}
-          <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-200 flex flex-col">
-            <h3 className="text-base font-semibold text-gray-900 mb-4">Distribusi Jenis Izin</h3>
-            <div className="flex-1 min-h-[240px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie 
-                    data={pieData} 
-                    cx="50%" 
-                    cy="50%" 
-                    innerRadius={55} 
-                    outerRadius={95} 
-                    dataKey="value"
-                  >
-                    {pieData.map((e, i) => <Cell key={i} fill={e.fill} />)}
-                  </Pie>
-                  <Tooltip 
-                    contentStyle={{ 
-                      backgroundColor: "#fff", 
-                      border: "1px solid #e5e7eb", 
-                      borderRadius: "8px" 
-                    }} 
-                  />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
-            <div className="mt-3 space-y-2.5 border-t border-gray-100 pt-3">
-              {[
-                { name: "Hot Work", color: "text-red-500", dot: "bg-[#FF6B6B]" },
-                { name: "Height Work", color: "text-cyan-500", dot: "bg-[#06B6D4]" },
-                { name: "Workshop", color: "text-emerald-500", dot: "bg-[#10B981]" },
-              ].map(item => (
-                <div key={item.name} className="flex items-center justify-between text-sm">
-                  <div className="flex items-center gap-2">
-                    <span className={`w-3 h-3 rounded-full ${item.dot}`} />
-                    <span className="text-gray-600">{item.name}</span>
+              {period === "monthly" && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Bulan</label>
+                  <div className="relative">
+                    <select 
+                      value={selectedMonth}
+                      onChange={e => setSelectedMonth(e.target.value)}
+                      className={selCls}
+                    >
+                      <option value="">Semua Bulan</option>
+                      {availableMonths.map(m => (
+                        <option key={m} value={String(m).padStart(2, "0")}>
+                          {monthNames[m - 1]}
+                        </option>
+                      ))}
+                    </select>
+                    <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
                   </div>
-                  <span className={`font-bold ${item.color}`}>{pct(item.name)}%</span>
                 </div>
-              ))}
+              )}
+
+              {period === "daily" && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Tanggal</label>
+                  <div className="relative">
+                    <select 
+                      value={selectedDay}
+                      onChange={e => setSelectedDay(e.target.value)}
+                      className={selCls}
+                    >
+                      <option value="">Pilih Tanggal</option>
+                      {availableDays.map(day => (
+                        <option key={day} value={day}>
+                          {new Date(day).toLocaleDateString("id-ID", { 
+                            day: "numeric", 
+                            month: "long", 
+                            year: "numeric" 
+                          })}
+                        </option>
+                      ))}
+                    </select>
+                    <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
-          {/* Bar Chart */}
-          <div className="lg:col-span-2 bg-white rounded-xl shadow-sm p-6 border border-gray-200 flex flex-col">
-            <h3 className="text-base font-semibold text-gray-900 mb-4">Perbandingan Jenis Izin</h3>
-            <div className="flex-1 min-h-[240px]">
+          {/* Stats Cards */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-5 mb-8">
+            <div className="bg-white rounded-xl shadow-sm p-5 border border-gray-200">
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-gray-500 text-xs font-medium mb-2 uppercase tracking-wide">Total Izin</p>
+                  <p className="text-3xl font-bold text-gray-900">{filteredForCards.length}</p>
+                  <p className="text-xs text-gray-400 mt-1">dari {permits.length} total</p>
+                </div>
+                <div className="p-2.5 bg-red-100 rounded-lg">
+                  <TrendingUp className="w-5 h-5 text-red-500" />
+                </div>
+              </div>
+            </div>
+
+            <div 
+              onClick={() => toggleJenis("hot-work")}
+              className={`bg-white rounded-xl shadow-sm p-5 border cursor-pointer transition-all ${
+                selectedJenis === "hot-work" 
+                  ? "border-orange-500 ring-2 ring-orange-200 bg-orange-50" 
+                  : "border-gray-200 hover:border-orange-300"
+              }`}
+            >
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-gray-500 text-xs font-medium mb-2 uppercase tracking-wide">Hot Work</p>
+                  <p className="text-3xl font-bold text-gray-900">
+                    {filteredForCards.filter(p => p.jenisForm === "hot-work").length}
+                  </p>
+                  <p className="text-xs text-gray-400 mt-1">Pekerjaan panas</p>
+                </div>
+                <div className="p-2.5 bg-orange-100 rounded-lg">
+                  <Flame className="w-5 h-5 text-orange-500" />
+                </div>
+              </div>
+            </div>
+            <div 
+              onClick={() => toggleJenis("height-work")}
+              className={`bg-white rounded-xl shadow-sm p-5 border cursor-pointer transition-all ${
+                selectedJenis === "height-work" 
+                  ? "border-blue-500 ring-2 ring-blue-200 bg-blue-50" 
+                  : "border-gray-200 hover:border-blue-300"
+              }`}
+            >
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-gray-500 text-xs font-medium mb-2 uppercase tracking-wide">Height Work</p>
+                  <p className="text-3xl font-bold text-gray-900">
+                    {filteredForCards.filter(p => p.jenisForm === "height-work").length}
+                  </p>
+                  <p className="text-xs text-gray-400 mt-1">Pekerjaan ketinggian</p>
+                </div>
+                <div className="p-2.5 bg-blue-100 rounded-lg">
+                  <AlertTriangle className="w-5 h-5 text-blue-500" />
+                </div>
+              </div>
+            </div>
+
+            <div 
+              onClick={() => toggleJenis("workshop")}
+              className={`bg-white rounded-xl shadow-sm p-5 border cursor-pointer transition-all ${
+                selectedJenis === "workshop" 
+                  ? "border-green-500 ring-2 ring-green-200 bg-green-50" 
+                  : "border-gray-200 hover:border-green-300"
+              }`}
+            >
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-gray-500 text-xs font-medium mb-2 uppercase tracking-wide">Workshop</p>
+                  <p className="text-3xl font-bold text-gray-900">
+                    {filteredForCards.filter(p => p.jenisForm === "workshop").length}
+                  </p>
+                  <p className="text-xs text-gray-400 mt-1">Workshop</p>
+                </div>
+                <div className="p-2.5 bg-green-100 rounded-lg">
+                  <Shield className="w-5 h-5 text-green-500" />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Empty State */}
+          {filtered.length === 0 && (
+            <div className="bg-white rounded-xl border border-gray-200 p-12 text-center mb-8">
+              <BarChart2 className="w-12 h-12 text-gray-200 mx-auto mb-3" />
+              <p className="text-gray-500 font-medium">Tidak ada data untuk filter yang dipilih</p>
+              <p className="text-gray-400 text-sm mt-1">Coba ubah tahun, periode, atau jenis form</p>
+            </div>
+          )}
+
+          {/* Line Chart */}
+          <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-200 mb-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-base font-semibold text-gray-900">Tren Permintaan Izin</h3>
+              <span className="text-xs text-gray-400 bg-gray-100 px-2 py-1 rounded-full">
+                berdasarkan tanggal pengisian
+              </span>
+            </div>
+            <div className="h-72">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={barData} barSize={48}>
+                <LineChart data={lineData} margin={{ bottom: 15, left: 10 }}>
                   <CartesianGrid stroke="#f0f0f0" strokeDasharray="3 3" />
-                  <XAxis dataKey="name" stroke="#999" tick={{ fontSize: 12, fill: "#9ca3af" }} />
-                  <YAxis stroke="#999" tick={{ fontSize: 12, fill: "#9ca3af" }} allowDecimals={false} />
+                  <XAxis 
+                    dataKey="name" 
+                    stroke="#999" 
+                    tick={{ fontSize: 11, fill: "#9ca3af" }}
+                    label={{
+                      value: period === "daily" ? "Jam" : period === "weekly" ? "Hari" : period === "monthly" ? "Tanggal" : "Bulan",
+                      position: "insideBottom", 
+                      offset: -10, 
+                      style: { fill: "#9ca3af", fontSize: 12 },
+                    }}
+                  />
+                  <YAxis 
+                    stroke="#999" 
+                    tick={{ fontSize: 11, fill: "#9ca3af" }} 
+                    allowDecimals={false}
+                    label={{ 
+                      value: "Jumlah Izin", 
+                      angle: -90, 
+                      position: "insideLeft", 
+                      offset: -5, 
+                      style: { fill: "#9ca3af", fontSize: 11 } 
+                    }}
+                  />
                   <Tooltip 
                     contentStyle={{ 
                       backgroundColor: "#fff", 
@@ -574,88 +506,164 @@ export default function DashboardPage() {
                       borderRadius: "8px" 
                     }} 
                   />
-                  <Legend />
-                  <Bar dataKey="jumlah" name="Jumlah Izin" radius={[8, 8, 0, 0]}>
-                    {barData.map((_, i) => (
-                      <Cell key={i} fill={["#FF6B6B", "#06B6D4", "#10B981"][i]} />
-                    ))}
-                  </Bar>
-                </BarChart>
+                  <Line 
+                    type="monotone" 
+                    dataKey="jumlah" 
+                    stroke="#f97316" 
+                    strokeWidth={3}
+                    dot={{ r: 4, fill: "#f97316", strokeWidth: 2, stroke: "#fff" }}
+                    activeDot={{ r: 6 }} 
+                    name="Jumlah"
+                  />
+                </LineChart>
               </ResponsiveContainer>
             </div>
           </div>
-        </div>
 
-        {/* Summary Table */}
-        <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-200">
-          <h3 className="text-base font-semibold text-gray-900 mb-4">Ringkasan Status</h3>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-gray-100">
-                  <th className="text-left py-2 px-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Jenis Form</th>
-                  <th className="text-right py-2 px-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Draft</th>
-                  <th className="text-right py-2 px-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Diajukan</th>
-                  <th className="text-right py-2 px-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Disetujui</th>
-                  <th className="text-right py-2 px-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Ditolak</th>
-                  <th className="text-right py-2 px-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Total</th>
-                </tr>
-              </thead>
-              <tbody>
+          {/* Pie + Bar Charts */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+            {/* Pie Chart */}
+            <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-200 flex flex-col">
+              <h3 className="text-base font-semibold text-gray-900 mb-4">Distribusi Jenis Izin</h3>
+              <div className="flex-1 min-h-[240px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie 
+                      data={pieData} 
+                      cx="50%" 
+                      cy="50%" 
+                      innerRadius={55} 
+                      outerRadius={95} 
+                      dataKey="value"
+                    >
+                      {pieData.map((e, i) => <Cell key={i} fill={e.fill} />)}
+                    </Pie>
+                    <Tooltip 
+                      contentStyle={{ 
+                        backgroundColor: "#fff", 
+                        border: "1px solid #e5e7eb", 
+                        borderRadius: "8px" 
+                      }} 
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+              <div className="mt-3 space-y-2.5 border-t border-gray-100 pt-3">
                 {[
-                  { key: "hot-work", label: "Hot Work", color: "text-red-600", bg: "bg-red-50" },
-                  { key: "height-work", label: "Height Work", color: "text-blue-600", bg: "bg-blue-50" },
-                  { key: "workshop", label: "Workshop", color: "text-green-600", bg: "bg-green-50" },
-                ].map(row => {
-                  const subset = filtered.filter(p => p.jenisForm === row.key);
-                  return (
-                    <tr key={row.key} className="border-b border-gray-50 hover:bg-gray-50 transition-colors">
-                      <td className="py-3 px-3">
-                        <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${row.bg} ${row.color}`}>
-                          {row.label}
-                        </span>
-                      </td>
-                      <td className="text-right py-3 px-3 text-gray-600">
-                        {subset.filter(p => p.status === "draft").length}
-                      </td>
-                      <td className="text-right py-3 px-3 text-blue-600 font-medium">
-                        {subset.filter(p => p.status === "submitted").length}
-                      </td>
-                      <td className="text-right py-3 px-3 text-green-600 font-medium">
-                        {subset.filter(p => p.status === "approved").length}
-                      </td>
-                      <td className="text-right py-3 px-3 text-red-500 font-medium">
-                        {subset.filter(p => p.status === "rejected").length}
-                      </td>
-                      <td className="text-right py-3 px-3 font-bold text-gray-900">
-                        {subset.length}
-                      </td>
-                    </tr>
-                  );
-                })}
-                <tr className="bg-gray-50 font-semibold">
-                  <td className="py-3 px-3 text-gray-700">Total</td>
-                  <td className="text-right py-3 px-3">
-                    {filtered.filter(p => p.status === "draft").length}
-                  </td>
-                  <td className="text-right py-3 px-3 text-blue-600">
-                    {filtered.filter(p => p.status === "submitted").length}
-                  </td>
-                  <td className="text-right py-3 px-3 text-green-600">
-                    {filtered.filter(p => p.status === "approved").length}
-                  </td>
-                  <td className="text-right py-3 px-3 text-red-500">
-                    {filtered.filter(p => p.status === "rejected").length}
-                  </td>
-                  <td className="text-right py-3 px-3 text-gray-900 font-bold">
-                    {filtered.length}
-                  </td>
-                </tr>
-              </tbody>
-            </table>
+                  { name: "Hot Work", color: "text-red-500", dot: "bg-[#FF6B6B]" },
+                  { name: "Height Work", color: "text-cyan-500", dot: "bg-[#06B6D4]" },
+                  { name: "Workshop", color: "text-emerald-500", dot: "bg-[#10B981]" },
+                ].map(item => (
+                  <div key={item.name} className="flex items-center justify-between text-sm">
+                    <div className="flex items-center gap-2">
+                      <span className={`w-3 h-3 rounded-full ${item.dot}`} />
+                      <span className="text-gray-600">{item.name}</span>
+                    </div>
+                    <span className={`font-bold ${item.color}`}>{pct(item.name)}%</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Bar Chart */}
+            <div className="lg:col-span-2 bg-white rounded-xl shadow-sm p-6 border border-gray-200 flex flex-col">
+              <h3 className="text-base font-semibold text-gray-900 mb-4">Perbandingan Jenis Izin</h3>
+              <div className="flex-1 min-h-[240px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={barData} barSize={48}>
+                    <CartesianGrid stroke="#f0f0f0" strokeDasharray="3 3" />
+                    <XAxis dataKey="name" stroke="#999" tick={{ fontSize: 12, fill: "#9ca3af" }} />
+                    <YAxis stroke="#999" tick={{ fontSize: 12, fill: "#9ca3af" }} allowDecimals={false} />
+                    <Tooltip 
+                      contentStyle={{ 
+                        backgroundColor: "#fff", 
+                        border: "1px solid #e5e7eb", 
+                        borderRadius: "8px" 
+                      }} 
+                    />
+                    <Legend />
+                    <Bar dataKey="jumlah" name="Jumlah Izin" radius={[8, 8, 0, 0]}>
+                      {barData.map((_, i) => (
+                        <Cell key={i} fill={["#FF6B6B", "#06B6D4", "#10B981"][i]} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
           </div>
-        </div>
-      </main>
+
+          {/* Summary Table */}
+          <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-200">
+            <h3 className="text-base font-semibold text-gray-900 mb-4">Ringkasan Status</h3>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-gray-100">
+                    <th className="text-left py-2 px-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Jenis Form</th>
+                    <th className="text-right py-2 px-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Draft</th>
+                    <th className="text-right py-2 px-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Diajukan</th>
+                    <th className="text-right py-2 px-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Disetujui</th>
+                    <th className="text-right py-2 px-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Ditolak</th>
+                    <th className="text-right py-2 px-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {[
+                    { key: "hot-work", label: "Hot Work", color: "text-red-600", bg: "bg-red-50" },
+                    { key: "height-work", label: "Height Work", color: "text-blue-600", bg: "bg-blue-50" },
+                    { key: "workshop", label: "Workshop", color: "text-green-600", bg: "bg-green-50" },
+                  ].map(row => {
+                    const subset = filtered.filter(p => p.jenisForm === row.key);
+                    return (
+                      <tr key={row.key} className="border-b border-gray-50 hover:bg-gray-50 transition-colors">
+                        <td className="py-3 px-3">
+                          <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${row.bg} ${row.color}`}>
+                            {row.label}
+                          </span>
+                        </td>
+                        <td className="text-right py-3 px-3 text-gray-600">
+                          {subset.filter(p => p.status === "draft").length}
+                        </td>
+                        <td className="text-right py-3 px-3 text-blue-600 font-medium">
+                          {subset.filter(p => p.status === "submitted").length}
+                        </td>
+                        <td className="text-right py-3 px-3 text-green-600 font-medium">
+                          {subset.filter(p => p.status === "approved").length}
+                        </td>
+                        <td className="text-right py-3 px-3 text-red-500 font-medium">
+                          {subset.filter(p => p.status === "rejected").length}
+                        </td>
+                        <td className="text-right py-3 px-3 font-bold text-gray-900">
+                          {subset.length}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                  <tr className="bg-gray-50 font-semibold">
+                    <td className="py-3 px-3 text-gray-700">Total</td>
+                    <td className="text-right py-3 px-3">
+                      {filtered.filter(p => p.status === "draft").length}
+                    </td>
+                    <td className="text-right py-3 px-3 text-blue-600">
+                      {filtered.filter(p => p.status === "submitted").length}
+                    </td>
+                    <td className="text-right py-3 px-3 text-green-600">
+                      {filtered.filter(p => p.status === "approved").length}
+                    </td>
+                    <td className="text-right py-3 px-3 text-red-500">
+                      {filtered.filter(p => p.status === "rejected").length}
+                    </td>
+                    <td className="text-right py-3 px-3 text-gray-900 font-bold">
+                      {filtered.length}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </main>
+      </div>
     </div>
   );
 }

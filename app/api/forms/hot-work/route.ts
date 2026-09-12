@@ -88,6 +88,9 @@ export async function POST(req: NextRequest) {
 
     // ── Relasi Ijin Kerja Eksternal (opsional) ───────────────────────────
     const idIjinKerja: string | null = f.idIjinKerja || null;
+    if (f.tipePerusahaan === 'eksternal' && !idIjinKerja) {
+      return NextResponse.json({ error: 'Form eksternal harus dibuat melalui Ijin Kerja Eksternal.' }, { status: 400 });
+    }
     let tipePerusahaan: 'internal' | 'eksternal' =
       f.tipePerusahaan === 'eksternal' ? 'eksternal' : 'internal';
 
@@ -118,9 +121,14 @@ export async function POST(req: NextRequest) {
     const startStage = 1;
     const status = isSubmit ? 'submitted' : 'draft';
 
+    const selectedSpvName = (f.spvPemberiIzin?.nama ?? null)?.toString().trim() || null;
+    const selectedSpvNik = (f.spvPemberiIzin?.nik ?? null)?.toString().trim() || null;
+    const selectedSpvJabatan = (f.spvPemberiIzin?.jabatan ?? null)?.toString().trim() || null;
+
     // JSA fields
     const perluJsa   = f.perluJsa === true;
     const jsaFileUrl = perluJsa ? (f.jsaFileUrl || null) : null;
+    const jsaData = f.jsaData && typeof f.jsaData === 'object' ? f.jsaData : null;
     const linkedJsaData = idIjinKerja && f.jsaData && typeof f.jsaData === 'object' ? f.jsaData : null;
     if (idIjinKerja && isSubmit && perluJsa && (!linkedJsaData || !String(linkedJsaData.area || '').trim() || !String(linkedJsaData.jenisPekerjaan || '').trim() || !String(linkedJsaData.pic || '').trim() || !Array.isArray(linkedJsaData.petugas) || !linkedJsaData.petugas.some((name: unknown) => typeof name === 'string' && name.trim()))) {
       return NextResponse.json({ error: 'JSA terhubung harus memiliki Area, Jenis Pekerjaan, PIC, dan minimal satu Petugas.' }, { status: 400 });
@@ -152,7 +160,7 @@ export async function POST(req: NextRequest) {
         kondisi_fire_blanket, jumlah_fire_blanket, permintaan_tambahan,
         spv_terkait, kontraktor, sfo, pga,
         perlu_jsa, jsa_file_url,
-        edit_token, user_id, id_ijin_kerja
+        edit_token, user_id, id_ijin_kerja, jsa_data
       ) VALUES (
         $1,$2,$3,$4,$5,$6,
         $7,$8,$9,$10,$11,
@@ -166,16 +174,16 @@ export async function POST(req: NextRequest) {
         $57,$58,$59,
         $60,$61,$62,$63,
         $64,$65,
-        $66,$67,$68
+        $66,$67,$68,$69
       )`,
       [
         idForm, now,
         f.tanggalPelaksanaan ? new Date(f.tanggalPelaksanaan).toISOString() : null,
         status, tipePerusahaan, startStage,
-        f.noRegistrasi   || null, f.namaKontraktor || null, f.namaPekerjaNIK || null,
+        idForm, f.namaKontraktor || null, f.namaPekerjaNIK || null,
         f.lokasi         || null, f.waktuPukul     || null,
         f.namaFireWatch  || null, f.nikFireWatch   || null, '',
-        null, null,
+        selectedSpvJabatan, selectedSpvNik,
         f.jenisPekerjaan?.preventive ?? false,
         f.jenisPekerjaan?.tangki     ?? false,
         f.jenisPekerjaan?.panel      ?? false,
@@ -216,9 +224,12 @@ export async function POST(req: NextRequest) {
         f.pencegahan?.fireblank === 'layak',
         f.pencegahan?.fireblank_jumlah ? parseInt(f.pencegahan.fireblank_jumlah) : null,
         f.pencegahan?.permintaan_tambahan || null,
-        null, null, null, null,
+        selectedSpvName,
+        null,
+        null,
+        null,
         perluJsa, jsaFileUrl,
-        editToken, userId ?? null, idIjinKerja,
+        editToken, userId ?? null, idIjinKerja, jsaData ? JSON.stringify(jsaData) : null,
       ]
     );
 

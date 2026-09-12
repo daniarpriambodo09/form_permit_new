@@ -1,9 +1,18 @@
 // app/approval-verification/[jenisForm]/[id]/[role]/page.tsx
 // Halaman publik — tidak butuh login — untuk verifikasi QR Code approval.
 // URL: /approval-verification/hot-work/HW-20250601-001/spv
+//
+// REFACTOR: TIDAK LAGI fetch() ke NEXT_PUBLIC_APP_URL / URL publik aplikasi
+// sendiri. Server component ini sekarang memanggil getApprovalVerification()
+// langsung (in-process, satu proses Node yang sama), sehingga:
+//  - Tidak lagi butuh env NEXT_PUBLIC_APP_URL yang harus di-hardcode ke IP
+//    LAN (yang bisa berubah karena DHCP).
+//  - Tidak ada lagi "hairpin" request lewat reverse proxy publik yang bisa
+//    ECONNREFUSED kalau proxy belum siap / IP berubah / port diblokir.
 
 import { Metadata } from "next";
 import { Shield, ShieldCheck, ShieldX, Building2, MapPin, Calendar, Clock, User, Hash, Briefcase, CheckCircle, AlertTriangle } from "lucide-react";
+import { getApprovalVerification } from "@/lib/approval-verification";
 
 interface PageProps {
   params: Promise<{ jenisForm: string; id: string; role: string }>;
@@ -14,14 +23,14 @@ export const metadata: Metadata = {
   description: "Halaman verifikasi digital approval surat izin kerja PT Jatim Autocomp Indonesia",
 };
 
-const formatDate = (ts?: string) => {
+const formatDate = (ts?: string | null) => {
   if (!ts) return "-";
   return new Date(ts).toLocaleDateString("id-ID", {
     day: "2-digit", month: "long", year: "numeric",
   });
 };
 
-const formatTime = (ts?: string) => {
+const formatTime = (ts?: string | null) => {
   if (!ts) return "-";
   return new Date(ts).toLocaleTimeString("id-ID", {
     hour: "2-digit", minute: "2-digit", second: "2-digit", timeZoneName: "short", hour12: false,
@@ -34,37 +43,6 @@ const statusColors: Record<string, { bg: string; text: string; label: string }> 
   rejected:  { bg: "bg-red-100",    text: "text-red-800",    label: "DITOLAK" },
   draft:     { bg: "bg-slate-100",  text: "text-slate-800",  label: "DRAFT" },
 };
-
-async function fetchVerification(
-  jenisForm: string,
-  id: string,
-  role: string
-) {
-  const baseUrl =
-    process.env.NEXT_PUBLIC_APP_URL ||
-    "http://localhost:3100";
-
-  try {
-    const url =
-      `${baseUrl}/api/approval-verification/${jenisForm}/${id}/${role}`;
-
-    console.log("BASE URL:", baseUrl);
-    console.log("FETCH URL:", url);
-
-    const res = await fetch(url, {
-      cache: "no-store",
-    });
-
-    return await res.json();
-  } catch (error) {
-    console.error(error);
-
-    return {
-      success: false,
-      error: "Tidak dapat terhubung ke server",
-    };
-  }
-}
 
 // ── Info row helper ──────────────────────────────────────────
 function InfoRow({
@@ -93,7 +71,7 @@ function InfoRow({
 
 export default async function ApprovalVerificationPage({ params }: PageProps) {
   const { jenisForm, id, role } = await params;
-  const result = await fetchVerification(jenisForm, id, role);
+  const result = await getApprovalVerification(jenisForm, id, role);
 
   const verifiedAt = new Date().toLocaleString("id-ID", {
     day: "2-digit", month: "long", year: "numeric",

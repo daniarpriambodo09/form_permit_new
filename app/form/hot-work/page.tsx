@@ -4,7 +4,8 @@ import { useState, useEffect, Suspense } from "react";
 import Link from "next/link";
 import { ChevronDown, ChevronUp, Home, Flame, Save, Send, AlertCircle, Lock } from "lucide-react";
 import { getFireWatchByDept } from "@/lib/firewatch";
-import JsaUploadSection, { type JsaFileInfo, type JsaUploadStatus as JsaStatus } from "@/components/JsaUploadSection";
+import JsaMethodSection, { type JsaMode } from "@/components/JsaMethodSection";
+import { type JsaFileInfo, type JsaUploadStatus as JsaStatus } from "@/components/JsaUploadSection";
 import LinkedJsaSection, { createEmptyJsa } from "@/components/LinkedJsaSection";
 import type { JsaData } from "@/components/JsaBuilderSection";
 import TimeInput24, { normalizeTo24h } from "@/components/Time24Input";
@@ -121,6 +122,8 @@ function HotWorkPermitFormInner() {
   const [expanded, setExpanded] = useState({ bagian1: true, bagian2: true, bagian3: true, bagian4: true });
   const [user, setUser] = useState<any>(null);
   const [fireWatchList, setFireWatchList] = useState<Array<{ nama: string; nik: string }>>([]);
+  const [spvOptions, setSpvOptions] = useState<Array<{ id: number; nama: string; nik: string | null; jabatan: string | null; departmen: string | null }>>([]);
+  const [spvPemberiIzin, setSpvPemberiIzin] = useState<{ nama: string; nik: string; jabatan: string }>({ nama: "", nik: "", jabatan: "" });
   const [validationError, setValidationError] = useState<string>("");
 
   // ── JSA state ──────────────────────────────────────────────
@@ -129,6 +132,7 @@ function HotWorkPermitFormInner() {
   const [jsaUploadStatus, setJsaUploadStatus] = useState<JsaStatus>("idle");
   const [jsaUploadError, setJsaUploadError] = useState("");
   const [jsaData, setJsaData] = useState<JsaData>(createEmptyJsa());
+  const [jsaMode, setJsaMode] = useState<JsaMode>("upload");
 
   const searchParams = useSearchParams();
   const idIjinKerja = searchParams.get("id_ijin_kerja");
@@ -143,12 +147,37 @@ function HotWorkPermitFormInner() {
     const fetchUser = async () => {
       try {
         const res = await fetch("/form-permit/api/auth/me");
-        if (res.ok) {
-          const data = await res.json();
-          setUser(data.user);
-          if (data.user.departmen) {
-            const fwList = getFireWatchByDept(data.user.departmen);
-            setFireWatchList(fwList);
+        if (!res.ok) return;
+
+        const data = await res.json();
+        setUser(data.user);
+
+        // ── Auto-isi Sect/Dept JSA dari departemen user (Internal) ──
+        if (data.user.departmen) {
+          setJsaData((prev) => ({ ...prev, sectDept: data.user.departmen }));
+        }
+
+        if (data.user.departmen) {
+          const fwList = getFireWatchByDept(data.user.departmen);
+          setFireWatchList(fwList);
+
+          const spvRes = await fetch("/form-permit/api/admin-users/approvers");
+          if (spvRes.ok) {
+            const spvData = await spvRes.json();
+            const options = (spvData.users ?? []).filter((u: any) => {
+              if (u.role !== "spv") return false;
+              if (!u.departmen) return true;
+              return u.departmen === data.user.departmen;
+            });
+            setSpvOptions(options);
+            if (options.length > 0) {
+              const defaultSpv = options[0];
+              setSpvPemberiIzin({
+                nama: defaultSpv.nama ?? "",
+                nik: defaultSpv.nik ?? "",
+                jabatan: defaultSpv.jabatan ?? "",
+              });
+            }
           }
         }
       } catch (err) {
@@ -177,8 +206,13 @@ function HotWorkPermitFormInner() {
       return;
     }
 
+    if (!spvPemberiIzin.nama || !spvPemberiIzin.nik) {
+      setValidationError("SPV / Pemberi Izin wajib dipilih");
+      return;
+    }
+
     // ── Validasi JSA ──────────────────────────────────────────
-    if (idIjinKerja && perluJsa && (!jsaData.area.trim() || !jsaData.jenisPekerjaan.trim() || !jsaData.pic.trim() || !jsaData.petugas.some((name) => name.trim()))) {
+    if ((idIjinKerja || jsaMode === "build") && perluJsa && (!jsaData.area.trim() || !jsaData.jenisPekerjaan.trim() || !jsaData.pic.trim() || !jsaData.petugas.some((name) => name.trim()))) {
       setValidationError("Area, Jenis Pekerjaan, PIC, dan minimal satu Petugas pada JSA wajib diisi");
       return;
     }
@@ -211,7 +245,8 @@ function HotWorkPermitFormInner() {
           isSubmit,
           perluJsa,
           jsaFileUrl: jsaFile?.url ?? null,
-          ...(idIjinKerja ? { jsaData } : {}),
+          spvPemberiIzin,
+          ...(idIjinKerja || jsaMode === "build" ? { jsaData } : {}),
           idIjinKerja,
         }),
       });
@@ -280,12 +315,12 @@ function HotWorkPermitFormInner() {
                   { value: "eksternal", label: "Eksternal / Subkontraktor", desc: "Alur: Kontraktor → SPV → Admin K3 → SFO → SMR" },
                 ].map(opt => (
                   <label key={opt.value}
-                    className={`flex flex-col gap-1 p-3 rounded-xl border-2 cursor-pointer transition-all ${formData.tipePerusahaan === opt.value ? "border-orange-400 bg-orange-50" : "border-slate-200 hover:border-orange-200"}`}>
+                    className={`flex flex-col gap-1 p-3 rounded-xl border-2 transition-all ${opt.value === "eksternal" ? "cursor-not-allowed opacity-60" : "cursor-pointer"} ${formData.tipePerusahaan === opt.value ? "border-orange-400 bg-orange-50" : "border-slate-200 hover:border-orange-200"}`}>
                     <div className="flex items-center gap-2">
                       <input type="radio" name="tipePerusahaan" value={opt.value}
                         checked={formData.tipePerusahaan === opt.value}
                         onChange={() => setFormData(p => ({ ...p, tipePerusahaan: opt.value as any }))}
-                        disabled={!!idIjinKerja}
+                        disabled={opt.value === "eksternal" || !!idIjinKerja}
                         className="text-orange-500" />
                       <span className="text-sm font-semibold text-slate-800">{opt.label}</span>
                     </div>
@@ -312,8 +347,38 @@ function HotWorkPermitFormInner() {
             </div>
 
             <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-2">Nama Pekerja / NIK *</label>
-              <input type="text" value={formData.namaPekerjaNIK} onChange={e => setFormData(p => ({ ...p, namaPekerjaNIK: e.target.value }))} className={inputCls} placeholder="Nama lengkap atau NIK" />
+              <label className="block text-sm font-semibold text-slate-700 mb-2">
+                {isInternal ? "Nama Pekerja / NIK *" : "Nama Pekerja / NIK *"}
+              </label>
+              {isInternal && fireWatchList.length > 0 ? (
+                <select
+                  value={formData.namaPekerjaNIK}
+                  onChange={(e) => {
+                    const selected = fireWatchList.find((fw) => `${fw.nama} / ${fw.nik}` === e.target.value);
+                    setFormData((p) => ({
+                      ...p,
+                      namaPekerjaNIK: selected ? `${selected.nama} / ${selected.nik}` : "",
+                    }));
+                    setValidationError("");
+                  }}
+                  className={inputCls}
+                >
+                  <option value="">-- Pilih Nama / NIK --</option>
+                  {fireWatchList.map((fw) => (
+                    <option key={`${fw.nama}-${fw.nik}`} value={`${fw.nama} / ${fw.nik}`}>
+                      {`${fw.nama} / ${fw.nik}`}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <input
+                  type="text"
+                  value={formData.namaPekerjaNIK}
+                  onChange={(e) => setFormData((p) => ({ ...p, namaPekerjaNIK: e.target.value }))}
+                  className={inputCls}
+                  placeholder="Nama lengkap atau NIK"
+                />
+              )}
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -340,7 +405,7 @@ function HotWorkPermitFormInner() {
               </div>
               <div className="flex items-start gap-2 bg-blue-100 border border-blue-300 rounded-lg px-3 py-2.5 mb-4">
                 <AlertCircle className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
-                <p className="text-xs text-blue-700">Pilih Fire Watch dari departemen Anda. Fire Watch dipilih saat membuat form dan tidak lagi menjadi approver.</p>
+                <p className="text-xs text-blue-700">Input manual nama dan NIK Fire Watch sesuai data yang benar.</p>
               </div>
               {validationError && (
                 <div className="bg-red-100 border border-red-300 rounded-lg px-3 py-2.5 mb-4">
@@ -350,22 +415,23 @@ function HotWorkPermitFormInner() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-semibold text-slate-700 mb-2">Nama Fire Watch <span className="text-red-500">*</span></label>
-                  <select value={formData.namaFireWatch}
-                    onChange={(e) => {
-                      const nama = e.target.value;
-                      setFormData(p => ({ ...p, namaFireWatch: nama }));
-                      const fw = fireWatchList.find(f => f.nama === nama);
-                      if (fw) setFormData(p => ({ ...p, nikFireWatch: fw.nik }));
-                      setValidationError("");
-                    }}
-                    className={`w-full px-4 py-2.5 border ${formData.namaFireWatch ? 'border-slate-300' : 'border-red-300 bg-red-50'} rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent text-black`}>
-                    <option value="">-- Pilih Fire Watch --</option>
-                    {fireWatchList.map((fw) => (<option key={fw.nik} value={fw.nama}>{fw.nama}</option>))}
-                  </select>
+                  <input
+                    type="text"
+                    value={formData.namaFireWatch}
+                    onChange={(e) => setFormData((p) => ({ ...p, namaFireWatch: e.target.value }))}
+                    className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent text-black"
+                    placeholder="Masukkan nama Fire Watch"
+                  />
                 </div>
                 <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-2">NIK Fire Watch (Readonly)</label>
-                  <input type="text" value={formData.nikFireWatch} readOnly className="w-full px-4 py-2.5 border border-slate-300 rounded-lg bg-slate-100 text-slate-600 text-sm" />
+                  <label className="block text-sm font-semibold text-slate-700 mb-2">NIK Fire Watch <span className="text-red-500">*</span></label>
+                  <input
+                    type="text"
+                    value={formData.nikFireWatch}
+                    onChange={(e) => setFormData((p) => ({ ...p, nikFireWatch: e.target.value }))}
+                    className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent text-black"
+                    placeholder="Masukkan NIK Fire Watch"
+                  />
                 </div>
               </div>
             </div>
@@ -378,11 +444,38 @@ function HotWorkPermitFormInner() {
               </div>
               <div className="flex items-start gap-2 bg-green-100 border border-green-300 rounded-lg px-3 py-2.5 mb-4">
                 <AlertCircle className="w-4 h-4 text-green-600 shrink-0 mt-0.5" />
-                <p className="text-xs text-green-700">Jabatan dan NIK Pemberi Izin akan <strong>terisi otomatis</strong> dari profil SPV saat approval.</p>
+                <p className="text-xs text-green-700">Pilih SPV yang sesuai dari departemen Anda. NIK dan jabatan akan muncul otomatis.</p>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div> <label className="block text-sm font-semibold text-slate-400 mb-2">Jabatan Pemberi Izin</label> <DisabledField placeholder="Diisi otomatis oleh SPV" /> </div>
-                <div> <label className="block text-sm font-semibold text-slate-400 mb-2">Nama / NIK Pemberi Izin</label> <DisabledField placeholder="Diisi otomatis oleh SPV" /> </div>
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-2">Nama SPV / Pemberi Izin <span className="text-red-500">*</span></label>
+                  <select
+                    value={spvPemberiIzin.nama}
+                    onChange={(e) => {
+                      const selected = spvOptions.find((spv) => spv.nama === e.target.value);
+                      setSpvPemberiIzin({
+                        nama: selected?.nama ?? "",
+                        nik: selected?.nik ?? "",
+                        jabatan: selected?.jabatan ?? "",
+                      });
+                    }}
+                    className={`w-full px-4 py-2.5 border ${spvPemberiIzin.nama ? 'border-slate-300' : 'border-red-300 bg-red-50'} rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent text-black`}
+                  >
+                    <option value="">-- Pilih SPV --</option>
+                    {spvOptions.map((spv) => (
+                      <option key={spv.id} value={spv.nama}>{spv.nama}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-2">NIK SPV</label>
+                  <input
+                    type="text"
+                    value={spvPemberiIzin.nik}
+                    readOnly
+                    className="w-full px-4 py-2.5 border border-slate-300 rounded-lg bg-slate-100 text-slate-600 text-sm"
+                  />
+                </div>
               </div>
             </div>
           </div>
@@ -564,7 +657,9 @@ function HotWorkPermitFormInner() {
           setEnabled={setPerluJsa}
           value={jsaData}
           setValue={setJsaData}
-        /> : <JsaUploadSection
+        /> : <JsaMethodSection
+          mode={jsaMode}
+          setMode={setJsaMode}
           perluJsa={perluJsa}
           setPerluJsa={setPerluJsa}
           jsaFile={jsaFile}
@@ -573,6 +668,8 @@ function HotWorkPermitFormInner() {
           setJsaUploadStatus={setJsaUploadStatus}
           jsaUploadError={jsaUploadError}
           setJsaUploadError={setJsaUploadError}
+          jsaData={jsaData}
+          setJsaData={setJsaData}
           sectionTitle="BAGIAN 5: UPLOAD JSA"
           sectionStyle="hot-work"
         />}

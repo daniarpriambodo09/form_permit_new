@@ -1,4 +1,8 @@
 // app/api/approval/[jenisForm]/[id]/route.ts
+// REFACTOR: Kontraktor dikeluarkan dari alur approval bertahap (current_stage).
+// Kontraktor sekarang tanda tangan bebas kapan saja lewat endpoint terpisah
+// /api/approval/[jenisForm]/[id]/sign, dan tidak lagi menempati satu stage
+// atau bisa approve/reject lewat endpoint ini.
 
 import { NextRequest, NextResponse } from 'next/server';
 import { query, queryOne } from '@/lib/db';
@@ -70,6 +74,8 @@ async function getSpvDepartmen(userId: number, role: UserRole): Promise<string |
 }
 
 // ── Mapping role → kolom DB (approved, approved_by, approved_at, nik) ──
+// REFACTOR: entry 'kontraktor' dihapus — kontraktor tidak lagi approve
+// lewat endpoint ini, hanya lewat endpoint sign (tanda tangan manual).
 function getRoleApprovalColumns(role: UserRole, formType: FormType, isLastStage: boolean): {
   approvedCol: string;
   approvedByCol: string;
@@ -93,12 +99,6 @@ function getRoleApprovalColumns(role: UserRole, formType: FormType, isLastStage:
     approvedAtCol: string;
     approvedNikCol: string;
   }>> = {
-    kontraktor: {
-      approvedCol: 'kontraktor_approved',
-      approvedByCol: 'kontraktor_approved_by',
-      approvedAtCol: 'kontraktor_approved_at',
-      approvedNikCol: 'kontraktor_nik',
-    },
     spv: {
       approvedCol: 'spv_approved',
       approvedByCol: 'spv_approved_by',
@@ -195,6 +195,15 @@ export async function PATCH(
   if (userRole === 'firewatch' || userRole === 'worker') {
     return NextResponse.json(
       { error: 'Role Anda tidak memiliki hak untuk melakukan approval.' },
+      { status: 403 }
+    );
+  }
+
+  // REFACTOR: Kontraktor tidak lagi punya stage approval — tanda tangan
+  // dilakukan lewat endpoint terpisah (/sign), bukan approve/reject di sini.
+  if (userRole === 'kontraktor') {
+    return NextResponse.json(
+      { error: 'Kontraktor tidak melakukan approve/reject di sini. Gunakan tanda tangan Kontraktor pada form.' },
       { status: 403 }
     );
   }
@@ -326,7 +335,7 @@ export async function PATCH(
 
     if (userRole === 'spv' && (formType === 'hot-work' || formType === 'workshop')) {
       setClauses.push(`jabatan_pemberi_izin = $${paramIdx++}`); queryParams.push(user.jabatan || null);
-      setClauses.push(`nik_pemberi_ijin     = $${paramIdx++}`); queryParams.push(String(user.userId) || null);
+      setClauses.push(`nik_pemberi_ijin     = $${paramIdx++}`); queryParams.push(userNik || null);
     }
 
     // ── Height-work: Admin K3 mengisi checklist Body Harness & Lanyard

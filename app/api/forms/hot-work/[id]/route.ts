@@ -123,7 +123,7 @@ export async function PUT(
 
     await query(
       `UPDATE form_kerja_panas SET
-        no_registrasi = $1,
+        no_registrasi = COALESCE(NULLIF($1, ''), id_form),
         nama_kontraktor_nik = $2,
         nama_pekerja_nik = $3,
         lokasi_pekerjaan = $4,

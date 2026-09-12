@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { useApproverAuth } from "@/hooks/useApproverAuth";
 import AuthLoadingSpinner from "@/components/AuthLoadingSpinner";
+import Sidebar from "@/components/Sidebar";
 
 // ── Types ─────────────────────────────────────────────────────
 interface FormItem {
@@ -245,282 +246,285 @@ export default function ApprovalPage() {
 
   return (
     <div className="min-h-screen bg-slate-50">
-      {/* Header */}
-      <div className="bg-white border-b border-slate-200 sticky top-0 z-40 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <Link href="/home" className="p-2 hover:bg-slate-100 rounded-lg transition-colors">
-                <Home className="w-5 h-5 text-slate-600" />
-              </Link>
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-blue-100 rounded-lg">
-                  <ShieldCheck className="w-5 h-5 text-blue-600" />
-                </div>
-                <div>
-                  <h1 className="text-xl font-bold text-slate-900">Dashboard Approval</h1>
-                  <p className="text-xs text-slate-500">PT Jatim Autocomp Indonesia</p>
-                </div>
-              </div>
-            </div>
-            <div className="flex items-center gap-3">
-              {/* ADDED: Shortcut ke pengaturan routing email Admin K3 — admin only */}
-              {isAdmin && (
-                <Link
-                  href="/admin/admin-k3-routing"
-                  title="Atur email Admin K3 per jenis form (hot-work/height-work/workshop)"
-                  className="hidden md:flex items-center gap-1.5 px-3 py-2 text-sm text-slate-600
-                             hover:bg-orange-50 hover:text-orange-600 rounded-lg transition-colors"
-                >
-                  <Mail className="w-4 h-4" /> Routing Admin K3
+      <Sidebar />
+      <div style={{ paddingLeft: "var(--sidebar-width, 0px)" }} className="transition-[padding] duration-300">
+        {/* Header */}
+        <div className="bg-white border-b border-slate-200 sticky top-0 z-40 shadow-sm">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <Link href="/home" className="p-2 hover:bg-slate-100 rounded-lg transition-colors">
+                  <Home className="w-5 h-5 text-slate-600" />
                 </Link>
-              )}
-              {/* Gunakan data dari user (hasil /api/auth/me), bukan sessionStorage */}
-              <div className="hidden md:flex items-center gap-2 bg-slate-100 rounded-lg px-3 py-2">
-                <User className="w-4 h-4 text-slate-500" />
-                <div>
-                  <span className="text-sm font-semibold text-slate-700 block">{user.nama}</span>
-                  <span className="text-xs text-slate-500">{user.jabatan} • {roleLabelMap[user.role] || user.role}</span>
-                </div>
-              </div>
-              <button onClick={handleRefresh} disabled={loading}
-                className="p-2 hover:bg-slate-100 rounded-lg transition-colors disabled:opacity-50" title="Refresh">
-                <RefreshCw className={`w-4 h-4 text-slate-500 ${loading ? "animate-spin" : ""}`} />
-              </button>
-              <button onClick={handleLogout}
-                className="flex items-center gap-1.5 px-3 py-2 text-sm text-slate-600 hover:bg-red-50 hover:text-red-600 rounded-lg transition-colors">
-                <LogOut className="w-4 h-4" /> Keluar
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-5">
-        {/* Info role */}
-        <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
-          <div className="flex items-center gap-3">
-            <Shield className="w-5 h-5 text-blue-600" />
-            <div>
-              <p className="text-sm font-semibold text-blue-900">
-                Anda login sebagai: <span className="font-bold">{roleLabelMap[user.role] || user.role}</span>
-              </p>
-              <p className="text-xs text-blue-700">
-                {activeTab === "submitted"
-                  ? "Menampilkan form yang menunggu approval Anda"
-                  : activeTab === "approved"
-                    ? "Menampilkan form yang telah Anda setujui"
-                    : "Menampilkan form yang ditolak"
-                }
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* Stat cards */}
-        <div className="grid grid-cols-3 gap-4">
-          {statusTabs.map(tab => {
-            const Icon = tab.icon;
-            return (
-              <button key={tab.key} onClick={() => handleTabChange(tab.key)}
-                className={`bg-white rounded-xl p-4 border-2 transition-all text-left ${activeTab === tab.key ? `${tab.border} shadow-md` : "border-slate-200 hover:border-slate-300"
-                  }`}>
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">{tab.label}</span>
-                  <Icon className={`w-4 h-4 ${tab.color}`} />
-                </div>
-                <p className={`text-3xl font-bold mt-2 ${tab.color}`}>
-                  {formCounts[tab.key as keyof FormCounts]}
-                </p>
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Filter jenis + Export Excel Workshop (admin only) */}
-        <div className="bg-white rounded-xl border border-slate-200 p-4 flex items-center gap-2 flex-wrap justify-between">
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-xs font-semibold text-slate-500 mr-1">Filter:</span>
-            {["all", "hot-work", "workshop", "height-work", "general-permit", ...(isSecurity || isAdmin ? ["external-permit"] : [])].map(type => (
-              <button key={type} onClick={() => setFilterJenis(type)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${filterJenis === type ? "bg-orange-600 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                  }`}>
-                {type === "all" ? "Semua" : jenisLabel[type]}
-              </button>
-            ))}
-          </div>
-
-          <div className="flex items-center gap-2 flex-wrap">
-            {/* ADDED: Shortcut mobile ke Routing Admin K3 (versi md:hidden, karena versi header disembunyikan di layar kecil) */}
-            {isAdmin && (
-              <Link
-                href="/admin/admin-k3-routing"
-                className="md:hidden flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold
-                           bg-slate-100 hover:bg-slate-200 text-slate-600 transition-colors"
-              >
-                <Mail className="w-3.5 h-3.5" /> Routing Admin K3
-              </Link>
-            )}
-
-            {/* ADDED: Tombol download rekap Excel Workshop — hanya untuk admin */}
-            {isAdmin && (
-              <button
-                onClick={handleExportWorkshop}
-                disabled={exportLoading}
-                title="Download rekap Excel khusus Workshop Permit sesuai tab yang sedang aktif"
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold
-                           bg-green-600 hover:bg-green-700 text-white transition-colors disabled:opacity-50">
-                {exportLoading
-                  ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                  : <Download className="w-3.5 h-3.5" />}
-                Excel Workshop
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* List */}
-        {loading ? (
-          <div className="text-center py-16">
-            <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-orange-200 border-t-orange-600" />
-            <p className="mt-3 text-slate-400 text-sm">Memuat data...</p>
-          </div>
-        ) : filtered.length === 0 ? (
-          <div className="bg-white rounded-xl border border-slate-200 p-12 text-center">
-            <FileText className="w-12 h-12 text-slate-200 mx-auto mb-3" />
-            <p className="font-semibold text-slate-600">
-              {activeTab === "submitted" ? "Tidak ada form yang menunggu approval Anda"
-                : activeTab === "approved" ? "Anda belum menyetujui form apapun"
-                  : "Tidak ada form yang ditolak"}
-            </p>
-            {activeTab === "submitted" && (
-              <p className="text-slate-400 text-sm mt-1">Form akan muncul di sini ketika mencapai tahap approval Anda</p>
-            )}
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {filtered.map(form => {
-              const stageLabel = getStageLabelForForm(form);
-              const approvalStages = getApprovalStages(form);
-              const isHeightWork = form.jenis_form === "height-work";
-              const isFwForm = form.jenis_form === "hot-work" || form.jenis_form === "workshop";
-              const isEksternal = form.tipe_perusahaan === "eksternal";
-
-              return (
-                <div key={form.id_form}
-                  className="bg-white rounded-xl border border-slate-200 hover:shadow-md transition-all">
-                  <div className="p-5 flex items-start justify-between gap-4">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-3 flex-wrap mb-3">
-                        <span className="text-base font-bold text-slate-900 font-mono">{form.id_form}</span>
-                        <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${jenisBadge[form.jenis_form] || "bg-slate-100 text-slate-600"}`}>
-                          {jenisLabel[form.jenis_form] || form.jenis_form}
-                        </span>
-                        {form.tipe_perusahaan && (
-                          <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${isEksternal ? "bg-purple-100 text-purple-700" : "bg-blue-100 text-blue-700"
-                            }`}>
-                            {isEksternal ? "Eksternal" : "Internal"}
-                          </span>
-                        )}
-                        {activeTab === "submitted" && (
-                          <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 flex items-center gap-1">
-                            <Shield className="w-3 h-3" /> Tahap {form.current_stage}: {stageLabel}
-                          </span>
-                        )}
-                        {form.status === "rejected" && form.catatan_reject && (
-                          <span className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-full px-2 py-0.5">
-                            ✗ Ditolak
-                          </span>
-                        )}
-                      </div>
-
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm text-slate-500">
-                        <div>
-                          <span className="text-xs text-slate-400">Kontraktor / Pekerja</span>
-                          <p className="font-medium text-slate-700 truncate">{form.nama_kontraktor_nik || "-"}</p>
-                        </div>
-                        <div>
-                          <span className="text-xs text-slate-400">Lokasi</span>
-                          <p className="font-medium text-slate-700 truncate">{form.lokasi_pekerjaan || "-"}</p>
-                        </div>
-                        <div>
-                          <span className="text-xs text-slate-400">Tgl Diajukan</span>
-                          <p className="font-medium text-slate-700">{formatDate(form.tanggal)}</p>
-                        </div>
-                        <div>
-                          <span className="text-xs text-slate-400">Tgl Pelaksanaan</span>
-                          <p className="font-medium text-slate-700">{formatDate(form.tanggal_pelaksanaan)}</p>
-                        </div>
-                      </div>
-
-                      {/* Approval Progress Badges */}
-                      <div className="mt-3 flex flex-wrap items-center gap-1.5">
-                        {approvalStages.map(stage => {
-                          const isApproved = Boolean((form as any)[stage.key]);
-                          return (
-                            <span key={stage.key}
-                              className={`text-xs px-2 py-0.5 rounded-full border ${isApproved
-                                ? "bg-green-100 text-green-700 border-green-200"
-                                : "bg-slate-100 text-slate-500 border-slate-200"
-                                }`}>
-                              {isApproved ? "✓" : "○"} {stage.label}
-                            </span>
-                          );
-                        })}
-                      </div>
-
-                      {isFwForm && form.tipe_perusahaan && (
-                        <p className="text-[10px] text-slate-400 mt-1">
-                          Alur: {isEksternal
-                            ? "Kontraktor → SPV → Admin K3 → SFO → SMR"
-                            : "SPV → Admin K3 → SFO → SMR"}
-                        </p>
-                      )}
-                      {isHeightWork && form.tipe_perusahaan && (
-                        <p className="text-[10px] text-slate-400 mt-1">
-                          Alur: {isEksternal
-                            ? "Kontraktor → SPV → Admin K3 → SFO → SMR"
-                            : "SPV → Admin K3 → SFO → SMR"}
-                        </p>
-                      )}
-
-                      {form.catatan_reject && (
-                        <div className="mt-2 text-xs text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-1.5">
-                          <span className="font-semibold">Catatan: </span>{form.catatan_reject}
-                        </div>
-                      )}
-                      {form.approved_by && activeTab !== "submitted" && (
-                        <p className="mt-2 text-xs text-green-600">
-                          ✓ {form.status === "approved" ? "Disetujui" : "Ditolak"} oleh <strong>{form.approved_by}</strong> — {formatDate(form.approved_at)}
-                        </p>
-                      )}
-                    </div>
-
-                    {/* Link ke halaman review */}
-                    <Link href={
-                      // external-permit: selalu ke /approval/external/[id]
-                      form.jenis_form === "external-permit"
-                        ? `/approval/external/${form.id_form}`
-                        // general-permit: SPV/SFO/SMR review form induk juga di halaman external
-                        : form.jenis_form === "general-permit"
-                          ? `/approval/external/${form.id_form}`
-                          // Form yang terkait ke Ijin Kerja Eksternal: ke halaman external parent
-                          : form.id_ijin_kerja
-                            ? `/approval/external/${form.id_ijin_kerja}`
-                            : `/approval/${form.jenis_form}/${form.id_form}`
-                    }
-                      className="shrink-0 flex items-center gap-1.5 px-4 py-2.5
-                                 bg-orange-600 hover:bg-orange-700 text-white
-                                 rounded-lg text-sm font-semibold transition-colors">
-                      <Eye className="w-4 h-4" />
-                      <span className="hidden sm:inline">{activeTab === "submitted" ? "Review" : "Lihat"}</span>
-                    </Link>
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-blue-100 rounded-lg">
+                    <ShieldCheck className="w-5 h-5 text-blue-600" />
+                  </div>
+                  <div>
+                    <h1 className="text-xl font-bold text-slate-900">Dashboard Approval</h1>
+                    <p className="text-xs text-slate-500">PT Jatim Autocomp Indonesia</p>
                   </div>
                 </div>
+              </div>
+              <div className="flex items-center gap-3">
+                {/* ADDED: Shortcut ke pengaturan routing email Admin K3 — admin only */}
+                {isAdmin && (
+                  <Link
+                    href="/admin/admin-k3-routing"
+                    title="Atur email Admin K3 per jenis form (hot-work/height-work/workshop)"
+                    className="hidden md:flex items-center gap-1.5 px-3 py-2 text-sm text-slate-600
+                              hover:bg-orange-50 hover:text-orange-600 rounded-lg transition-colors"
+                  >
+                    <Mail className="w-4 h-4" /> Routing Admin K3
+                  </Link>
+                )}
+                {/* Gunakan data dari user (hasil /api/auth/me), bukan sessionStorage */}
+                <div className="hidden md:flex items-center gap-2 bg-slate-100 rounded-lg px-3 py-2">
+                  <User className="w-4 h-4 text-slate-500" />
+                  <div>
+                    <span className="text-sm font-semibold text-slate-700 block">{user.nama}</span>
+                    <span className="text-xs text-slate-500">{user.jabatan} • {roleLabelMap[user.role] || user.role}</span>
+                  </div>
+                </div>
+                <button onClick={handleRefresh} disabled={loading}
+                  className="p-2 hover:bg-slate-100 rounded-lg transition-colors disabled:opacity-50" title="Refresh">
+                  <RefreshCw className={`w-4 h-4 text-slate-500 ${loading ? "animate-spin" : ""}`} />
+                </button>
+                <button onClick={handleLogout}
+                  className="flex items-center gap-1.5 px-3 py-2 text-sm text-slate-600 hover:bg-red-50 hover:text-red-600 rounded-lg transition-colors">
+                  <LogOut className="w-4 h-4" /> Keluar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-5">
+          {/* Info role */}
+          <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+            <div className="flex items-center gap-3">
+              <Shield className="w-5 h-5 text-blue-600" />
+              <div>
+                <p className="text-sm font-semibold text-blue-900">
+                  Anda login sebagai: <span className="font-bold">{roleLabelMap[user.role] || user.role}</span>
+                </p>
+                <p className="text-xs text-blue-700">
+                  {activeTab === "submitted"
+                    ? "Menampilkan form yang menunggu approval Anda"
+                    : activeTab === "approved"
+                      ? "Menampilkan form yang telah Anda setujui"
+                      : "Menampilkan form yang ditolak"
+                  }
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Stat cards */}
+          <div className="grid grid-cols-3 gap-4">
+            {statusTabs.map(tab => {
+              const Icon = tab.icon;
+              return (
+                <button key={tab.key} onClick={() => handleTabChange(tab.key)}
+                  className={`bg-white rounded-xl p-4 border-2 transition-all text-left ${activeTab === tab.key ? `${tab.border} shadow-md` : "border-slate-200 hover:border-slate-300"
+                    }`}>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">{tab.label}</span>
+                    <Icon className={`w-4 h-4 ${tab.color}`} />
+                  </div>
+                  <p className={`text-3xl font-bold mt-2 ${tab.color}`}>
+                    {formCounts[tab.key as keyof FormCounts]}
+                  </p>
+                </button>
               );
             })}
           </div>
-        )}
+
+          {/* Filter jenis + Export Excel Workshop (admin only) */}
+          <div className="bg-white rounded-xl border border-slate-200 p-4 flex items-center gap-2 flex-wrap justify-between">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-xs font-semibold text-slate-500 mr-1">Filter:</span>
+              {["all", "hot-work", "workshop", "height-work", "general-permit", ...(isSecurity || isAdmin ? ["external-permit"] : [])].map(type => (
+                <button key={type} onClick={() => setFilterJenis(type)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${filterJenis === type ? "bg-orange-600 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                    }`}>
+                  {type === "all" ? "Semua" : jenisLabel[type]}
+                </button>
+              ))}
+            </div>
+
+            <div className="flex items-center gap-2 flex-wrap">
+              {/* ADDED: Shortcut mobile ke Routing Admin K3 (versi md:hidden, karena versi header disembunyikan di layar kecil) */}
+              {isAdmin && (
+                <Link
+                  href="/admin/admin-k3-routing"
+                  className="md:hidden flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold
+                            bg-slate-100 hover:bg-slate-200 text-slate-600 transition-colors"
+                >
+                  <Mail className="w-3.5 h-3.5" /> Routing Admin K3
+                </Link>
+              )}
+
+              {/* ADDED: Tombol download rekap Excel Workshop — hanya untuk admin */}
+              {isAdmin && (
+                <button
+                  onClick={handleExportWorkshop}
+                  disabled={exportLoading}
+                  title="Download rekap Excel khusus Workshop Permit sesuai tab yang sedang aktif"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold
+                            bg-green-600 hover:bg-green-700 text-white transition-colors disabled:opacity-50">
+                  {exportLoading
+                    ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    : <Download className="w-3.5 h-3.5" />}
+                  Excel Workshop
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* List */}
+          {loading ? (
+            <div className="text-center py-16">
+              <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-orange-200 border-t-orange-600" />
+              <p className="mt-3 text-slate-400 text-sm">Memuat data...</p>
+            </div>
+          ) : filtered.length === 0 ? (
+            <div className="bg-white rounded-xl border border-slate-200 p-12 text-center">
+              <FileText className="w-12 h-12 text-slate-200 mx-auto mb-3" />
+              <p className="font-semibold text-slate-600">
+                {activeTab === "submitted" ? "Tidak ada form yang menunggu approval Anda"
+                  : activeTab === "approved" ? "Anda belum menyetujui form apapun"
+                    : "Tidak ada form yang ditolak"}
+              </p>
+              {activeTab === "submitted" && (
+                <p className="text-slate-400 text-sm mt-1">Form akan muncul di sini ketika mencapai tahap approval Anda</p>
+              )}
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {filtered.map(form => {
+                const stageLabel = getStageLabelForForm(form);
+                const approvalStages = getApprovalStages(form);
+                const isHeightWork = form.jenis_form === "height-work";
+                const isFwForm = form.jenis_form === "hot-work" || form.jenis_form === "workshop";
+                const isEksternal = form.tipe_perusahaan === "eksternal";
+
+                return (
+                  <div key={form.id_form}
+                    className="bg-white rounded-xl border border-slate-200 hover:shadow-md transition-all">
+                    <div className="p-5 flex items-start justify-between gap-4">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-3 flex-wrap mb-3">
+                          <span className="text-base font-bold text-slate-900 font-mono">{form.id_form}</span>
+                          <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${jenisBadge[form.jenis_form] || "bg-slate-100 text-slate-600"}`}>
+                            {jenisLabel[form.jenis_form] || form.jenis_form}
+                          </span>
+                          {form.tipe_perusahaan && (
+                            <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${isEksternal ? "bg-purple-100 text-purple-700" : "bg-blue-100 text-blue-700"
+                              }`}>
+                              {isEksternal ? "Eksternal" : "Internal"}
+                            </span>
+                          )}
+                          {activeTab === "submitted" && (
+                            <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 flex items-center gap-1">
+                              <Shield className="w-3 h-3" /> Tahap {form.current_stage}: {stageLabel}
+                            </span>
+                          )}
+                          {form.status === "rejected" && form.catatan_reject && (
+                            <span className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-full px-2 py-0.5">
+                              ✗ Ditolak
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm text-slate-500">
+                          <div>
+                            <span className="text-xs text-slate-400">Kontraktor / Pekerja</span>
+                            <p className="font-medium text-slate-700 truncate">{form.nama_kontraktor_nik || "-"}</p>
+                          </div>
+                          <div>
+                            <span className="text-xs text-slate-400">Lokasi</span>
+                            <p className="font-medium text-slate-700 truncate">{form.lokasi_pekerjaan || "-"}</p>
+                          </div>
+                          <div>
+                            <span className="text-xs text-slate-400">Tgl Diajukan</span>
+                            <p className="font-medium text-slate-700">{formatDate(form.tanggal)}</p>
+                          </div>
+                          <div>
+                            <span className="text-xs text-slate-400">Tgl Pelaksanaan</span>
+                            <p className="font-medium text-slate-700">{formatDate(form.tanggal_pelaksanaan)}</p>
+                          </div>
+                        </div>
+
+                        {/* Approval Progress Badges */}
+                        <div className="mt-3 flex flex-wrap items-center gap-1.5">
+                          {approvalStages.map(stage => {
+                            const isApproved = Boolean((form as any)[stage.key]);
+                            return (
+                              <span key={stage.key}
+                                className={`text-xs px-2 py-0.5 rounded-full border ${isApproved
+                                  ? "bg-green-100 text-green-700 border-green-200"
+                                  : "bg-slate-100 text-slate-500 border-slate-200"
+                                  }`}>
+                                {isApproved ? "✓" : "○"} {stage.label}
+                              </span>
+                            );
+                          })}
+                        </div>
+
+                        {isFwForm && form.tipe_perusahaan && (
+                          <p className="text-[10px] text-slate-400 mt-1">
+                            Alur: {isEksternal
+                              ? "Kontraktor → SPV → Admin K3 → SFO → SMR"
+                              : "SPV → Admin K3 → SFO → SMR"}
+                          </p>
+                        )}
+                        {isHeightWork && form.tipe_perusahaan && (
+                          <p className="text-[10px] text-slate-400 mt-1">
+                            Alur: {isEksternal
+                              ? "Kontraktor → SPV → Admin K3 → SFO → SMR"
+                              : "SPV → Admin K3 → SFO → SMR"}
+                          </p>
+                        )}
+
+                        {form.catatan_reject && (
+                          <div className="mt-2 text-xs text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-1.5">
+                            <span className="font-semibold">Catatan: </span>{form.catatan_reject}
+                          </div>
+                        )}
+                        {form.approved_by && activeTab !== "submitted" && (
+                          <p className="mt-2 text-xs text-green-600">
+                            ✓ {form.status === "approved" ? "Disetujui" : "Ditolak"} oleh <strong>{form.approved_by}</strong> — {formatDate(form.approved_at)}
+                          </p>
+                        )}
+                      </div>
+
+                      {/* Link ke halaman review */}
+                      <Link href={
+                        // external-permit: selalu ke /approval/external/[id]
+                        form.jenis_form === "external-permit"
+                          ? `/approval/external/${form.id_form}`
+                          // general-permit: SPV/SFO/SMR review form induk juga di halaman external
+                          : form.jenis_form === "general-permit"
+                            ? `/approval/external/${form.id_form}`
+                            // Form yang terkait ke Ijin Kerja Eksternal: ke halaman external parent
+                            : form.id_ijin_kerja
+                              ? `/approval/external/${form.id_ijin_kerja}`
+                              : `/approval/${form.jenis_form}/${form.id_form}`
+                      }
+                        className="shrink-0 flex items-center gap-1.5 px-4 py-2.5
+                                  bg-orange-600 hover:bg-orange-700 text-white
+                                  rounded-lg text-sm font-semibold transition-colors">
+                        <Eye className="w-4 h-4" />
+                        <span className="hidden sm:inline">{activeTab === "submitted" ? "Review" : "Lihat"}</span>
+                      </Link>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

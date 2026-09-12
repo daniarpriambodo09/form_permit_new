@@ -1,13 +1,17 @@
 // app/api/approval/[jenisForm]/[id]/sign/route.ts
 // Tanda tangan Kontraktor untuk form jenis kerja (hot-work, height-work,
-// workshop) yang tipe_perusahaan = 'eksternal'. Menggantikan tombol
-// "approve" biasa pada stage 1 — kontraktor WAJIB tanda tangan dulu
-// sebelum current_stage lanjut ke SPV (stage 2).
+// workshop) yang tipe_perusahaan = 'eksternal'.
+//
+// REFACTOR: Kontraktor TIDAK LAGI menjadi bagian dari alur approval
+// bertahap (current_stage). Kontraktor bisa menandatangani form ini
+// kapan saja selama form berstatus "submitted" dan belum ditandatangani
+// — tidak menunggu giliran, dan tidak lagi menggeser current_stage ke
+// SPV. SPV (dan approver lain) tetap berjalan berdasarkan current_stage
+// masing-masing, independen dari tanda tangan kontraktor.
 
 import { NextRequest, NextResponse } from "next/server";
 import { query, queryOne } from "@/lib/db";
 import { verifyToken, COOKIE_NAME } from "@/lib/auth";
-import { notifyNextApprover, FormType } from "@/lib/approval-email";
 
 const TABLE_MAP: Record<string, string> = {
   "hot-work": "form_kerja_panas",
@@ -26,12 +30,12 @@ export async function PATCH(
 ) {
   const user = getUser(req);
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  if (user.role !== "kontraktor" && user.role !== "admin") {
-    return NextResponse.json(
-      { error: "Hanya Kontraktor yang dapat menandatangani di sini." },
-      { status: 403 }
-    );
-  }
+  // if (user.role !== "kontraktor" && user.role !== "admin") {
+  //   return NextResponse.json(
+  //     { error: "Hanya Kontraktor yang dapat menandatangani di sini." },
+  //     { status: 403 }
+  //   );
+  // }
 
   const { jenisForm, id } = await params;
   const table = TABLE_MAP[jenisForm];
@@ -68,9 +72,11 @@ export async function PATCH(
       { status: 409 }
     );
   }
-  if (existing.tipe_perusahaan !== "eksternal" || existing.current_stage !== 1) {
+  // REFACTOR: kontraktor tidak lagi harus menunggu current_stage === 1 —
+  // yang penting form ini memang milik kontraktor eksternal.
+  if (existing.tipe_perusahaan !== "eksternal") {
     return NextResponse.json(
-      { error: "Belum giliran approval Kontraktor pada form ini." },
+      { error: "Tanda tangan Kontraktor hanya berlaku untuk form eksternal." },
       { status: 409 }
     );
   }
@@ -81,7 +87,8 @@ export async function PATCH(
     );
   }
 
-  const nextStage = 2; // setelah kontraktor -> SPV
+  // REFACTOR: tidak lagi mengubah current_stage — tanda tangan kontraktor
+  // independen dari alur approval SPV → Admin K3 → SFO → SMR.
   await query(
     `UPDATE ${table}
         SET kontraktor_approved = TRUE,
@@ -89,32 +96,10 @@ export async function PATCH(
             kontraktor_approved_at = NOW(),
             kontraktor_nik = $2,
             kontraktor_signature_url = $3,
-            current_stage = $4,
             updated_at = NOW()
-      WHERE id_form = $5`,
-    [user.nama || user.username, (user as any).nik ?? null, signatureUrl, nextStage, id]
+      WHERE id_form = $4`,
+    [user.nama || user.username, (user as any).nik ?? null, signatureUrl, id]
   );
-
-  queryOne<{ nama: string }>(
-    `SELECT u.nama FROM ${table} f LEFT JOIN users u ON u.id = f.user_id WHERE f.id_form = $1`,
-    [id]
-  )
-    .then((makerRow) => {
-      notifyNextApprover({
-        formType: jenisForm as FormType,
-        idForm: id,
-        tipePerusahaan: existing.tipe_perusahaan,
-        nextStage,
-        userId: existing.user_id,
-        namaPemohon: makerRow?.nama ?? "-",
-        tanggal: existing.tanggal,
-      }).catch((err) => {
-        console.error(`[EMAIL] notify next approver after kontraktor sign for ${id}:`, err);
-      });
-    })
-    .catch(() => {
-      // tidak kritikal
-    });
 
   return NextResponse.json({ success: true });
 }

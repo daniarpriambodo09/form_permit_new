@@ -59,6 +59,7 @@ interface FormState {
   lokasiTipe: { dalamGedung: boolean; luarGedung: boolean; luarPagarGedung: boolean; diAtasGedung: boolean };
   lokasiLainnya: string;
   pengawasBagian: string;
+  departemenPengawas: string;
   picLotoStationLoto: string;
   bahan: { mudahTerbakar: boolean; mudahMeledak: boolean; kimiaBeracunIritan: boolean };
   bahanLainnya: string;
@@ -103,7 +104,7 @@ const defaultForm = (): FormState => ({
   alatLainnya: "", alatLainnyaKondisi: "",
   lokasiPekerjaan: "",
   lokasiTipe: { dalamGedung: false, luarGedung: false, luarPagarGedung: false, diAtasGedung: false },
-  lokasiLainnya: "", pengawasBagian: "", picLotoStationLoto: "",
+  lokasiLainnya: "", pengawasBagian: "", departemenPengawas: "", picLotoStationLoto: "",
   bahan: { mudahTerbakar: false, mudahMeledak: false, kimiaBeracunIritan: false },
   bahanLainnya: "",
   dampak: {
@@ -191,6 +192,8 @@ export default function IjinKerjaEksternalPage() {
 
   // ── Upload Lisensi state (Bagian 9) — wajib, bisa lebih dari 1 file ──
   const [licenseFiles, setLicenseFiles] = useState<LicenseFileInfo[]>([]);
+  const [pengawasOptions, setPengawasOptions] = useState<Array<{ id: number; nama: string; nik: string; departemen: string }>>([]);
+  const [departemenOptions, setDepartemenOptions] = useState<string[]>([]);
 
   useEffect(() => {
     fetch("/form-permit/api/auth/me", { credentials: "include" })
@@ -200,6 +203,19 @@ export default function IjinKerjaEksternalPage() {
         setJsa((prev) => ({ ...prev, sectDept: departmen }));
       })
       .catch(() => undefined);
+  }, []);
+
+  useEffect(() => {
+    Promise.all([
+      fetch("/form-permit/api/pengawas-departemen", { credentials: "include" }).then((res) => res.ok ? res.json() : { data: [] }),
+      fetch("/form-permit/api/departemen?activeOnly=1", { credentials: "include" }).then((res) => res.ok ? res.json() : { data: [] }),
+    ]).then(([pengawas, departemen]) => {
+      setPengawasOptions(pengawas.data ?? []);
+      setDepartemenOptions((departemen.data ?? []).map((item: { nama_departemen: string }) => item.nama_departemen));
+    }).catch(() => {
+      setPengawasOptions([]);
+      setDepartemenOptions([]);
+    });
   }, []);
 
   const set = <K extends keyof FormState>(key: K, val: FormState[K]) => setForm((prev) => ({ ...prev, [key]: val }));
@@ -263,6 +279,11 @@ export default function IjinKerjaEksternalPage() {
       return;
     }
     const successLicenseCount = licenseFiles.filter((f) => f.status === "success" && f.url).length;
+    if (!form.departemenPengawas || !form.pengawasBagian) {
+      setError("Departemen dan Pengawas (Bagian) wajib dipilih.");
+      document.getElementById("bagian-5")?.scrollIntoView({ behavior: "smooth", block: "center" });
+      return;
+    }
     if ((workerCount > 0 && successLicenseCount < 1) || successLicenseCount > workerCount) {
       setError(`Jumlah file Lisensi/Sertifikasi harus minimal 1 dan maksimal ${workerCount}, saat ini ${successLicenseCount} file berhasil diupload.`);
       document.getElementById("bagian-lisensi")?.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -450,7 +471,7 @@ export default function IjinKerjaEksternalPage() {
           </section>
 
           {/* ═══ BAGIAN 5 (dulu 4) ═══ */}
-          <SectionCard nomor={5} title="Informasi Lokasi Proyek & Pengawas">
+          <section id="bagian-5"><SectionCard nomor={5} title="Informasi Lokasi Proyek & Pengawas">
             <div>
               <label className="block text-sm font-semibold text-slate-700 mb-2">Lokasi Pekerjaan <span className="text-red-500">*</span></label>
               <textarea rows={2} value={form.lokasiPekerjaan} onChange={(e) => set("lokasiPekerjaan", e.target.value)} required className={`${inputCls} resize-none`} />
@@ -463,15 +484,38 @@ export default function IjinKerjaEksternalPage() {
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2">Pengawas (Bagian)</label>
-                <input type="text" value={form.pengawasBagian} onChange={(e) => set("pengawasBagian", e.target.value)} className={inputCls} />
+                <label className="block text-sm font-semibold text-slate-700 mb-2">Departemen Pengawas <span className="text-red-500">*</span></label>
+                <select
+                  value={form.departemenPengawas}
+                  onChange={(e) => setForm((prev) => ({ ...prev, departemenPengawas: e.target.value, pengawasBagian: "" }))}
+                  required
+                  className={inputCls}
+                >
+                  <option value="">-- Pilih Departemen --</option>
+                  {departemenOptions.map((departemen) => <option key={departemen} value={departemen}>{departemen}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">Pengawas (Bagian) <span className="text-red-500">*</span></label>
+                <select
+                  value={form.pengawasBagian}
+                  onChange={(e) => set("pengawasBagian", e.target.value)}
+                  required
+                  disabled={!form.departemenPengawas}
+                  className={`${inputCls} ${!form.departemenPengawas ? "bg-slate-100 text-slate-400 cursor-not-allowed" : ""}`}
+                >
+                  <option value="">{form.departemenPengawas ? "-- Pilih Pengawas --" : "Pilih departemen terlebih dahulu"}</option>
+                  {pengawasOptions.filter((item) => item.departemen === form.departemenPengawas).map((item) => (
+                    <option key={item.id} value={item.nama}>{item.nama} / {item.nik}</option>
+                  ))}
+                </select>
               </div>
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-2">PIC LOTO / Station LOTO</label>
                 <input type="text" value={form.picLotoStationLoto} onChange={(e) => set("picLotoStationLoto", e.target.value)} className={inputCls} />
               </div>
             </div>
-          </SectionCard>
+          </SectionCard></section>
 
           {/* ═══ BAGIAN 6 (dulu 5) ═══ */}
           <SectionCard nomor={6} title="Karakter Bahan yang Dipakai">

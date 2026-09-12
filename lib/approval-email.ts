@@ -104,6 +104,46 @@ export async function getApproverEmails(
   return rows;
 }
 
+async function getSelectedSpvForForm(
+  formType: FormType,
+  idForm: string,
+  makerDepartmen?: string | null,
+): Promise<UserRow | null> {
+  if (formType !== 'hot-work' && formType !== 'workshop') return null;
+
+  const row = await queryOne<{ spv_terkait: string | null; nik_pemberi_ijin: string | null }>(
+    `SELECT spv_terkait, nik_pemberi_ijin
+     FROM ${formType === 'hot-work' ? 'form_kerja_panas' : 'form_kerja_workshop'}
+     WHERE id_form = $1`,
+    [idForm]
+  );
+
+  if (!row?.spv_terkait) return null;
+
+  const matchName = row.spv_terkait.trim();
+  const matchNik = (row.nik_pemberi_ijin ?? '').trim();
+
+  const rows = await query<UserRow>(
+    `SELECT id, nama, email, role, departmen
+     FROM users
+     WHERE role = 'spv'
+       AND is_active = TRUE
+       AND departmen = $1
+       AND email IS NOT NULL
+       AND email != ''
+       AND (
+         LOWER(nama) = LOWER($2)
+         OR LOWER(nama) LIKE LOWER($2 || '%')
+         OR nik = $3
+       )
+     ORDER BY nama ASC
+     LIMIT 1`,
+    [makerDepartmen ?? '', matchName, matchNik || null]
+  );
+
+  return rows[0] ?? null;
+}
+
 // ── getMakerDepartmen / getMakerUser ─────────────────────────
 
 async function getMakerDepartmen(userId: number | null): Promise<string | null> {
@@ -167,8 +207,25 @@ export async function notifyNextApprover(params: {
       // sengaja tidak return, lanjut ke logika default di bawah
     }
 
-    // ── Perilaku default (SPV per-departemen, atau semua user per-role) ──
     const makerDepartmen = await getMakerDepartmen(userId);
+
+    if (approverRole === 'spv' && (formType === 'hot-work' || formType === 'workshop')) {
+      const selectedSpv = await getSelectedSpvForForm(formType, idForm, makerDepartmen);
+      if (selectedSpv?.email) {
+        await sendApprovalNotification({
+          idForm,
+          jenisForm: getFormLabel(formType),
+          namaPemohon,
+          tanggal: formatTanggal(tanggal),
+          approverName: selectedSpv.nama,
+          approverEmail: selectedSpv.email,
+        });
+        console.log(`[EMAIL] SPV terpilih untuk ${formType} ${idForm} → ${selectedSpv.nama} (${selectedSpv.email})`);
+        return;
+      }
+    }
+
+    // ── Perilaku default (SPV per-departemen, atau semua user per-role) ──
     const approvers = await getApproverEmails(approverRole, makerDepartmen);
 
     if (approvers.length === 0) {

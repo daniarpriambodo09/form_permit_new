@@ -14,19 +14,19 @@ async function generateId(): Promise<string> {
   const row = await queryOne<{ next_number: number }>(
     `SELECT COALESCE(MAX(SUBSTRING(id_form FROM 5)::integer), 0) + 1 AS next_number
      FROM form_ijin_kerja
-     WHERE id_form ~ '^IJK-[0-9]+$'`
+     WHERE id_form ~ '^WP-[0-9]+$'`
   );
   let next = Number(row?.next_number) || 1;
 
   // Find the first unused number in case historical data has gaps.
   while (await queryOne<{ id_form: string }>(
     `SELECT id_form FROM form_ijin_kerja WHERE id_form = $1`,
-    [`IJK-${String(next).padStart(4, '0')}`]
+    [`WP-${String(next).padStart(4, '0')}`]
   )) {
     next += 1;
   }
 
-  return `IJK-${String(next).padStart(4, '0')}`;
+  return `WP-${String(next).padStart(4, '0')}`;
 }
 
 function getUserFromReq(req: NextRequest): { userId: number | null; nama: string | null } {

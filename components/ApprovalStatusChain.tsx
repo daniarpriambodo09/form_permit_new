@@ -18,36 +18,20 @@ interface ApprovalStatusChainProps {
   tipePerusahaan?: "internal" | "eksternal";
 }
 
+// REFACTOR: Kontraktor dikeluarkan dari alur approval bertahap — kontraktor
+// sekarang tanda tangan bebas kapan saja (lihat ContractorSignatureBlock /
+// SignatureBox di DetailModal), bukan lagi salah satu "stage" di sini.
+// Internal & eksternal sekarang punya urutan stage yang SAMA:
+// SPV → Admin K3 → SFO → SMR, untuk hot-work, height-work, maupun workshop.
 const getStages = (
   formType: string,
   tipePerusahaan?: string
 ): ApprovalStage[] => {
-  if (formType === "hot-work" || formType === "workshop") {
-    return [
-      { role: "spv",        label: "SPV",        isApproved: false },
-      { role: "kontraktor", label: "Kontraktor", isApproved: false },
-      { role: "sfo",        label: "SFO",        isApproved: false },
-      { role: "pga",        label: "PGA",        isApproved: false },
-    ];
-  }
-
-  // height-work
-  if (tipePerusahaan === "eksternal") {
-    return [
-      { role: "kontraktor", label: "Kontraktor", isApproved: false },
-      { role: "spv",        label: "SPV",        isApproved: false },
-      { role: "admin_k3",   label: "Admin K3",  isApproved: false },
-      { role: "sfo",        label: "SFO",        isApproved: false },
-      { role: "mr_pga",     label: "SMR",    isApproved: false },
-    ];
-  }
-
-  // height-work internal (default)
   return [
-    { role: "spv",      label: "SPV",       isApproved: false },
+    { role: "spv",      label: "SPV",      isApproved: false },
     { role: "admin_k3", label: "Admin K3", isApproved: false },
-    { role: "sfo",      label: "SFO",       isApproved: false },
-    { role: "mr_pga",   label: "SMR",   isApproved: false },
+    { role: "sfo",      label: "SFO",      isApproved: false },
+    { role: "smr",      label: "SMR",      isApproved: false },
   ];
 };
 
@@ -63,26 +47,11 @@ export default function ApprovalStatusChain({
   const isRejected = formStatus === "rejected";
   const isSubmitted = formStatus === "submitted";
 
-  // Untuk height-work eksternal stage dimulai dari 1 (kontraktor)
-  // Untuk height-work internal stage dimulai dari 1 (spv)
-  // Untuk hot-work/workshop, stage 0 = firewatch (tidak ditampilkan di chain ini)
-  // currentStage dari DB: hot-work dimulai dari 0, height-work dari 1
-
-  // Map currentStage ke index array stages
-  const getStageIndex = (): number => {
-    if (formType === "hot-work" || formType === "workshop") {
-      // stages[0]=spv(stage1), stages[1]=kontraktor(stage2), ...
-      return currentStage - 1;
-    }
-    if (tipePerusahaan === "eksternal") {
-      // stages[0]=kontraktor(stage1), stages[1]=spv(stage2), ...
-      return currentStage - 1;
-    }
-    // internal: stages[0]=spv(stage1), stages[1]=admin_k3(stage2), ...
-    return currentStage - 1;
-  };
-
-  const currentIndex = getStageIndex();
+  // REFACTOR: Kontraktor sudah tidak menjadi bagian dari current_stage.
+  // Internal & eksternal kini sama-sama mulai dari stage 1 = SPV, jadi
+  // pemetaan index-nya seragam untuk semua formType/tipePerusahaan.
+  // stages[0]=spv(stage1), stages[1]=admin_k3(stage2), stages[2]=sfo(stage3), stages[3]=smr(stage4)
+  const currentIndex = currentStage - 1;
 
   return (
     <div className="w-full">

@@ -9,6 +9,7 @@ interface User {
   nama: string;
   jabatan: string;
   role: string;
+  nik: string | null;
   is_active: boolean;
 }
 
@@ -25,7 +26,7 @@ export async function POST(req: NextRequest) {
 
     // 🔍 Cari user
     const user = await queryOne<User>(
-      `SELECT id, username, password, nama, jabatan, role, is_active
+      `SELECT id, username, password, nama, jabatan, role, nik, is_active
        FROM users
        WHERE username = $1`,
       [username.trim()]
@@ -54,6 +55,7 @@ export async function POST(req: NextRequest) {
       nama: user.nama,
       jabatan: user.jabatan,
       role: user.role as UserRole,
+      nik: user.nik ?? null,
     });
 
     // ✅ Response + set cookie

@@ -59,6 +59,21 @@ const STATUS_CFG: Record<string, { label: string; bg: RGB }> = {
   draft:     { label: "DRAFT",      bg: C.s500 },
 };
 
+const WORKSHOP_CHECKLIST_ITEMS = [
+  ["equipment", "Equipment/tool/mesin berfungsi dengan baik"],
+  ["apar", "APAR tersedia dekat area kerja"],
+  ["flammableNearby", "Tidak ada cairan mudah terbakar dekat area kerja panas"],
+  ["b3Stored", "B3 & cairan mudah terbakar disimpan di lemari khusus"],
+  ["cleanFloor", "Lantai bersih dari benda mudah terbakar"],
+  ["metalShield", "Lantai ditutup dengan perisai metal untuk menampung bunga api"],
+  ["completePpe", "Memakai APD lengkap sesuai OS APD"],
+  ["cleanMaterial", "Membersihkan sisa material, serpihan logam, atau sampah"],
+  ["returnEquipment", "Mengembalikan Equipment/tool/mesin ke tempat penyimpanan semula"],
+  ["disposeWaste", "Membuang sampah sesuai jenisnya (organik, anorganik, dan B3)"],
+  ["firewatchSafety", "Fire watch memastikan kondisi aman selama dan setelah proses kerja"],
+  ["firewatchTraining", "Fire watch terlatih Pemakaian APAR"],
+] as const;
+
 // ═══════════════════════════════════════════════════════════════════════════
 // HELPERS
 // ═══════════════════════════════════════════════════════════════════════════
@@ -540,7 +555,7 @@ function drawBadge(
 //   └──────────────────────────────────────────────────────┘
 // ═══════════════════════════════════════════════════════════════════════════
 
-async function jsaSection(doc: Doc, perluJsa: boolean, url?: string | null, x = ML, w = CW) {
+async function jsaSection(doc: Doc, perluJsa: boolean, url?: string | null, jsaData?: any, x = ML, w = CW) {
   const d = doc.d;
 
   // ── Tidak perlu JSA ────────────────────────────────────
@@ -557,6 +572,20 @@ async function jsaSection(doc: Doc, perluJsa: boolean, url?: string | null, x = 
     d.setTextColor(...C.s500);
     d.text("JSA: Tidak diperlukan untuk pekerjaan ini", x + 4, y + 4.8);
     doc.y = y + H + 2;
+    return;
+  }
+
+  // JSA dibuat langsung pada form, bukan berupa file upload.
+  if (jsaData) {
+    const rows = [
+      { lbl: "Area", val: jsaData.area },
+      { lbl: "Jenis Pekerjaan", val: jsaData.jenisPekerjaan },
+      { lbl: "Sect/Dept", val: jsaData.sectDept },
+      { lbl: "PIC", val: jsaData.pic },
+      { lbl: "Petugas", val: (jsaData.petugas || []).filter(Boolean).join(", ") },
+    ];
+    sec(doc, "JSA Terstruktur", x, w);
+    infoTable(doc, rows, x, w);
     return;
   }
 
@@ -850,7 +879,7 @@ function buildHotWorkWorkshop(doc: Doc, data: any, formType: FormType) {
   // Informasi Dasar
   sec(doc, "Informasi Dasar", lx, lw);
   infoTable(doc, [
-    { lbl: "No. Registrasi",   val: data.no_registrasi },
+    { lbl: "No. Registrasi",   val: data.id_form },
     { lbl: "Lokasi Pekerjaan", val: data.lokasi_pekerjaan },
     { lbl: "Kontraktor / NIK", val: data.nama_kontraktor_nik },
     { lbl: "Pekerja / NIK",    val: data.nama_pekerja_nik },
@@ -862,7 +891,7 @@ function buildHotWorkWorkshop(doc: Doc, data: any, formType: FormType) {
   infoTable(doc, [
     { lbl: "Nama Fire Watch", val: data.nama_fire_watch },
     { lbl: "NIK Fire Watch",  val: data.nik_fire_watch },
-    { lbl: "Jabatan Pemberi", val: data.jabatan_pemberi_izin },
+    { lbl: "Nama Pemberi SPV", val: data.spv_terkait },
     { lbl: "NIK Pemberi",     val: data.nik_pemberi_ijin },
   ], lx, lw);
 
@@ -934,24 +963,31 @@ function buildHotWorkWorkshop(doc: Doc, data: any, formType: FormType) {
 
   // ── FULL WIDTH: Checklist Upaya Pencegahan ──────────────
   sec(doc, "Upaya Pencegahan");
-  checkGrid(doc, [
-    { lbl: "Equipment/Tools kondisi baik",            val: data.kondisi_tools_baik },
-    { lbl: "APAR dan Hydrant tersedia",               val: data.tersedia_apar_hydrant },
-    { lbl: "Sensor smoke detector non-aktif",         val: data.sensor_smoke_detector_non_aktif },
-    { lbl: "APD lengkap",                             val: data.apd_lengkap },
-    { lbl: "Tidak ada cairan mudah terbakar",         val: data.tidak_ada_cairan_mudah_terbakar },
-    { lbl: "Lantai bersih",                           val: data.lantai_bersih },
-    { lbl: "Lantai sudah dibasahi",                   val: data.lantai_sudah_dibasahi },
-    { lbl: "Cairan mudah terbakar tertutup",          val: data.cairan_mudah_tebakar_tertutup },
-    { lbl: "Lembaran dibawah pekerjaan",              val: data.lembaran_dibawah_pekerjaan },
-    { lbl: "Lindungi conveyor dll",                   val: data.lindungi_conveyor_dll },
-    { lbl: "Alat telah bersih",                       val: data.alat_telah_bersih },
-    { lbl: "Uap menyala telah dibuang",               val: data.uap_menyala_telah_dibuang },
-    { lbl: "Kerja pada dinding/langit-langit",        val: data.kerja_pada_dinding_lagit },
-    { lbl: "Bahan mudah terbakar dipindahkan",        val: data.bahan_mudah_terbakar_dipindahkan_dari_dinding },
-    { lbl: "Fire watch memastikan area aman",         val: data.fire_watch_memastikan_area_aman },
-    { lbl: "Fire watch terlatih",                     val: data.firwatch_terlatih },
-  ]);
+  if (formType === "workshop") {
+    checkGrid(doc, WORKSHOP_CHECKLIST_ITEMS.map(([key, lbl]) => ({
+      lbl,
+      val: data.checklist_pencegahan?.[key],
+    })));
+  } else {
+    checkGrid(doc, [
+      { lbl: "Equipment/Tools kondisi baik", val: data.kondisi_tools_baik },
+      { lbl: "APAR dan Hydrant tersedia", val: data.tersedia_apar_hydrant },
+      { lbl: "Sensor smoke detector non-aktif", val: data.sensor_smoke_detector_non_aktif },
+      { lbl: "APD lengkap", val: data.apd_lengkap },
+      { lbl: "Tidak ada cairan mudah terbakar", val: data.tidak_ada_cairan_mudah_terbakar },
+      { lbl: "Lantai bersih", val: data.lantai_bersih },
+      { lbl: "Lantai sudah dibasahi", val: data.lantai_sudah_dibasahi },
+      { lbl: "Cairan mudah terbakar tertutup", val: data.cairan_mudah_tebakar_tertutup },
+      { lbl: "Lembaran dibawah pekerjaan", val: data.lembaran_dibawah_pekerjaan },
+      { lbl: "Lindungi conveyor dll", val: data.lindungi_conveyor_dll },
+      { lbl: "Alat telah bersih", val: data.alat_telah_bersih },
+      { lbl: "Uap menyala telah dibuang", val: data.uap_menyala_telah_dibuang },
+      { lbl: "Kerja pada dinding/langit-langit", val: data.kerja_pada_dinding_lagit },
+      { lbl: "Bahan mudah terbakar dipindahkan", val: data.bahan_mudah_terbakar_dipindahkan_dari_dinding },
+      { lbl: "Fire watch memastikan area aman", val: data.fire_watch_memastikan_area_aman },
+      { lbl: "Fire watch terlatih", val: data.firwatch_terlatih },
+    ]);
+  }
 
   if (data.jumlah_fire_blanket) {
     infoTable(doc, [{ lbl: "Jumlah Fire Blanket", val: String(data.jumlah_fire_blanket) }]);
@@ -979,6 +1015,7 @@ function buildHeightWork(doc: Doc, data: any) {
     { lbl: "Pengawas Kontraktor", val: data.nama_pengawas_kontraktor },
     { lbl: "Pengawas Dept",       val: data.nama_pengawas_departemen },
     { lbl: "Departemen",          val: data.nama_departemen },
+    { lbl: "Nama Pemberi SPV",    val: data.spv_terkait },
   ], lx, lw);
 
   sec(doc, "Peminjaman APD", lx, lw);
@@ -1223,7 +1260,7 @@ export async function generatePermitPdf(data: any, formType: FormType): Promise<
 
   // ── JSA ────────────────────────────────────────────────
   sec(doc, "Dokumen JSA");
-  await jsaSection(doc, bool(data.perlu_jsa), data.jsa_file_url);
+  await jsaSection(doc, bool(data.perlu_jsa), data.jsa_file_url, data.jsa_data);
 
   // ── Catatan Reject ─────────────────────────────────────
   if (data.catatan_reject) {
@@ -1313,7 +1350,7 @@ export async function generatePermitPdfBlob(data: any, formType: FormType): Prom
  
   // ── JSA ────────────────────────────────────────────────
   sec(doc, "Dokumen JSA");
-  await jsaSection(doc, bool(data.perlu_jsa), data.jsa_file_url);
+  await jsaSection(doc, bool(data.perlu_jsa), data.jsa_file_url, data.jsa_data);
  
   // ── Catatan Reject ─────────────────────────────────────
   if (data.catatan_reject) {
