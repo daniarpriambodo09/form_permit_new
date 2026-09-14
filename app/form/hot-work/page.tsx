@@ -33,12 +33,14 @@ interface FormData {
   };
   pencegahan: {
     equipment: string; apar: string; sensor: string; apd: string;
-    meter11_cairan: string; lantai: string; lantaiBasah: string; cairan_diproteksi: string;
-    lembaran: string; lindungi_conveyor: string;
+    lantaiBasah: string; cairan_diproteksi: string; lindungi_conveyor: string;
+    ruangTertutupBerlaku: string;
     ruang_tertutup_dibersihkan: string; uap_dibuang: string;
+    dindingBerlaku: string;
     dinding_konstruksi: string; bahan_dipindahkan: string;
     firewatch_ada: string; firewatch_pelatihan: string;
-    fireblank: string; fireblank_jumlah: string; permintaan_tambahan: string;
+    fireblank: string; fireblank_jumlah: string;
+    permintaan_tambahan: string;
   };
   persetujuan: { spvNama: string; kontraktorNama: string; sfoNama: string; pgaNama: string };
 }
@@ -69,18 +71,65 @@ const CheckItem = ({ label, checked, onChange }: any) => (
   </label>
 );
 
-const YesNoRow = ({ label, fieldKey, pencegahan, setPencegahan }: any) => (
-  <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
-    <span className="text-sm text-slate-700 flex-1 mr-4">{label}</span>
-    <div className="flex gap-4 shrink-0">
-      {["ya", "tidak"].map(v => (
-        <label key={v} className="flex items-center gap-1.5 cursor-pointer">
-          <input type="radio" name={fieldKey} value={v} checked={pencegahan[fieldKey] === v}
-            onChange={() => setPencegahan({ ...pencegahan, [fieldKey]: v })} className="w-4 h-4 text-orange-600" />
-          <span className="text-sm">{v === "ya" ? "YA" : "TIDAK"}</span>
-        </label>
-      ))}
-    </div>
+// ── Bagian 3: baris checklist tunggal (item biasa & sub-item kelompok) ──
+// `options` opsional: default YA/TIDAK, bisa diganti mis. LAYAK/TIDAK LAYAK.
+const ChecklistRow = ({ no, label, fieldKey, pencegahan, setPencegahan, disabled, indent, options }: any) => {
+  const opts = options ?? [
+    { value: "ya", label: "YA" },
+    { value: "tidak", label: "TIDAK" },
+  ];
+  return (
+    <label
+      className={`grid grid-cols-[3.5rem_1fr] border-b border-slate-200 last:border-0 transition-colors ${
+        disabled ? "opacity-50 bg-slate-50 cursor-not-allowed" : "cursor-pointer hover:bg-orange-50"
+      }`}
+    >
+      <span className="px-3 py-2.5 text-sm text-slate-600 text-center border-r border-slate-200">{no}</span>
+      <span className={`flex items-center justify-between gap-3 px-3 py-2.5 text-sm text-slate-700 ${indent ? "pl-6" : ""}`}>
+        <span>{label}</span>
+        <span className="flex items-center gap-3 shrink-0">
+          {opts.map((opt: { value: string; label: string }) => (
+            <label key={opt.value} className={`flex items-center gap-1.5 text-xs font-semibold ${disabled ? "cursor-not-allowed" : "cursor-pointer"}`}>
+              <input
+                type="radio"
+                name={fieldKey}
+                value={opt.value}
+                disabled={disabled}
+                checked={pencegahan[fieldKey] === opt.value}
+                onChange={() => setPencegahan({ ...pencegahan, [fieldKey]: opt.value })}
+                className="w-4 h-4 text-orange-600 border-slate-300"
+              />
+              {opt.label}
+            </label>
+          ))}
+        </span>
+      </span>
+    </label>
+  );
+};
+
+// ── Bagian 3: header kelompok (item 8 & 9) — YA/TIDAK di sini mengaktifkan/menonaktifkan sub-item ──
+const ChecklistGroupHeader = ({ no, label, groupField, pencegahan, onToggleGroup }: any) => (
+  <div className="grid grid-cols-[3.5rem_1fr] border-b border-slate-200 bg-orange-50">
+    <span className="px-3 py-2.5 text-sm font-bold text-slate-700 text-center border-r border-slate-200">{no}</span>
+    <span className="flex items-center justify-between gap-3 px-3 py-2.5">
+      <span className="text-sm font-bold text-slate-800 uppercase">{label}</span>
+      <span className="flex items-center gap-3 shrink-0">
+        {["ya", "tidak"].map((v) => (
+          <label key={v} className="flex items-center gap-1.5 text-xs font-semibold cursor-pointer">
+            <input
+              type="radio"
+              name={groupField}
+              value={v}
+              checked={pencegahan[groupField] === v}
+              onChange={() => onToggleGroup(v)}
+              className="w-4 h-4 text-orange-600 border-slate-300"
+            />
+            {v === "ya" ? "YA" : "TIDAK"}
+          </label>
+        ))}
+      </span>
+    </span>
   </div>
 );
 
@@ -102,12 +151,14 @@ const defaultForm = (): FormData => ({
   areaBerisiko: { ruangTertutup: false, bahanMudah: false, gas: false, ketinggian: false, cairan: false, hydrocarbon: false, lain: "" },
   pencegahan: {
     equipment: "tidak", apar: "tidak", sensor: "tidak", apd: "tidak",
-    meter11_cairan: "tidak", lantai: "tidak", lantaiBasah: "tidak", cairan_diproteksi: "tidak",
-    lembaran: "tidak", lindungi_conveyor: "tidak",
+    lantaiBasah: "tidak", cairan_diproteksi: "tidak", lindungi_conveyor: "tidak",
+    ruangTertutupBerlaku: "tidak",
     ruang_tertutup_dibersihkan: "tidak", uap_dibuang: "tidak",
+    dindingBerlaku: "tidak",
     dinding_konstruksi: "tidak", bahan_dipindahkan: "tidak",
     firewatch_ada: "tidak", firewatch_pelatihan: "tidak",
-    fireblank: "", fireblank_jumlah: "", permintaan_tambahan: "",
+    fireblank: "tidak_layak", fireblank_jumlah: "",
+    permintaan_tambahan: "",
   },
   persetujuan: { spvNama: "", kontraktorNama: "", sfoNama: "", pgaNama: "" },
 });
@@ -193,6 +244,17 @@ function HotWorkPermitFormInner() {
   const setP = (patch: any) => setFormData(prev => ({ ...prev, pencegahan: { ...prev.pencegahan, ...patch } }));
   const setWork = (key: "cutting" | "grinding" | "welding" | "painting", field: keyof WorkDetail, val: string) =>
     setJ({ [key]: { ...formData.jenisPekerjaan[key], [field]: val } });
+
+  // ── Bagian 3: kelompok 8 (ruangan tertutup) & 9 (dinding/langit-langit) ──
+  // Kalau kelompok "tidak", sub-item ikut dipaksa "tidak" & dikunci.
+  const setRuangTertutupBerlaku = (v: string) =>
+    setP(v === "tidak"
+      ? { ruangTertutupBerlaku: v, ruang_tertutup_dibersihkan: "tidak", uap_dibuang: "tidak" }
+      : { ruangTertutupBerlaku: v });
+  const setDindingBerlaku = (v: string) =>
+    setP(v === "tidak"
+      ? { dindingBerlaku: v, dinding_konstruksi: "tidak", bahan_dipindahkan: "tidak" }
+      : { dindingBerlaku: v });
 
   const isInternal = formData.tipePerusahaan === "internal";
   const approverLabels = getApproverLabels(isInternal);
@@ -500,9 +562,7 @@ function HotWorkPermitFormInner() {
                   return (
                     <div key={key} className="border border-slate-200 rounded-lg p-4 bg-slate-50 hover:bg-orange-50 transition-colors">
                       <p className="text-sm font-bold text-slate-900 mb-3 capitalize">{key}</p>
-                      {/* Grid layout yang lebih rapi - Detail lebih lebar, waktu lebih compact */}
                       <div className="grid grid-cols-12 gap-4 items-end">
-                        {/* Detail - 5 kolom */}
                         <div className="col-span-12 md:col-span-5">
                           <label className="block text-xs font-semibold text-slate-600 mb-1.5">Detail Pekerjaan</label>
                           <input
@@ -513,8 +573,6 @@ function HotWorkPermitFormInner() {
                             placeholder="Deskripsi pekerjaan"
                           />
                         </div>
-
-                        {/* Mulai - 3 kolom */}
                         <div className="col-span-6 md:col-span-3">
                           <label className="block text-xs font-semibold text-slate-600 mb-1.5">Mulai</label>
                           <TimeInput24
@@ -523,8 +581,6 @@ function HotWorkPermitFormInner() {
                             label=""
                           />
                         </div>
-
-                        {/* Selesai - 4 kolom */}
                         <div className="col-span-6 md:col-span-4">
                           <label className="block text-xs font-semibold text-slate-600 mb-1.5">Selesai</label>
                           <TimeInput24
@@ -563,65 +619,58 @@ function HotWorkPermitFormInner() {
         {/* ── BAGIAN 3 ── */}
         <Section title="BAGIAN 3: HAL-HAL YANG PERLU DIPERHATIKAN SEBAGAI UPAYA PENCEGAHAN"
           section="bagian3" description="Checklist keselamatan" expanded={expanded} toggle={toggle}>
-          <div className="space-y-6">
-            {[
-              { t: "1. UMUM", items: [{ k: "equipment", l: "Equipment / Tools kondisi baik" }, { k: "apar", l: "Alat pemadam api tersedia" }, { k: "sensor", l: "Sensor Smoke Detector non-aktif" }, { k: "apd", l: "APD lengkap dipakai" }] },
-              { t: "2. DAERAH 11 METER", items: [{ k: "meter11_cairan", l: "Tidak ada cairan mudah terbakar" }, { k: "lantai", l: "Lantai bersih dari benda mudah terbakar" }, { k: "lantaiBasah", l: "Lantai dibasahi / ditutupi pasir basah" }, { k: "cairan_diproteksi", l: "Cairan mudah terbakar diproteksi" }, { k: "lembaran", l: "Lembaran di bawah pekerjaan" }, { k: "lindungi_conveyor", l: "Lindungi conveyor dan instalasi kabel" }] },
-              { t: "3. RUANGAN TERTUTUP", items: [{ k: "ruang_tertutup_dibersihkan", l: "Alat dibersihkan dari bahan mudah terbakar" }, { k: "uap_dibuang", l: "Uap menyala dibuang dari ruangan" }] },
-              { t: "4. DINDING / LANGIT-LANGIT", items: [{ k: "dinding_konstruksi", l: "Konstruksi tidak mudah terbakar" }, { k: "bahan_dipindahkan", l: "Bahan mudah terbakar dipindahkan dari dinding" }] },
-            ].map(group => (
-              <div key={group.t} className="border border-slate-200 rounded-lg p-4">
-                <h4 className="font-bold text-slate-900 text-sm mb-4">{group.t}</h4>
-                <div className="space-y-3">
-                  {group.items.map(item => <YesNoRow key={item.k} label={item.l} fieldKey={item.k} pencegahan={formData.pencegahan} setPencegahan={setP} />)}
-                </div>
-              </div>
-            ))}
-
-            <div className="border border-blue-200 rounded-lg p-4 bg-blue-50">
-              <h4 className="font-bold text-blue-900 text-sm mb-4">5. PERAN API (FIRE WATCH)</h4>
-              <div className="space-y-3">
-                {[{ k: "firewatch_ada", l: "Fire Watch ada memastikan area aman selama proses dan 30 menit setelahnya" }, { k: "firewatch_pelatihan", l: "Fire Watch sudah mendapat pelatihan menggunakan alat pemadam kebakaran" }]
-                  .map(item => (
-                    <div key={item.k} className="flex items-center justify-between p-3 bg-white rounded-lg">
-                      <span className="text-sm text-slate-700 flex-1 mr-4">{item.l}</span>
-                      <div className="flex gap-4 shrink-0">
-                        {["ya", "tidak"].map(v => (
-                          <label key={v} className="flex items-center gap-1.5 cursor-pointer">
-                            <input type="radio" name={item.k} value={v} checked={formData.pencegahan[item.k as keyof typeof formData.pencegahan] === v} onChange={() => setP({ [item.k]: v })} className="w-4 h-4 text-orange-600" />
-                            <span className="text-sm">{v === "ya" ? "YA" : "TIDAK"}</span>
-                          </label>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-              </div>
+          <div className="border border-slate-200 rounded-lg overflow-hidden">
+            <div className="grid grid-cols-[3.5rem_1fr] bg-slate-100 border-b border-slate-300">
+              <span className="px-3 py-2.5 text-xs font-bold text-slate-600 text-center">NO.</span>
+              <span className="px-3 py-2.5 text-xs font-bold text-slate-600">ITEM CHECK LIST</span>
             </div>
 
-            <div className="border border-slate-200 rounded-lg p-4">
-              <h4 className="font-bold text-slate-900 text-sm mb-4">6. FIRE BLANKET / PERISAI METAL</h4>
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">Kondisi</label>
-                  <div className="flex gap-6">
-                    {[{ v: "layak", l: "Layak" }, { v: "tidak_layak", l: "Tidak Layak" }].map(({ v, l }) => (
-                      <label key={v} className="flex items-center gap-2 cursor-pointer">
-                        <input type="radio" name="fireblank" value={v} checked={formData.pencegahan.fireblank === v} onChange={() => setP({ fireblank: v })} className="w-4 h-4 text-orange-600" />
-                        <span className="text-sm">{l}</span>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">Jumlah</label>
-                  <input type="number" value={formData.pencegahan.fireblank_jumlah} onChange={e => setP({ fireblank_jumlah: e.target.value })} className={inputCls} placeholder="Jumlah" />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">Permintaan Tambahan</label>
-                  <textarea rows={2} value={formData.pencegahan.permintaan_tambahan} onChange={e => setP({ permintaan_tambahan: e.target.value })} className={inputCls} placeholder="Sebutkan..." />
-                </div>
-              </div>
-            </div>
+            <ChecklistRow no="1" label="Equipment/Tools kondisi baik" fieldKey="equipment" pencegahan={formData.pencegahan} setPencegahan={setP} />
+            <ChecklistRow no="2" label="Alat pemadam api (APAR, Hydrant)" fieldKey="apar" pencegahan={formData.pencegahan} setPencegahan={setP} />
+            <ChecklistRow no="3" label="Sensor Smoke Detector perlu dinon-aktifkan" fieldKey="sensor" pencegahan={formData.pencegahan} setPencegahan={setP} />
+            <ChecklistRow no="4" label="APD lengkap dipakai" fieldKey="apd" pencegahan={formData.pencegahan} setPencegahan={setP} />
+            <ChecklistRow no="5" label="Lantai dari bahan mudah terbakar dibasahi, ditutupi dengan pasir basah atau perisai metal lainnya" fieldKey="lantaiBasah" pencegahan={formData.pencegahan} setPencegahan={setP} />
+            <ChecklistRow no="6" label="Cairan mudah terbakar dan menyala diproteksi dengan tutup atau perisai metal" fieldKey="cairan_diproteksi" pencegahan={formData.pencegahan} setPencegahan={setP} />
+            <ChecklistRow no="7" label="Lindungi conveyor, instalasi kabel, equipment penghantar listrik dengan perisai metal tidak mudah terbakar" fieldKey="lindungi_conveyor" pencegahan={formData.pencegahan} setPencegahan={setP} />
+
+            <ChecklistGroupHeader no="8" label="Pekerjaan Pada Ruangan Tertutup" groupField="ruangTertutupBerlaku" pencegahan={formData.pencegahan} onToggleGroup={setRuangTertutupBerlaku} />
+            <ChecklistRow no="8.1" indent label="Peralatan dibersihkan dari semua bahan mudah terbakar" fieldKey="ruang_tertutup_dibersihkan" pencegahan={formData.pencegahan} setPencegahan={setP} disabled={formData.pencegahan.ruangTertutupBerlaku !== "ya"} />
+            <ChecklistRow no="8.2" indent label="Uap menyala di ruangan tertutup dibuang dari ruangan" fieldKey="uap_dibuang" pencegahan={formData.pencegahan} setPencegahan={setP} disabled={formData.pencegahan.ruangTertutupBerlaku !== "ya"} />
+
+            <ChecklistGroupHeader no="9" label="Pekerjaan Pada Dinding Atau Langit-Langit" groupField="dindingBerlaku" pencegahan={formData.pencegahan} onToggleGroup={setDindingBerlaku} />
+            <ChecklistRow no="9.1" indent label="Pekerjaan pada dinding atau langit-langit konstruksi tidak mudah terbakar dan tanpa penutup yang mudah terbakar" fieldKey="dinding_konstruksi" pencegahan={formData.pencegahan} setPencegahan={setP} disabled={formData.pencegahan.dindingBerlaku !== "ya"} />
+            <ChecklistRow no="9.2" indent label="Bahan mudah terbakar dipindahkan dari dinding yang bersebrangan" fieldKey="bahan_dipindahkan" pencegahan={formData.pencegahan} setPencegahan={setP} disabled={formData.pencegahan.dindingBerlaku !== "ya"} />
+
+            <ChecklistRow no="10" label="Fire watch ada memastikan area aman selama proses dan 60 menit setelahnya untuk menghindari bunga api dan panas yang menjalar" fieldKey="firewatch_ada" pencegahan={formData.pencegahan} setPencegahan={setP} />
+            <ChecklistRow no="11" label="Fire Watch sudah mendapatkan pelatihan dan mampu menggunakan alat pemadam kebakaran dan fire alarm" fieldKey="firewatch_pelatihan" pencegahan={formData.pencegahan} setPencegahan={setP} />
+            <ChecklistRow
+              no="12"
+              label="Kondisi Fire Blanket / Perisai Metal"
+              fieldKey="fireblank"
+              pencegahan={formData.pencegahan}
+              setPencegahan={setP}
+              options={[
+                { value: "layak", label: "LAYAK" },
+                { value: "tidak_layak", label: "TIDAK LAYAK" },
+              ]}
+            />
+          </div>
+
+          <div className="mt-4 max-w-xs">
+            <label className="block text-sm font-medium text-slate-700 mb-2">Jumlah Fire Blanket yang Digunakan</label>
+            <input
+              type="number"
+              min={0}
+              value={formData.pencegahan.fireblank_jumlah}
+              onChange={e => setP({ fireblank_jumlah: e.target.value })}
+              className={inputCls}
+              placeholder="Jumlah"
+            />
+          </div>
+
+          <div className="mt-4">
+            <label className="block text-sm font-medium text-slate-700 mb-2">Permintaan Tambahan Tindakan Pengamanan</label>
+            <textarea rows={3} value={formData.pencegahan.permintaan_tambahan} onChange={e => setP({ permintaan_tambahan: e.target.value })} className={inputCls} placeholder="Sebutkan..." />
           </div>
         </Section>
 

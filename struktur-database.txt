@@ -467,7 +467,6 @@ Triggers:
 
 
 jai_permit_db=#
-jai_permit_db=# \d form_kerja_workshop
                                                         Table "public.form_kerja_workshop"
                     Column                     |           Type           | Collation | Nullable |                     Default
 -----------------------------------------------+--------------------------+-----------+----------+-------------------------------------------------

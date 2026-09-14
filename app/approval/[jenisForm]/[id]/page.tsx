@@ -1,34 +1,4 @@
 // app/approval/[jenisForm]/[id]/page.tsx
-// REFACTOR: Role 'pga' diganti 'smr'. Kolom DB mr_pga_* tetap.
-// SECURITY: Auth guard via useApproverAuth — tidak lagi mengandalkan sessionStorage untuk auth.
-// FIX: Halaman detail approval sekarang menampilkan SELURUH informasi form yang diisi worker,
-//      termasuk field yang sebelumnya tidak ditampilkan sama sekali:
-//        - Height-work: daftar petugas + status sehat + foto lisensi (Bagian 2),
-//          peminjaman APD (Bagian 3), dan seluruh item checklist Bagian 4 & 5.
-//        - Hot-work/Workshop: cairan/gas bertekanan, bahaya lain, pekerjaan lainnya,
-//          fire blanket (hot-work), spray/non-spray (workshop), dan permintaan tambahan.
-//
-// UPDATED: Height-work Bagian 5 (Pengecekan Body Harness & Lanyard) TIDAK LAGI diisi
-//          worker di form pembuatan. Sekarang:
-//            - Role SEBELUM Admin K3 (SPV untuk internal; Kontraktor & SPV untuk
-//              eksternal) melihat teks placeholder — checklist belum tersedia.
-//            - Role Admin K3, pada gilirannya (status submitted & current_stage
-//              == stage Admin K3), melihat checklist INTERAKTIF dan mengisinya
-//              bersamaan dengan aksi approve.
-//            - Setelah Admin K3 approve (admin_k3_approved = true), SEMUA role
-//              (termasuk SFO, SMR, dan Admin K3 sendiri jika kembali membuka
-//              halaman ini) melihat hasil checklist dalam mode read-only.
-//
-// UPDATED: Bagian 5 sekarang juga menyertakan checklist "Helm" (sebelumnya
-//          belum ada), mengikuti pola yang sama seperti item Body Harness &
-//          Lanyard lainnya — diisi oleh Admin K3 saat approve, kolom DB
-//          helm_kondisi_baik, dikirim via body.harness_checklist.
-//
-// WORKFLOW:
-//   Hot-work & Workshop INTERNAL:  SPV(1) → Admin K3(2) → SFO(3) → SMR(4)
-//   Hot-work & Workshop EKSTERNAL: Kontraktor(1) → SPV(2) → Admin K3(3) → SFO(4) → SMR(5)
-//   Height-work INTERNAL:          SPV(1) → Admin K3(2) → SFO(3) → SMR(4)
-//   Height-work EKSTERNAL:         Kontraktor(1) → SPV(2) → Admin K3(3) → SFO(4) → SMR(5)
 "use client";
 import { useState, useEffect, use } from "react";
 import Link from "next/link";
@@ -69,6 +39,31 @@ const WORKSHOP_CHECKLIST_ITEMS = [
   ["disposeWaste", "Membuang sampah sesuai jenisnya (organik, anorganik, dan B3)"],
   ["firewatchSafety", "Fire watch memastikan kondisi aman selama dan setelah proses kerja"],
   ["firewatchTraining", "Fire watch terlatih Pemakaian APAR"],
+] as const;
+
+const HOT_WORK_CHECKLIST_ITEMS = [
+  ["1", "Equipment/Tools kondisi baik", "kondisi_tools_baik"],
+  ["2", "Alat pemadam api (APAR, Hydrant)", "tersedia_apar_hydrant"],
+  ["3", "Sensor Smoke Detector perlu dinon-aktifkan", "sensor_smoke_detector_non_aktif"],
+  ["4", "APD lengkap dipakai", "apd_lengkap"],
+  ["5", "Lantai dari bahan mudah terbakar dibasahi, ditutupi dengan pasir basah atau perisai metal lainnya", "lantai_sudah_dibasahi"],
+  ["6", "Cairan mudah terbakar dan menyala diproteksi dengan tutup atau perisai metal", "cairan_mudah_tebakar_tertutup"],
+  ["7", "Lindungi conveyor, instalasi kabel, equipment penghantar listrik dengan perisai metal tidak mudah terbakar", "lindungi_conveyor_dll"],
+] as const;
+
+const HOT_WORK_RUANG_TERTUTUP_ITEMS = [
+  ["8.1", "Peralatan dibersihkan dari semua bahan mudah terbakar", "alat_telah_bersih"],
+  ["8.2", "Uap menyala di ruangan tertutup dibuang dari ruangan", "uap_menyala_telah_dibuang"],
+] as const;
+
+const HOT_WORK_DINDING_ITEMS = [
+  ["9.1", "Pekerjaan pada dinding atau langit-langit konstruksi tidak mudah terbakar dan tanpa penutup yang mudah terbakar", "kerja_pada_dinding_lagit"],
+  ["9.2", "Bahan mudah terbakar dipindahkan dari dinding yang bersebrangan", "bahan_mudah_terbakar_dipindahkan_dari_dinding"],
+] as const;
+
+const HOT_WORK_TAIL_ITEMS = [
+  ["10", "Fire watch ada memastikan area aman selama proses dan 60 menit setelahnya untuk menghindari bunga api dan panas yang menjalar", "fire_watch_memastikan_area_aman"],
+  ["11", "Fire Watch sudah mendapatkan pelatihan dan mampu menggunakan alat pemadam kebakaran dan fire alarm", "firwatch_terlatih"],
 ] as const;
 
 function getTipeLabel(tipe?: string): string {
@@ -771,38 +766,76 @@ export default function ApprovalDetailPage({
                   ))}
                 </div>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8">
-                  <div>
-                    <BF label="Equipment / Tools kondisi baik"      value={form.kondisi_tools_baik} />
-                    <BF label="APAR / Hydrant tersedia"             value={form.tersedia_apar_hydrant} />
-                    <BF label="Sensor Smoke Detector non-aktif"     value={form.sensor_smoke_detector_non_aktif} />
-                    <BF label="APD lengkap dipakai"                 value={form.apd_lengkap} />
-                    <BF label="Tidak ada cairan mudah terbakar"     value={form.tidak_ada_cairan_mudah_terbakar} />
-                    <BF label="Lantai bersih"                       value={form.lantai_bersih} />
-                    <BF label="Lantai dibasahi"                     value={form.lantai_sudah_dibasahi} />
-                    <BF label="Cairan mudah terbakar tertutup"      value={form.cairan_mudah_tebakar_tertutup} />
+                <div className="border border-slate-200 rounded-lg overflow-hidden">
+                  <div className="grid grid-cols-[3.5rem_1fr_auto] bg-slate-100 border-b border-slate-300 text-xs font-bold text-slate-600">
+                    <span className="px-3 py-2 text-center">NO.</span>
+                    <span className="px-3 py-2">ITEM CHECK LIST</span>
+                    <span className="px-3 py-2">STATUS</span>
                   </div>
-                  <div>
-                    <BF label="Lembaran di bawah pekerjaan"         value={form.lembaran_dibawah_pekerjaan} />
-                    <BF label="Lindungi conveyor, kabel"            value={form.lindungi_conveyor_dll} />
-                    <BF label="Alat dibersihkan"                    value={form.alat_telah_bersih} />
-                    <BF label="Uap menyala dibuang"                 value={form.uap_menyala_telah_dibuang} />
-                    <BF label="Konstruksi tidak mudah terbakar"     value={form.kerja_pada_dinding_lagit} />
-                    <BF label="Bahan mudah terbakar dipindahkan"    value={form.bahan_mudah_terbakar_dipindahkan_dari_dinding} />
-                    <BF label="Fire watch memastikan area aman"     value={form.fire_watch_memastikan_area_aman} />
-                    <BF label="Fire watch terlatih pakai APAR"      value={form.firwatch_terlatih} />
+
+                  {HOT_WORK_CHECKLIST_ITEMS.map(([no, label, key]) => (
+                    <div key={key} className="grid grid-cols-[3.5rem_1fr_auto] border-b border-slate-200 last:border-0 items-center">
+                      <span className="px-3 py-2 text-sm text-center text-slate-600">{no}</span>
+                      <span className="px-3 py-2 text-sm text-slate-700">{label}</span>
+                      <span className={`px-3 py-2 text-xs font-bold ${isTruthy(form[key]) ? "text-green-600" : "text-red-500"}`}>
+                        {isTruthy(form[key]) ? "YA" : "TIDAK"}
+                      </span>
+                    </div>
+                  ))}
+
+                  <div className="grid grid-cols-[3.5rem_1fr_auto] border-b border-slate-200 items-center bg-orange-50">
+                    <span className="px-3 py-2 text-sm text-center font-bold text-slate-700">8</span>
+                    <span className="px-3 py-2 text-sm font-bold uppercase text-slate-800">Pekerjaan Pada Ruangan Tertutup</span>
+                    <span className="px-3 py-2 text-xs font-bold text-slate-500">—</span>
+                  </div>
+                  {HOT_WORK_RUANG_TERTUTUP_ITEMS.map(([no, label, key]) => (
+                    <div key={key} className="grid grid-cols-[3.5rem_1fr_auto] border-b border-slate-200 last:border-0 items-center">
+                      <span className="px-3 py-2 text-sm text-center text-slate-600">{no}</span>
+                      <span className="px-3 py-2 text-sm text-slate-700">{label}</span>
+                      <span className={`px-3 py-2 text-xs font-bold ${isTruthy(form[key]) ? "text-green-600" : "text-red-500"}`}>
+                        {isTruthy(form[key]) ? "YA" : "TIDAK"}
+                      </span>
+                    </div>
+                  ))}
+
+                  <div className="grid grid-cols-[3.5rem_1fr_auto] border-b border-slate-200 items-center bg-orange-50">
+                    <span className="px-3 py-2 text-sm text-center font-bold text-slate-700">9</span>
+                    <span className="px-3 py-2 text-sm font-bold uppercase text-slate-800">Pekerjaan Pada Dinding Atau Langit-Langit</span>
+                    <span className="px-3 py-2 text-xs font-bold text-slate-500">—</span>
+                  </div>
+                  {HOT_WORK_DINDING_ITEMS.map(([no, label, key]) => (
+                    <div key={key} className="grid grid-cols-[3.5rem_1fr_auto] border-b border-slate-200 last:border-0 items-center">
+                      <span className="px-3 py-2 text-sm text-center text-slate-600">{no}</span>
+                      <span className="px-3 py-2 text-sm text-slate-700">{label}</span>
+                      <span className={`px-3 py-2 text-xs font-bold ${isTruthy(form[key]) ? "text-green-600" : "text-red-500"}`}>
+                        {isTruthy(form[key]) ? "YA" : "TIDAK"}
+                      </span>
+                    </div>
+                  ))}
+
+                  {HOT_WORK_TAIL_ITEMS.map(([no, label, key]) => (
+                    <div key={key} className="grid grid-cols-[3.5rem_1fr_auto] border-b border-slate-200 last:border-0 items-center">
+                      <span className="px-3 py-2 text-sm text-center text-slate-600">{no}</span>
+                      <span className="px-3 py-2 text-sm text-slate-700">{label}</span>
+                      <span className={`px-3 py-2 text-xs font-bold ${isTruthy(form[key]) ? "text-green-600" : "text-red-500"}`}>
+                        {isTruthy(form[key]) ? "YA" : "TIDAK"}
+                      </span>
+                    </div>
+                  ))}
+
+                  <div className="grid grid-cols-[3.5rem_1fr_auto] border-b border-slate-200 last:border-0 items-center">
+                    <span className="px-3 py-2 text-sm text-center text-slate-600">12</span>
+                    <span className="px-3 py-2 text-sm text-slate-700">Kondisi Fire Blanket / Perisai Metal</span>
+                    <span className={`px-3 py-2 text-xs font-bold ${isTruthy(form.kondisi_fire_blanket) ? "text-green-600" : "text-red-500"}`}>
+                      {isTruthy(form.kondisi_fire_blanket) ? "LAYAK" : "TIDAK LAYAK"}
+                    </span>
                   </div>
                 </div>
               )}
 
-              {/* Fire Blanket / Perisai Metal — khusus Hot Work */}
-              {isHotWork && (form.kondisi_fire_blanket !== null && form.kondisi_fire_blanket !== undefined) && (
-                <div className="mt-4 pt-4 border-t border-slate-200">
-                  <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Fire Blanket / Perisai Metal</p>
-                  <div className="grid grid-cols-2 gap-4">
-                    <F label="Kondisi" value={isTruthy(form.kondisi_fire_blanket) ? "Layak" : "Tidak Layak"} />
-                    <F label="Jumlah"  value={form.jumlah_fire_blanket ?? "-"} />
-                  </div>
+              {isHotWork && (form.jumlah_fire_blanket !== null && form.jumlah_fire_blanket !== undefined && form.jumlah_fire_blanket !== "") && (
+                <div className="mt-3">
+                  <F label="Jumlah Fire Blanket yang Digunakan" value={form.jumlah_fire_blanket} />
                 </div>
               )}
 

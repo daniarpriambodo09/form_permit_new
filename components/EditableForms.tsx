@@ -56,6 +56,58 @@ function ImagePreviewModal({
 }
 
 // ─────────────────────────────────────────────────────────────
+// Sub-komponen: baris checklist YA/TIDAK untuk Bagian 3 Hot Work
+// (dipakai untuk item biasa maupun sub-item kelompok 8 & 9)
+// ─────────────────────────────────────────────────────────────
+function YaTidakRow({
+  no,
+  label,
+  checked,
+  onChange,
+  disabled,
+  bold,
+  trueLabel = "YA",
+  falseLabel = "TIDAK",
+}: {
+  no: string;
+  label: string;
+  checked: boolean;
+  onChange: (v: boolean) => void;
+  disabled?: boolean;
+  bold?: boolean;
+  trueLabel?: string;
+  falseLabel?: string;
+}) {
+  return (
+    <div
+      className={`grid grid-cols-[2.5rem_1fr_auto] items-center gap-2 border-b border-slate-100 last:border-0 py-2 px-1 ${
+        disabled ? "opacity-50" : ""
+      } ${bold ? "bg-orange-50" : ""}`}
+    >
+      <span className="text-xs text-slate-400 text-center">{no}</span>
+      <span className={`text-sm ${bold ? "font-bold uppercase text-slate-800" : "text-slate-700"}`}>{label}</span>
+      <span className="flex items-center gap-3 shrink-0">
+        {[true, false].map((v) => (
+          <label
+            key={String(v)}
+            className={`flex items-center gap-1 text-xs font-semibold ${disabled ? "cursor-not-allowed" : "cursor-pointer"}`}
+          >
+            <input
+              type="radio"
+              disabled={disabled}
+              checked={checked === v}
+              onChange={() => onChange(v)}
+              className="w-3.5 h-3.5 text-orange-600"
+            />
+            {v ? trueLabel : falseLabel}
+          </label>
+        ))}
+      </span>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
 // Sub-komponen: Tombol upload lisensi per baris petugas
 // ─────────────────────────────────────────────────────────────
 interface LisensiButtonProps {
@@ -249,6 +301,39 @@ export default function EditableForms({ formType, formData, onChange }: Editable
   useEffect(() => {
     setLocalData(formData);
   }, [formData]);
+
+  // ── Hot Work Bagian 3: kelompok 8 (ruangan tertutup) & 9 (dinding/
+  //    langit-langit) — status "berlaku" ini hanya di sisi UI (tidak ada
+  //    kolom DB terpisah), diturunkan dari sub-item yang sudah true.
+  const [ruangTertutupBerlaku, setRuangTertutupBerlakuState] = useState<boolean>(false);
+  const [dindingBerlaku, setDindingBerlakuState] = useState<boolean>(false);
+
+  useEffect(() => {
+    setRuangTertutupBerlakuState(Boolean(formData?.alat_telah_bersih || formData?.uap_menyala_telah_dibuang));
+    setDindingBerlakuState(Boolean(formData?.kerja_pada_dinding_lagit || formData?.bahan_mudah_terbakar_dipindahkan_dari_dinding));
+  }, [formData]);
+
+  const setRuangTertutupBerlaku = useCallback((val: boolean) => {
+    setRuangTertutupBerlakuState(val);
+    if (!val) {
+      setLocalData((prev: any) => {
+        const newData = { ...prev, alat_telah_bersih: false, uap_menyala_telah_dibuang: false };
+        onChange(newData);
+        return newData;
+      });
+    }
+  }, [onChange]);
+
+  const setDindingBerlaku = useCallback((val: boolean) => {
+    setDindingBerlakuState(val);
+    if (!val) {
+      setLocalData((prev: any) => {
+        const newData = { ...prev, kerja_pada_dinding_lagit: false, bahan_mudah_terbakar_dipindahkan_dari_dinding: false };
+        onChange(newData);
+        return newData;
+      });
+    }
+  }, [onChange]);
 
   const handleLocalChange = useCallback((field: string, value: any) => {
     setLocalData((prev: any) => ({ ...prev, [field]: value }));
@@ -887,35 +972,38 @@ export default function EditableForms({ formType, formData, onChange }: Editable
         <div className="border border-slate-200 rounded-lg p-4">
           <h4 className="font-bold text-slate-800 mb-3 text-sm">Bagian 3: Upaya Pencegahan</h4>
 
-          <div className="space-y-2">
-            {[
-              { key: "kondisi_tools_baik", label: "Equipment/Tools kondisi baik" },
-              { key: "tersedia_apar_hydrant", label: "Tersedia APAR dan Hydrant" },
-              { key: "sensor_smoke_detector_non_aktif", label: "Sensor smoke detector non-aktif" },
-              { key: "apd_lengkap", label: "APD lengkap" },
-              { key: "tidak_ada_cairan_mudah_terbakar", label: "Tidak ada cairan mudah terbakar" },
-              { key: "lantai_bersih", label: "Lantai bersih" },
-              { key: "lantai_sudah_dibasahi", label: "Lantai sudah dibasahi" },
-              { key: "cairan_mudah_tebakar_tertutup", label: "Cairan mudah terbakar tertutup" },
-              { key: "lembaran_dibawah_pekerjaan", label: "Lembaran dibawah pekerjaan" },
-              { key: "lindungi_conveyor_dll", label: "Lindungi conveyor dll" },
-              { key: "alat_telah_bersih", label: "Alat telah bersih" },
-              { key: "uap_menyala_telah_dibuang", label: "Uap menyala telah dibuang" },
-              { key: "kerja_pada_dinding_lagit", label: "Kerja pada dinding langit" },
-              { key: "bahan_mudah_terbakar_dipindahkan_dari_dinding", label: "Bahan mudah terbakar dipindahkan dari dinding" },
-              { key: "fire_watch_memastikan_area_aman", label: "Fire watch memastikan area aman" },
-              { key: "firwatch_terlatih", label: "Firewatch terlatih" },
-            ].map(({ key, label }) => (
-              <label key={key} className="flex items-center gap-3 cursor-pointer p-2 hover:bg-slate-50 rounded">
-                <input type="checkbox" checked={localData[key] || false} onChange={(e) => handleToggle(key, e.target.checked)} className="w-4 h-4 text-orange-600 rounded border-slate-300" />
-                <span className="text-sm text-slate-700">{label}</span>
-              </label>
-            ))}
+          <div className="border border-slate-200 rounded-lg overflow-hidden">
+            <YaTidakRow no="1" label="Equipment/Tools kondisi baik" checked={!!localData.kondisi_tools_baik} onChange={(v) => handleToggle("kondisi_tools_baik", v)} />
+            <YaTidakRow no="2" label="Alat pemadam api (APAR, Hydrant)" checked={!!localData.tersedia_apar_hydrant} onChange={(v) => handleToggle("tersedia_apar_hydrant", v)} />
+            <YaTidakRow no="3" label="Sensor Smoke Detector perlu dinon-aktifkan" checked={!!localData.sensor_smoke_detector_non_aktif} onChange={(v) => handleToggle("sensor_smoke_detector_non_aktif", v)} />
+            <YaTidakRow no="4" label="APD lengkap dipakai" checked={!!localData.apd_lengkap} onChange={(v) => handleToggle("apd_lengkap", v)} />
+            <YaTidakRow no="5" label="Lantai dari bahan mudah terbakar dibasahi, ditutupi dengan pasir basah atau perisai metal lainnya" checked={!!localData.lantai_sudah_dibasahi} onChange={(v) => handleToggle("lantai_sudah_dibasahi", v)} />
+            <YaTidakRow no="6" label="Cairan mudah terbakar dan menyala diproteksi dengan tutup atau perisai metal" checked={!!localData.cairan_mudah_tebakar_tertutup} onChange={(v) => handleToggle("cairan_mudah_tebakar_tertutup", v)} />
+            <YaTidakRow no="7" label="Lindungi conveyor, instalasi kabel, equipment penghantar listrik dengan perisai metal tidak mudah terbakar" checked={!!localData.lindungi_conveyor_dll} onChange={(v) => handleToggle("lindungi_conveyor_dll", v)} />
+
+            <YaTidakRow no="8" bold label="Pekerjaan Pada Ruangan Tertutup" checked={ruangTertutupBerlaku} onChange={setRuangTertutupBerlaku} />
+            <YaTidakRow no="8.1" label="Peralatan dibersihkan dari semua bahan mudah terbakar" checked={!!localData.alat_telah_bersih} onChange={(v) => handleToggle("alat_telah_bersih", v)} disabled={!ruangTertutupBerlaku} />
+            <YaTidakRow no="8.2" label="Uap menyala di ruangan tertutup dibuang dari ruangan" checked={!!localData.uap_menyala_telah_dibuang} onChange={(v) => handleToggle("uap_menyala_telah_dibuang", v)} disabled={!ruangTertutupBerlaku} />
+
+            <YaTidakRow no="9" bold label="Pekerjaan Pada Dinding Atau Langit-Langit" checked={dindingBerlaku} onChange={setDindingBerlaku} />
+            <YaTidakRow no="9.1" label="Pekerjaan pada dinding atau langit-langit konstruksi tidak mudah terbakar dan tanpa penutup yang mudah terbakar" checked={!!localData.kerja_pada_dinding_lagit} onChange={(v) => handleToggle("kerja_pada_dinding_lagit", v)} disabled={!dindingBerlaku} />
+            <YaTidakRow no="9.2" label="Bahan mudah terbakar dipindahkan dari dinding yang bersebrangan" checked={!!localData.bahan_mudah_terbakar_dipindahkan_dari_dinding} onChange={(v) => handleToggle("bahan_mudah_terbakar_dipindahkan_dari_dinding", v)} disabled={!dindingBerlaku} />
+
+            <YaTidakRow no="10" label="Fire watch ada memastikan area aman selama proses dan 60 menit setelahnya untuk menghindari bunga api dan panas yang menjalar" checked={!!localData.fire_watch_memastikan_area_aman} onChange={(v) => handleToggle("fire_watch_memastikan_area_aman", v)} />
+            <YaTidakRow no="11" label="Fire Watch sudah mendapatkan pelatihan dan mampu menggunakan alat pemadam kebakaran dan fire alarm" checked={!!localData.firwatch_terlatih} onChange={(v) => handleToggle("firwatch_terlatih", v)} />
+            <YaTidakRow
+              no="12"
+              label="Kondisi Fire Blanket / Perisai Metal"
+              checked={!!localData.kondisi_fire_blanket}
+              onChange={(v) => handleToggle("kondisi_fire_blanket", v)}
+              trueLabel="LAYAK"
+              falseLabel="TIDAK LAYAK"
+            />
           </div>
 
           <div className="mt-4">
-            <label className="block text-xs font-medium text-slate-600 mb-1">Jumlah Fire Blanket</label>
-            <input type="number" value={localData.jumlah_fire_blanket || ""} onChange={(e) => handleLocalChange("jumlah_fire_blanket", e.target.value)} onBlur={(e) => handleBlur("jumlah_fire_blanket", e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm text-black" />
+            <label className="block text-xs font-medium text-slate-600 mb-1">Jumlah Fire Blanket yang Digunakan</label>
+            <input type="number" min={0} value={localData.jumlah_fire_blanket ?? ""} onChange={(e) => handleLocalChange("jumlah_fire_blanket", e.target.value)} onBlur={(e) => handleBlur("jumlah_fire_blanket", e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm text-black" />
           </div>
 
           <div className="mt-3">

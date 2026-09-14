@@ -32,6 +32,31 @@ const formatTime = (t?: string | null) => {
 
 const isTruthy = (v: any): boolean => v === true || v === "t" || v === "true";
 
+const HOT_WORK_CHECKLIST_ITEMS = [
+  ["1", "Equipment/Tools kondisi baik", "kondisi_tools_baik"],
+  ["2", "Alat pemadam api (APAR, Hydrant)", "tersedia_apar_hydrant"],
+  ["3", "Sensor Smoke Detector perlu dinon-aktifkan", "sensor_smoke_detector_non_aktif"],
+  ["4", "APD lengkap dipakai", "apd_lengkap"],
+  ["5", "Lantai dari bahan mudah terbakar dibasahi, ditutupi dengan pasir basah atau perisai metal lainnya", "lantai_sudah_dibasahi"],
+  ["6", "Cairan mudah terbakar dan menyala diproteksi dengan tutup atau perisai metal", "cairan_mudah_tebakar_tertutup"],
+  ["7", "Lindungi conveyor, instalasi kabel, equipment penghantar listrik dengan perisai metal tidak mudah terbakar", "lindungi_conveyor_dll"],
+] as const;
+
+const HOT_WORK_RUANG_TERTUTUP_ITEMS = [
+  ["8.1", "Peralatan dibersihkan dari semua bahan mudah terbakar", "alat_telah_bersih"],
+  ["8.2", "Uap menyala di ruangan tertutup dibuang dari ruangan", "uap_menyala_telah_dibuang"],
+] as const;
+
+const HOT_WORK_DINDING_ITEMS = [
+  ["9.1", "Pekerjaan pada dinding atau langit-langit konstruksi tidak mudah terbakar dan tanpa penutup yang mudah terbakar", "kerja_pada_dinding_lagit"],
+  ["9.2", "Bahan mudah terbakar dipindahkan dari dinding yang bersebrangan", "bahan_mudah_terbakar_dipindahkan_dari_dinding"],
+] as const;
+
+const HOT_WORK_TAIL_ITEMS = [
+  ["10", "Fire watch ada memastikan area aman selama proses dan 60 menit setelahnya untuk menghindari bunga api dan panas yang menjalar", "fire_watch_memastikan_area_aman"],
+  ["11", "Fire Watch sudah mendapatkan pelatihan dan mampu menggunakan alat pemadam kebakaran dan fire alarm", "firwatch_terlatih"],
+] as const;
+
 const WORKSHOP_CHECKLIST_ITEMS = [
   ["equipment", "Equipment/tool/mesin berfungsi dengan baik"],
   ["apar", "APAR tersedia dekat area kerja"],
@@ -784,29 +809,71 @@ export default function DetailModal({ isOpen, onClose, formId, formType, initial
           ))}
         </MS>
         <MS title="Bagian 3: Upaya Pencegahan">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8">
-            <div>
-              <BF label="Equipment/Tools kondisi baik" value={p.kondisi_tools_baik} />
-              <BF label="APAR dan Hydrant tersedia" value={p.tersedia_apar_hydrant} />
-              <BF label="Sensor smoke detector non-aktif" value={p.sensor_smoke_detector_non_aktif} />
-              <BF label="APD lengkap" value={p.apd_lengkap} />
-              <BF label="Tidak ada cairan mudah terbakar" value={p.tidak_ada_cairan_mudah_terbakar} />
-              <BF label="Lantai bersih" value={p.lantai_bersih} />
-              <BF label="Lantai sudah dibasahi" value={p.lantai_sudah_dibasahi} />
-              <BF label="Cairan mudah terbakar tertutup" value={p.cairan_mudah_tebakar_tertutup} />
+          <div className="border border-slate-200 rounded-lg overflow-hidden">
+            <div className="grid grid-cols-[3.5rem_1fr_auto] bg-slate-100 border-b border-slate-300 text-xs font-bold text-slate-600">
+              <span className="px-3 py-2 text-center">NO.</span><span className="px-3 py-2">ITEM CHECK LIST</span><span className="px-3 py-2">STATUS</span>
             </div>
-            <div>
-              <BF label="Lembaran dibawah pekerjaan" value={p.lembaran_dibawah_pekerjaan} />
-              <BF label="Lindungi conveyor dll" value={p.lindungi_conveyor_dll} />
-              <BF label="Alat telah bersih" value={p.alat_telah_bersih} />
-              <BF label="Uap menyala telah dibuang" value={p.uap_menyala_telah_dibuang} />
-              <BF label="Kerja pada dinding langit" value={p.kerja_pada_dinding_lagit} />
-              <BF label="Bahan mudah terbakar dipindahkan" value={p.bahan_mudah_terbakar_dipindahkan_dari_dinding} />
-              <BF label="Fire watch memastikan area aman" value={p.fire_watch_memastikan_area_aman} />
-              <BF label="Firewatch terlatih" value={p.firwatch_terlatih} />
+            {HOT_WORK_CHECKLIST_ITEMS.map(([no, label, key]) => (
+              <div key={key} className="grid grid-cols-[3.5rem_1fr_auto] border-b border-slate-200 last:border-0 items-center">
+                <span className="px-3 py-2 text-sm text-center text-slate-600">{no}</span>
+                <span className="px-3 py-2 text-sm text-slate-700">{label}</span>
+                <span className={`px-3 py-2 text-xs font-bold ${isTruthy(p[key]) ? "text-green-600" : "text-red-500"}`}>
+                  {isTruthy(p[key]) ? "YA" : "TIDAK"}
+                </span>
+              </div>
+            ))}
+
+            <div className="grid grid-cols-[3.5rem_1fr_auto] border-b border-slate-200 items-center bg-orange-50">
+              <span className="px-3 py-2 text-sm text-center font-bold text-slate-700">8</span>
+              <span className="px-3 py-2 text-sm font-bold uppercase text-slate-800">Pekerjaan Pada Ruangan Tertutup</span>
+              <span className="px-3 py-2 text-xs font-bold text-slate-500">—</span>
+            </div>
+            {HOT_WORK_RUANG_TERTUTUP_ITEMS.map(([no, label, key]) => (
+              <div key={key} className="grid grid-cols-[3.5rem_1fr_auto] border-b border-slate-200 last:border-0 items-center">
+                <span className="px-3 py-2 text-sm text-center text-slate-600">{no}</span>
+                <span className="px-3 py-2 text-sm text-slate-700">{label}</span>
+                <span className={`px-3 py-2 text-xs font-bold ${isTruthy(p[key]) ? "text-green-600" : "text-red-500"}`}>
+                  {isTruthy(p[key]) ? "YA" : "TIDAK"}
+                </span>
+              </div>
+            ))}
+
+            <div className="grid grid-cols-[3.5rem_1fr_auto] border-b border-slate-200 items-center bg-orange-50">
+              <span className="px-3 py-2 text-sm text-center font-bold text-slate-700">9</span>
+              <span className="px-3 py-2 text-sm font-bold uppercase text-slate-800">Pekerjaan Pada Dinding Atau Langit-Langit</span>
+              <span className="px-3 py-2 text-xs font-bold text-slate-500">—</span>
+            </div>
+            {HOT_WORK_DINDING_ITEMS.map(([no, label, key]) => (
+              <div key={key} className="grid grid-cols-[3.5rem_1fr_auto] border-b border-slate-200 last:border-0 items-center">
+                <span className="px-3 py-2 text-sm text-center text-slate-600">{no}</span>
+                <span className="px-3 py-2 text-sm text-slate-700">{label}</span>
+                <span className={`px-3 py-2 text-xs font-bold ${isTruthy(p[key]) ? "text-green-600" : "text-red-500"}`}>
+                  {isTruthy(p[key]) ? "YA" : "TIDAK"}
+                </span>
+              </div>
+            ))}
+
+            {HOT_WORK_TAIL_ITEMS.map(([no, label, key]) => (
+              <div key={key} className="grid grid-cols-[3.5rem_1fr_auto] border-b border-slate-200 last:border-0 items-center">
+                <span className="px-3 py-2 text-sm text-center text-slate-600">{no}</span>
+                <span className="px-3 py-2 text-sm text-slate-700">{label}</span>
+                <span className={`px-3 py-2 text-xs font-bold ${isTruthy(p[key]) ? "text-green-600" : "text-red-500"}`}>
+                  {isTruthy(p[key]) ? "YA" : "TIDAK"}
+                </span>
+              </div>
+            ))}
+
+            <div className="grid grid-cols-[3.5rem_1fr_auto] border-b border-slate-200 last:border-0 items-center">
+              <span className="px-3 py-2 text-sm text-center text-slate-600">12</span>
+              <span className="px-3 py-2 text-sm text-slate-700">Kondisi Fire Blanket / Perisai Metal</span>
+              <span className={`px-3 py-2 text-xs font-bold ${isTruthy(p.kondisi_fire_blanket) ? "text-green-600" : "text-red-500"}`}>
+                {isTruthy(p.kondisi_fire_blanket) ? "LAYAK" : "TIDAK LAYAK"}
+              </span>
             </div>
           </div>
-          {p.jumlah_fire_blanket && <div className="mt-3"><F label="Jumlah Fire Blanket" value={p.jumlah_fire_blanket} /></div>}
+          {(p.jumlah_fire_blanket !== null && p.jumlah_fire_blanket !== undefined && p.jumlah_fire_blanket !== "") && (
+            <div className="mt-3"><F label="Jumlah Fire Blanket yang Digunakan" value={p.jumlah_fire_blanket} /></div>
+          )}
           {p.permintaan_tambahan && (
             <div className="mt-3 p-3 bg-amber-50 rounded-lg">
               <span className="text-xs font-semibold text-amber-700">Permintaan Tambahan:</span>
