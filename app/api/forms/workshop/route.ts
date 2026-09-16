@@ -8,6 +8,8 @@
 //   - divalidasi belum ada Workshop lain yang terhubung ke id_ijin_kerja
 //     yang sama (maksimal 1 form per jenis kerja per Ijin Kerja Eksternal)
 //   - id_ijin_kerja disimpan ke kolom baru form_kerja_workshop.id_ijin_kerja
+// UPDATED: waktu_pukul sekarang mewakili "Waktu Mulai". Ditambahkan kolom
+//   baru waktu_selesai untuk "Waktu Selesai" (lihat migration di bawah).
 
 import { NextRequest, NextResponse } from 'next/server';
 import { query, queryOne } from '@/lib/db';
@@ -53,7 +55,7 @@ export async function GET(req: NextRequest) {
       ? '*'
       : `id_form, tanggal, tanggal_pelaksanaan, status,
          no_registrasi, nama_kontraktor_nik, nama_pekerja_nik, nik_pekerja,
-         lokasi_pekerjaan, waktu_pukul, tipe_perusahaan, spv_terkait,
+         lokasi_pekerjaan, waktu_pukul, waktu_selesai, tipe_perusahaan, spv_terkait,
          perlu_jsa, jsa_file_url, id_ijin_kerja`;
 
     let sql = `SELECT ${selectCols} FROM form_kerja_workshop`;
@@ -139,7 +141,7 @@ export async function POST(req: NextRequest) {
         id_form, tanggal, tanggal_pelaksanaan, status,
         tipe_perusahaan, current_stage,
         no_registrasi, nama_kontraktor_nik, nama_pekerja_nik, nik_pekerja,
-        lokasi_pekerjaan, waktu_pukul,
+        lokasi_pekerjaan, waktu_pukul, waktu_selesai,
         nama_fire_watch, nik_fire_watch,
         jabatan_pemberi_izin, nik_pemberi_ijin,
         preventive_genset_pump_room, tangki_solar, panel_listrik,
@@ -164,19 +166,20 @@ export async function POST(req: NextRequest) {
         user_id, id_ijin_kerja, checklist_pencegahan, jsa_data
       ) VALUES (
         $1,$2,$3,$4,$5,$6,
-        $7,$8,$9,$10,$11,
-        $12,$13,$14,$15,
-        $16,$17,$18,
-        $19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,
-        $31,$32,
+        $7,$8,$9,$10,$11,$12,$13,
+        $14,$15,
+        $16,$17,
+        $18,$19,$20,
+        $21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,
         $33,$34,
-        $35,$36,$37,$38,$39,$40,$41,
-        $42,$43,$44,$45,$46,$47,$48,$49,$50,$51,
-        $52,$53,$54,$55,$56,$57,
-        $58,
-        $59,$60,$61,$62,
-        $63,$64,
-        $65,$66,$67,$68,$69
+        $35,$36,
+        $37,$38,$39,$40,$41,$42,$43,
+        $44,$45,$46,$47,$48,$49,$50,$51,$52,$53,
+        $54,$55,$56,$57,$58,$59,
+        $60,
+        $61,$62,$63,$64,
+        $65,$66,
+        $67,$68,$69,$70
       )`,
       [
         idForm, now,
@@ -184,7 +187,7 @@ export async function POST(req: NextRequest) {
         status, tipePerusahaan, startStage,
         idForm, f.namaKontraktor || null, namaPekerjaNik,
         pekerjaNik,
-        f.lokasi         || null, f.waktuPukul     || null,
+        f.lokasi         || null, f.waktuPukul     || null, f.waktuSelesai || null,
         f.namaFireWatch  || null, f.nikFireWatch   || null,
         selectedSpvJabatan, selectedSpvNik,
         f.jenisPekerjaan?.preventive ?? false,

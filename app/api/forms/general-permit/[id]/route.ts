@@ -3,6 +3,9 @@
 // mengikuti penambahan Bagian 4: Upload JSA di halaman
 // /form/ijin-kerja-eksternal. license_sertifikasi tidak berubah strukturnya
 // (masih text), hanya isinya sekarang URL file lisensi.
+// UPDATED: PUT sekarang juga menerima spvPemberiIzin { nama, nik } untuk
+//   Bagian 11 (SPV Terkait), disimpan ke spv_terkait_pj & nik_spv_terkait_pj
+//   (kolom baru — lihat migration-spv-terkait-ijin-kerja.sql).
 import { NextRequest, NextResponse } from 'next/server';
 import { query, queryOne } from '@/lib/db';
 import { verifyToken, COOKIE_NAME } from '@/lib/auth';
@@ -103,6 +106,16 @@ export async function PUT(
     const perluJsa   = f.perluJsa === true;
     const jsaFileUrl = perluJsa ? (f.jsaFileUrl || null) : null;
 
+    // ── Bagian 11: SPV Terkait — nama + NIK ─────────────────────────────
+    const selectedSpvName = (f.spvPemberiIzin?.nama ?? null)?.toString().trim() || null;
+    const selectedSpvNik  = (f.spvPemberiIzin?.nik  ?? null)?.toString().trim() || null;
+    if (newStatus === 'submitted' && (!selectedSpvName || !selectedSpvNik)) {
+      return NextResponse.json(
+        { error: 'SPV Terkait (Bagian 11) wajib dipilih.' },
+        { status: 400 }
+      );
+    }
+
     // ── Lisensi/Sertifikasi files (Bagian 9) — wajib, bisa banyak file ──
     const licenseFiles = Array.isArray(f.licenseFiles)
       ? f.licenseFiles.filter((x: any) => x && typeof x.url === 'string')
@@ -161,10 +174,10 @@ export async function PUT(
         apar_dry_powder = $76, apar_gas_cair = $77, apar_tidak_perlu = $78, apar_lainnya = $79,
         limbah_kontraktor = $80, limbah_pt_jai = $81, limbah_lokasi_pt = $82, limbah_luar_jai = $83,
         izin_kerja_dari = $84, izin_kerja_sampai = $85,
-        kontraktor_pj = $86, spv_terkait_pj = $87,
-        pernyataan_diperiksa = $88, pengawas_pekerjaan_user = $89,
-        perlu_jsa = $90, jsa_file_url = $91, license_files = $92,
-        status = $93,
+        kontraktor_pj = $86, spv_terkait_pj = $87, nik_spv_terkait_pj = $88,
+        pernyataan_diperiksa = $89, pengawas_pekerjaan_user = $90,
+        perlu_jsa = $91, jsa_file_url = $92, license_files = $93,
+        status = $94,
         current_stage = 1,
         security_approved = false, security_approved_by = NULL, security_approved_at = NULL,
         sfo_approved = false, sfo_approved_by = NULL, sfo_approved_at = NULL,
@@ -172,8 +185,8 @@ export async function PUT(
         catatan_reject = NULL,
         approved_by = NULL,
         approved_at = NULL,
-        updated_at = $94
-       WHERE id_form = $95
+        updated_at = $95
+       WHERE id_form = $96
        RETURNING id_form, status`,
       [
         f.namaKontraktorPekerja || null, f.namaPengawasPicSubkont || null,
@@ -212,7 +225,7 @@ export async function PUT(
         f.apar?.dryPowder ?? false, f.apar?.gasCair ?? false, f.apar?.tidakPerlu ?? false, f.aparLainnya || null,
         f.limbah?.kontraktor ?? false, f.limbah?.ptJai ?? false, f.limbahLokasiPt || null, f.limbah?.luarJai ?? false,
         f.izinKerjaDari || null, f.izinKerjaSampai || null,
-        f.kontraktorPj || null, f.spvTerkaitPj || null,
+        f.kontraktorPj || null, selectedSpvName, selectedSpvNik,
         f.pernyataanDiperiksa ?? false, f.pengawasPekerjaanUser || null,
         perluJsa, jsaFileUrl, JSON.stringify(licenseFiles),
         newStatus,

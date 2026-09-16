@@ -14,13 +14,18 @@
 // sekarang jadi Upload Lisensi (reuse JsaUploadSection juga) — hasil
 // upload disimpan ke kolom license_sertifikasi yang sudah ada (isinya
 // sekarang URL file, bukan lagi teks deskripsi bebas).
+// UPDATED: Bagian 11 sekarang punya input "SPV Terkait" (dropdown, gaya
+// sama seperti di /form/hot-work) — SPV difilter dari departemen user
+// yang login, supaya notifikasi email approval tertuju ke SPV yang benar
+// (bukan lagi seluruh SPV di departemen tsb). NIK SPV ikut dikirim &
+// disimpan supaya pencocokan approver di lib/approval-email.ts akurat.
 "use client";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   Shield, ChevronRight, AlertCircle, AlertTriangle,
-  CheckCircle, Loader2, ClipboardList, Flame, Wrench,
+  CheckCircle, Loader2, ClipboardList, Flame, Wrench, Lock,
 } from "lucide-react";
 import TimeInput24, { normalizeTo24h } from "@/components/Time24Input";
 import JsaBuilderSection, { createEmptyJsa, type JsaData } from "@/components/JsaBuilderSection";
@@ -83,7 +88,6 @@ interface FormState {
   limbah: { kontraktor: boolean; ptJai: boolean; luarJai: boolean };
   limbahLokasiPt: string;
   kontraktorPj: string;
-  spvTerkaitPj: string;
   pernyataanDiperiksa: boolean;
   pengawasPekerjaanUser: string;
 }
@@ -126,7 +130,7 @@ const defaultForm = (): FormState => ({
   aparLainnya: "",
   limbah: { kontraktor: false, ptJai: false, luarJai: false },
   limbahLokasiPt: "",
-  kontraktorPj: "", spvTerkaitPj: "",
+  kontraktorPj: "",
   pernyataanDiperiksa: false, pengawasPekerjaanUser: "",
 });
 
@@ -195,12 +199,40 @@ export default function IjinKerjaEksternalPage() {
   const [pengawasOptions, setPengawasOptions] = useState<Array<{ id: number; nama: string; nik: string; departemen: string }>>([]);
   const [departemenOptions, setDepartemenOptions] = useState<string[]>([]);
 
+  // ── SPV Terkait (Bagian 11) — difilter dari departemen user yang login,
+  //    gaya sama seperti "Pemberi Izin (SPV)" di /form/hot-work ──────────
+  const [spvOptions, setSpvOptions] = useState<Array<{ id: number; nama: string; nik: string | null; jabatan: string | null; departmen: string | null }>>([]);
+  const [spvPemberiIzin, setSpvPemberiIzin] = useState<{ nama: string; nik: string; jabatan: string }>({ nama: "", nik: "", jabatan: "" });
+
   useEffect(() => {
     fetch("/form-permit/api/auth/me", { credentials: "include" })
       .then((res) => res.ok ? res.json() : null)
-      .then((data) => {
+      .then(async (data) => {
         const departmen = data?.user?.departmen ?? "";
         setJsa((prev) => ({ ...prev, sectDept: departmen }));
+
+        if (!departmen) return;
+        try {
+          const spvRes = await fetch("/form-permit/api/admin-users/approvers", { credentials: "include" });
+          if (!spvRes.ok) return;
+          const spvData = await spvRes.json();
+          const options = (spvData.users ?? []).filter((u: any) => {
+            if (u.role !== "spv") return false;
+            if (!u.departmen) return true;
+            return u.departmen === departmen;
+          });
+          setSpvOptions(options);
+          if (options.length > 0) {
+            const defaultSpv = options[0];
+            setSpvPemberiIzin({
+              nama: defaultSpv.nama ?? "",
+              nik: defaultSpv.nik ?? "",
+              jabatan: defaultSpv.jabatan ?? "",
+            });
+          }
+        } catch {
+          // Tidak kritikal — SPV tetap bisa dipilih manual jika daftar gagal dimuat
+        }
       })
       .catch(() => undefined);
   }, []);
@@ -233,6 +265,9 @@ export default function IjinKerjaEksternalPage() {
     licenseFiles: licenseFiles
       .filter((f) => f.status === "success" && f.url)
       .map((f) => ({ url: f.url, name: f.name })),
+    // Bagian 11: SPV Terkait — dikirim terpisah (nama + NIK) seperti di hot-work,
+    // supaya notifikasi email approval tertuju ke SPV yang tepat.
+    spvPemberiIzin,
   });
 
   const handleSaveDraft = async () => {
@@ -282,6 +317,11 @@ export default function IjinKerjaEksternalPage() {
     if (!form.departemenPengawas || !form.pengawasBagian) {
       setError("Departemen dan Pengawas (Bagian) wajib dipilih.");
       document.getElementById("bagian-5")?.scrollIntoView({ behavior: "smooth", block: "center" });
+      return;
+    }
+    if (!spvPemberiIzin.nama || !spvPemberiIzin.nik) {
+      setError("SPV Terkait (Bagian 11) wajib dipilih.");
+      document.getElementById("bagian-11")?.scrollIntoView({ behavior: "smooth", block: "center" });
       return;
     }
     if ((workerCount > 0 && successLicenseCount < 1) || successLicenseCount > workerCount) {
@@ -599,7 +639,7 @@ export default function IjinKerjaEksternalPage() {
           </SectionCard>
 
           {/* ═══ BAGIAN 11 (dulu 10) ═══ */}
-          <SectionCard nomor={11} title="Tanggung Jawab Limbah Hasil Kegiatan">
+          <section id="bagian-11"><SectionCard nomor={11} title="Tanggung Jawab Limbah Hasil Kegiatan">
             <div className="space-y-1">
               <CheckboxRow checked={form.limbah.kontraktor} onChange={(v) => setGroup("limbah", { kontraktor: v })} label="Kontraktor" />
               <CheckboxRow checked={form.limbah.ptJai} onChange={(v) => setGroup("limbah", { ptJai: v })} label="PT.JAI" />
@@ -611,6 +651,58 @@ export default function IjinKerjaEksternalPage() {
                 <span className="text-sm text-slate-700 whitespace-nowrap">Luar JAI</span>
               </label>
             </div>
+
+            {/* ── Kontraktor & SPV Terkait Penanggung Jawab ── */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-slate-100">
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">Kontraktor Penanggung Jawab</label>
+                <input type="text" value={form.kontraktorPj} onChange={(e) => set("kontraktorPj", e.target.value)} className={inputCls} placeholder="Nama penanggung jawab dari kontraktor" />
+              </div>
+            </div>
+
+            {/* SPV Terkait — gaya sama seperti "Pemberi Izin (SPV)" di /form/hot-work */}
+            <div className="bg-green-50 border border-green-200 rounded-xl p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <Lock className="w-4 h-4 text-green-600 shrink-0" />
+                <h4 className="font-bold text-green-900 text-sm">SPV Terkait Penanggung Jawab <span className="text-red-500">*</span></h4>
+              </div>
+              <div className="flex items-start gap-2 bg-green-100 border border-green-300 rounded-lg px-3 py-2.5 mb-4">
+                <AlertCircle className="w-4 h-4 text-green-600 shrink-0 mt-0.5" />
+                <p className="text-xs text-green-700">Pilih SPV yang sesuai dari departemen Anda. NIK akan muncul otomatis dan dipakai untuk mengirim notifikasi approval ke SPV yang tepat.</p>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-2">Nama SPV Terkait <span className="text-red-500">*</span></label>
+                  <select
+                    value={spvPemberiIzin.nama}
+                    onChange={(e) => {
+                      const selected = spvOptions.find((spv) => spv.nama === e.target.value);
+                      setSpvPemberiIzin({
+                        nama: selected?.nama ?? "",
+                        nik: selected?.nik ?? "",
+                        jabatan: selected?.jabatan ?? "",
+                      });
+                    }}
+                    className={`w-full px-4 py-2.5 border ${spvPemberiIzin.nama ? "border-slate-300" : "border-red-300 bg-red-50"} rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent text-black text-sm`}
+                  >
+                    <option value="">-- Pilih SPV --</option>
+                    {spvOptions.map((spv) => (
+                      <option key={spv.id} value={spv.nama}>{spv.nama}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-2">NIK SPV</label>
+                  <input
+                    type="text"
+                    value={spvPemberiIzin.nik}
+                    readOnly
+                    className="w-full px-4 py-2.5 border border-slate-300 rounded-lg bg-slate-100 text-slate-600 text-sm"
+                  />
+                </div>
+              </div>
+            </div>
+
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-slate-100">
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-2">Izin Mulai Kerja</label>
@@ -625,7 +717,7 @@ export default function IjinKerjaEksternalPage() {
                 </p>
               </div>
             </div>
-          </SectionCard>
+          </SectionCard></section>
 
           <div className="px-4 py-3 rounded-xl text-xs bg-blue-50 text-blue-700 border border-blue-200">
             <strong>Alur approval Ijin Kerja (Bagian 12) yang akan diterapkan:</strong>

@@ -32,6 +32,11 @@ const formatTime = (t?: string | null) => {
 
 const isTruthy = (v: any): boolean => v === true || v === "t" || v === "true";
 
+function resolveFileUrl(url: string): string {
+  if (!url) return url;
+  return url.startsWith("http") ? url : `${window.location.origin}${url}`;
+}
+
 const HOT_WORK_CHECKLIST_ITEMS = [
   ["1", "Equipment/Tools kondisi baik", "kondisi_tools_baik"],
   ["2", "Alat pemadam api (APAR, Hydrant)", "tersedia_apar_hydrant"],
@@ -767,7 +772,8 @@ export default function DetailModal({ isOpen, onClose, formId, formType, initial
             <F label="Nama Kontraktor / NIK" value={p.nama_kontraktor_nik} />
             <F label="Nama Pekerja / NIK" value={p.nama_pekerja_nik} />
             <F label="Lokasi Pekerjaan" value={p.lokasi_pekerjaan} />
-            <F label="Waktu Pukul" value={formatTime(p.waktu_pukul)} />
+            <F label="Waktu Mulai" value={formatTime(p.waktu_pukul)} />
+            <F label="Waktu Selesai" value={formatTime(p.waktu_selesai)} />
           </div>
         </MS>
         <MS title="Bagian 2: Fire Watch & Pemberi Izin">
@@ -1064,7 +1070,8 @@ export default function DetailModal({ isOpen, onClose, formId, formType, initial
             <F label="Nama Kontraktor / NIK" value={p.nama_kontraktor_nik} />
             <F label="Nama Pekerja / NIK" value={p.nama_pekerja_nik} />
             <F label="Lokasi Pekerjaan" value={p.lokasi_pekerjaan} />
-            <F label="Waktu Pukul" value={formatTime(p.waktu_pukul)} />
+            <F label="Waktu Mulai" value={formatTime(p.waktu_pukul)} />
+            <F label="Waktu Selesai" value={formatTime(p.waktu_selesai)} />
           </div>
         </MS>
         <MS title="Bagian 2: Fire Watch & Pemberi Izin">
@@ -1165,6 +1172,33 @@ export default function DetailModal({ isOpen, onClose, formId, formType, initial
   const renderGeneralPermit = () => {
     if (!data) return null;
     const p = data;
+
+    // ── Badge daftar boolean aktif (dipakai berulang di bawah) ──
+    const BoolBadges = ({ items }: { items: { label: string; active: boolean }[] }) => {
+      const active = items.filter((i) => i.active);
+      if (active.length === 0) return <p className="text-sm text-slate-400 italic">Tidak ada yang dipilih.</p>;
+      return (
+        <div className="flex flex-wrap gap-1.5">
+          {active.map((i) => (
+            <span key={i.label} className="px-2 py-1 bg-slate-100 text-slate-700 text-xs rounded-full border border-slate-200">{i.label}</span>
+          ))}
+        </div>
+      );
+    };
+
+    const alatItems: [string, string, string][] = [
+      ["Mesin Potong", "alat_mesin_potong", "alat_mesin_potong_kondisi"],
+      ["Mesin Las / Gerinda", "alat_mesin_las_gerinda", "alat_mesin_las_gerinda_kondisi"],
+      ["Genset", "alat_genset", "alat_genset_kondisi"],
+      ["Tabung Gas", "alat_tabung_gas", "alat_tabung_gas_kondisi"],
+      ["Tangga / Alat Kerja Listrik (AWP)", "alat_tangga_listrik_awp", "alat_tangga_listrik_awp_kondisi"],
+      ["Forklift", "alat_forklift", "alat_forklift_kondisi"],
+      ["Lift Barang", "alat_lift_barang", "alat_lift_barang_kondisi"],
+    ];
+    const alatDipakai = alatItems.filter(([, key]) => isTruthy(p[key]));
+
+    const licenseFiles: any[] = Array.isArray(p.license_files) ? p.license_files : [];
+
     return (
       <>
         <MS title="Bagian 1: Informasi Kontraktor/Pekerja">
@@ -1178,11 +1212,175 @@ export default function DetailModal({ isOpen, onClose, formId, formType, initial
             <F label="Tanggal Mulai Kerja" value={formatDate(p.tgl_mulai_kerja)} />
             <F label="Tanggal Akhir Kerja" value={formatDate(p.tgl_akhir_kerja_rencana)} />
             <F label="Waktu Kerja" value={formatTime(p.waktu_kerja)} />
+            <F label="Actual Tanggal Kerja" value={formatDate(p.actual_tanggal_kerja)} />
           </div>
         </MS>
-        <MS title="Bagian 2 & 4: Spesifikasi & Lokasi Pekerjaan">
-          <F label="Deskripsi Pekerjaan" value={p.deskripsi_pekerjaan} />
-          <F label="Lokasi Pekerjaan" value={p.lokasi_pekerjaan} />
+
+        <MS title="Bagian 2: Spesifikasi Pekerjaan">
+          <BoolBadges items={[
+            { label: "Area Workshop", active: isTruthy(p.spek_area_workshop) },
+            { label: "Ruang Tertutup", active: isTruthy(p.spek_ruang_tertutup) },
+            { label: "Ketinggian", active: isTruthy(p.spek_ketinggian) },
+            { label: "Tegangan Tinggi", active: isTruthy(p.spek_tegangan_tinggi) },
+            { label: "Pemakaian LOTO", active: isTruthy(p.spek_pemakaian_loto) },
+            { label: "Forklift", active: isTruthy(p.spek_forklift) },
+            { label: "Temperatur Tinggi", active: isTruthy(p.spek_temperatur_tinggi) },
+          ]} />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-3">
+            <F label="Deskripsi Pekerjaan" value={p.deskripsi_pekerjaan} />
+            <F label="Spesifikasi Lainnya" value={p.spesifikasi_lainnya} />
+          </div>
+        </MS>
+
+        <MS title="Bagian 3: Alat yang Digunakan">
+          {alatDipakai.length === 0 && !p.alat_lainnya ? (
+            <p className="text-sm text-slate-400 italic">Tidak ada alat yang dipilih.</p>
+          ) : (
+            <div className="border border-slate-200 rounded-lg overflow-hidden">
+              <div className="grid grid-cols-[1fr_auto] bg-slate-100 border-b border-slate-300 text-xs font-bold text-slate-600">
+                <span className="px-3 py-2">NAMA ALAT</span><span className="px-3 py-2">KONDISI</span>
+              </div>
+              {alatDipakai.map(([label, , kondisiKey]) => (
+                <div key={label} className="grid grid-cols-[1fr_auto] border-b border-slate-200 last:border-0 items-center">
+                  <span className="px-3 py-2 text-sm text-slate-700">{label}</span>
+                  <span className="px-3 py-2 text-sm text-slate-600 uppercase">{p[kondisiKey] || "-"}</span>
+                </div>
+              ))}
+              {p.alat_lainnya && (
+                <div className="grid grid-cols-[1fr_auto] items-center">
+                  <span className="px-3 py-2 text-sm text-slate-700">{p.alat_lainnya}</span>
+                  <span className="px-3 py-2 text-sm text-slate-600 uppercase">{p.alat_lainnya_kondisi || "-"}</span>
+                </div>
+              )}
+            </div>
+          )}
+        </MS>
+
+        <MS title="Bagian 4: Upload JSA">
+          <p className="text-sm text-slate-600">
+            JSA {isTruthy(p.perlu_jsa) ? <strong className="text-green-700">Diperlukan</strong> : <strong className="text-slate-500">Tidak Diperlukan</strong>} untuk pekerjaan ini.
+            {isTruthy(p.perlu_jsa) && <> Lihat detail lengkap lewat tombol <strong>&quot;Lihat JSA&quot;</strong> di bagian atas.</>}
+          </p>
+        </MS>
+
+        <MS title="Bagian 5: Lokasi Pekerjaan">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-3">
+            <F label="Lokasi Pekerjaan" value={p.lokasi_pekerjaan} />
+            <F label="Lokasi Lainnya" value={p.lokasi_lainnya} />
+            <F label="Pengawas Bagian" value={p.pengawas_bagian} />
+            <F label="PIC LOTO / Station LOTO" value={p.pic_loto_station_loto} />
+          </div>
+          <BoolBadges items={[
+            { label: "Dalam Gedung", active: isTruthy(p.lokasi_dalam_gedung) },
+            { label: "Luar Gedung", active: isTruthy(p.lokasi_luar_gedung) },
+            { label: "Luar Pagar Gedung", active: isTruthy(p.lokasi_luar_pagar_gedung) },
+            { label: "Di Atas Gedung", active: isTruthy(p.lokasi_di_atas_gedung) },
+          ]} />
+        </MS>
+
+        <MS title="Bagian 6: Bahan Berbahaya yang Digunakan">
+          <BoolBadges items={[
+            { label: "Bahan Mudah Terbakar", active: isTruthy(p.bahan_mudah_terbakar) },
+            { label: "Bahan Mudah Meledak", active: isTruthy(p.bahan_mudah_meledak) },
+            { label: "Bahan Kimia Beracun/Iritan", active: isTruthy(p.bahan_kimia_beracun_iritan) },
+          ]} />
+          {p.bahan_lainnya && <div className="mt-3"><F label="Bahan Lainnya" value={p.bahan_lainnya} /></div>}
+        </MS>
+
+        <MS title="Bagian 7: Potensi Bahaya / Dampak">
+          <BoolBadges items={[
+            { label: "Ledakan/Kebakaran", active: isTruthy(p.dampak_ledakan_kebakaran) },
+            { label: "Jatuh dari Ketinggian", active: isTruthy(p.dampak_jatuh_ketinggian) },
+            { label: "Kepala Tertimpa", active: isTruthy(p.dampak_kepala_tertimpa) },
+            { label: "Kaki Tertimpa", active: isTruthy(p.dampak_kaki_tertimpa) },
+            { label: "Tumpahan Oli/BBM/B3", active: isTruthy(p.dampak_tumpahan_oli_bbm_b3) },
+            { label: "Tersengat Listrik", active: isTruthy(p.dampak_tersengat_listrik) },
+            { label: "Terjepit Mesin", active: isTruthy(p.dampak_terjepit_mesin) },
+            { label: "Tersayat/Tertusuk", active: isTruthy(p.dampak_tersayat_tertusuk) },
+            { label: "Infeksi Pernafasan", active: isTruthy(p.dampak_infeksi_pernafasan) },
+            { label: "Iritasi Mata", active: isTruthy(p.dampak_iritasi_mata) },
+            { label: "Radiasi Sinar Las", active: isTruthy(p.dampak_radiasi_sinar_las) },
+            { label: "Iritasi Kulit", active: isTruthy(p.dampak_iritasi_kulit) },
+            { label: "Kebisingan", active: isTruthy(p.dampak_kebisingan) },
+            { label: "Keracunan Zat Kimia", active: isTruthy(p.dampak_keracunan_zat_kimia) },
+          ]} />
+          {p.dampak_lainnya && <div className="mt-3"><F label="Dampak Lainnya" value={p.dampak_lainnya} /></div>}
+        </MS>
+
+        <MS title="Bagian 8: Alat Pelindung Diri (APD)">
+          <BoolBadges items={[
+            { label: "Masker", active: isTruthy(p.apd_masker) },
+            { label: "Masker Kimia", active: isTruthy(p.apd_masker_kimia) },
+            { label: "Kacamata Biasa", active: isTruthy(p.apd_kacamata_biasa) },
+            { label: "Kacamata Las", active: isTruthy(p.apd_kacamata_las) },
+            { label: "Ear Plug", active: isTruthy(p.apd_ear_plug) },
+            { label: "Gloves", active: isTruthy(p.apd_gloves) },
+            { label: "Full Body Harness", active: isTruthy(p.apd_full_body_harness) },
+            { label: "Sarung Tangan Bintil", active: isTruthy(p.apd_sarung_tangan_bintil) },
+            { label: "Sarung Tangan Listrik", active: isTruthy(p.apd_sarung_tangan_listrik) },
+            { label: "Sarung Tangan Kulit", active: isTruthy(p.apd_sarung_tangan_kulit) },
+            { label: "Helm", active: isTruthy(p.apd_helm) },
+            { label: "Safety Shoes", active: isTruthy(p.apd_safety_shoes) },
+            { label: "Sepatu Karet", active: isTruthy(p.apd_sepatu_karet) },
+            { label: "Topi Kerja", active: isTruthy(p.apd_topi_kerja) },
+          ]} />
+          {p.apd_lainnya && <div className="mt-3"><F label="APD Lainnya" value={p.apd_lainnya} /></div>}
+        </MS>
+
+        <MS title="Bagian 9: Lisensi/Sertifikasi Pekerja">
+          {licenseFiles.length === 0 && !p.license_sertifikasi ? (
+            <p className="text-sm text-slate-400 italic">Belum ada file lisensi/sertifikasi diupload.</p>
+          ) : (
+            <div className="space-y-2">
+              {licenseFiles.map((f: any, idx: number) => (
+                <a
+                  key={idx}
+                  href={f?.url ? resolveFileUrl(f.url) : "#"}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center justify-between p-3 bg-green-50 rounded-lg border border-green-200 hover:bg-green-100 transition-colors"
+                >
+                  <span className="text-sm text-green-800 font-medium truncate pr-3">{f?.name || `File Lisensi ${idx + 1}`}</span>
+                  <Eye className="w-4 h-4 text-green-600 shrink-0" />
+                </a>
+              ))}
+              {licenseFiles.length === 0 && p.license_sertifikasi && (
+                <a
+                  href={resolveFileUrl(p.license_sertifikasi)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center justify-between p-3 bg-green-50 rounded-lg border border-green-200 hover:bg-green-100 transition-colors"
+                >
+                  <span className="text-sm text-green-800 font-medium">Lisensi/Sertifikasi</span>
+                  <Eye className="w-4 h-4 text-green-600 shrink-0" />
+                </a>
+              )}
+            </div>
+          )}
+        </MS>
+
+        <MS title="Bagian 10: Alat Pemadam Api Ringan (APAR)">
+          <BoolBadges items={[
+            { label: "Dry Powder", active: isTruthy(p.apar_dry_powder) },
+            { label: "Gas/Cair", active: isTruthy(p.apar_gas_cair) },
+            { label: "Tidak Perlu", active: isTruthy(p.apar_tidak_perlu) },
+          ]} />
+          {p.apar_lainnya && <div className="mt-3"><F label="APAR Lainnya" value={p.apar_lainnya} /></div>}
+        </MS>
+
+        <MS title="Bagian 11: Penanganan Limbah & Waktu Izin Kerja">
+          <BoolBadges items={[
+            { label: "Dibawa Kontraktor", active: isTruthy(p.limbah_kontraktor) },
+            { label: "Dibuang di PT.JAI", active: isTruthy(p.limbah_pt_jai) },
+            { label: "Dibuang di Luar PT.JAI", active: isTruthy(p.limbah_luar_jai) },
+          ]} />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-3">
+            <F label="Lokasi Pembuangan di PT" value={p.limbah_lokasi_pt} />
+            <F label="Jam Izin Kerja" value={p.izin_kerja_dari && p.izin_kerja_sampai ? `${formatTime(p.izin_kerja_dari)} – ${formatTime(p.izin_kerja_sampai)}` : "-"} />
+            <F label="Periode Izin Kerja" value={p.izin_kerja_tanggal_dari && p.izin_kerja_tanggal_sampai ? `${formatDate(p.izin_kerja_tanggal_dari)} – ${formatDate(p.izin_kerja_tanggal_sampai)}` : "-"} />
+            <F label="Kontraktor Penanggung Jawab" value={p.kontraktor_pj} />
+            <F label="SPV Terkait Penanggung Jawab" value={p.spv_terkait_pj ? `${p.spv_terkait_pj}${p.nik_spv_terkait_pj ? ` (NIK: ${p.nik_spv_terkait_pj})` : ""}` : undefined} />
+          </div>
         </MS>
 
         {!p.kontraktor_signature_url && (
@@ -1208,6 +1406,13 @@ export default function DetailModal({ isOpen, onClose, formId, formType, initial
 
         <MS title="Bagian 13: Persetujuan & Verifikasi QR">
           <GeneralPermitApprovalGrid p={p} />
+        </MS>
+
+        <MS title="Bagian 14: Pernyataan">
+          <BF label="Pernyataan telah diperiksa dan disetujui" value={p.pernyataan_diperiksa} />
+          <div className="mt-3">
+            <F label="Nama Pengawas Pekerjaan" value={p.pengawas_pekerjaan_user} />
+          </div>
         </MS>
         {p.catatan_reject && <MS title="Catatan Penolakan"><p className="text-sm text-red-600">{p.catatan_reject}</p></MS>}
         {p.status === "rejected" && (

@@ -144,6 +144,47 @@ async function getSelectedSpvForForm(
   return rows[0] ?? null;
 }
 
+// ── getSelectedSpvForGeneralPermit: SPV Terkait pilihan pada Bagian 11 ──
+// Ijin Kerja Eksternal (form_ijin_kerja.spv_terkait_pj / nik_spv_terkait_pj).
+// Sama pola dengan getSelectedSpvForForm di atas untuk hot-work/workshop.
+
+async function getSelectedSpvForGeneralPermit(
+  idForm: string,
+  makerDepartmen?: string | null,
+): Promise<UserRow | null> {
+  const row = await queryOne<{ spv_terkait_pj: string | null; nik_spv_terkait_pj: string | null }>(
+    `SELECT spv_terkait_pj, nik_spv_terkait_pj
+     FROM form_ijin_kerja
+     WHERE id_form = $1`,
+    [idForm]
+  );
+
+  if (!row?.spv_terkait_pj) return null;
+
+  const matchName = row.spv_terkait_pj.trim();
+  const matchNik = (row.nik_spv_terkait_pj ?? '').trim();
+
+  const rows = await query<UserRow>(
+    `SELECT id, nama, email, role, departmen
+     FROM users
+     WHERE role = 'spv'
+       AND is_active = TRUE
+       AND departmen = $1
+       AND email IS NOT NULL
+       AND email != ''
+       AND (
+         LOWER(nama) = LOWER($2)
+         OR LOWER(nama) LIKE LOWER($2 || '%')
+         OR nik = $3
+       )
+     ORDER BY nama ASC
+     LIMIT 1`,
+    [makerDepartmen ?? '', matchName, matchNik || null]
+  );
+
+  return rows[0] ?? null;
+}
+
 // ── getMakerDepartmen / getMakerUser ─────────────────────────
 
 async function getMakerDepartmen(userId: number | null): Promise<string | null> {
@@ -414,6 +455,27 @@ export async function notifyGeneralPermitNextApprover(params: {
     }
 
     const makerDepartmen = await getMakerDepartmen(userId);
+
+    // ── SPV Terkait yang dipilih di Bagian 11 — kirim hanya ke dia,
+    //    bukan ke seluruh SPV di departemen pembuat form.
+    if (approverRole === 'spv') {
+      const selectedSpv = await getSelectedSpvForGeneralPermit(idForm, makerDepartmen);
+      if (selectedSpv?.email) {
+        await sendExternalApprovalNotification({
+          idForm,
+          namaPemohon,
+          tanggal: formatTanggal(tanggal),
+          approverName: selectedSpv.nama,
+          approverEmail: selectedSpv.email,
+          attachmentCount: 0,
+        });
+        console.log(`[EMAIL] SPV terpilih untuk Ijin Kerja Eksternal ${idForm} → ${selectedSpv.nama} (${selectedSpv.email})`);
+        return;
+      }
+      console.log(`[EMAIL] Tidak ditemukan SPV terpilih yang cocok untuk Ijin Kerja Eksternal ${idForm} — fallback ke semua SPV di departemen.`);
+      // sengaja tidak return, lanjut ke fallback default di bawah
+    }
+
     const approvers = await getApproverEmails(approverRole, makerDepartmen);
 
     if (approvers.length === 0) {

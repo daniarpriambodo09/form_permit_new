@@ -20,6 +20,7 @@ interface FormData {
   lokasi: string;
   tanggalPelaksanaan: string;
   waktuPukul: string;
+  waktuSelesai: string;
   namaFireWatch: string;
   nikFireWatch: string;
   jenisPekerjaan: {
@@ -141,7 +142,7 @@ const emptyWork = (): WorkDetail => ({ detail: "", mulai: "", selesai: "" });
 
 const defaultForm = (): FormData => ({
   tipePerusahaan: "internal",
-  namaKontraktor: "", namaPekerjaNIK: "", lokasi: "", tanggalPelaksanaan: "", waktuPukul: "",
+  namaKontraktor: "", namaPekerjaNIK: "", lokasi: "", tanggalPelaksanaan: "", waktuPukul: "", waktuSelesai: "",
   namaFireWatch: "", nikFireWatch: "",
   jenisPekerjaan: {
     preventive: false, tangki: false, panel: false,
@@ -291,6 +292,7 @@ function HotWorkPermitFormInner() {
       const normalizedData = {
         ...formData,
         waktuPukul: normalizeTo24h(formData.waktuPukul),
+        waktuSelesai: normalizeTo24h(formData.waktuSelesai),
         jenisPekerjaan: {
           ...formData.jenisPekerjaan,
           cutting: normalizeWork(formData.jenisPekerjaan.cutting),
@@ -454,9 +456,15 @@ function HotWorkPermitFormInner() {
               </div>
             </div>
 
-            <div className="max-w-xs">
-              <label className="block text-sm font-semibold text-slate-700 mb-2">Waktu (Pukul)</label>
-              <TimeInput24 value={formData.waktuPukul} onChange={val => setFormData(p => ({ ...p, waktuPukul: val }))} />
+            <div className="grid grid-cols-2 gap-4 max-w-md">
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">Waktu Mulai</label>
+                <TimeInput24 value={formData.waktuPukul} onChange={val => setFormData(p => ({ ...p, waktuPukul: val }))} />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">Waktu Selesai</label>
+                <TimeInput24 value={formData.waktuSelesai} onChange={val => setFormData(p => ({ ...p, waktuSelesai: val }))} />
+              </div>
             </div>
 
             {/* Fire Watch */}

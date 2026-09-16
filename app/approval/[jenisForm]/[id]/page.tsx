@@ -669,7 +669,8 @@ export default function ApprovalDetailPage({
                 {form.nik_pekerja && <F label="NIK Pekerja" value={form.nik_pekerja} />}
                 <F label="Lokasi Pekerjaan"       value={form.lokasi_pekerjaan} />
                 <F label="Tanggal Pelaksanaan"    value={formatDate(form.tanggal_pelaksanaan)} />
-                <F label="Waktu Pukul"            value={formatTime(form.waktu_pukul)} />
+                <F label="Waktu Mulai"            value={formatTime(form.waktu_pukul)} />
+                <F label="Waktu Selesai"          value={formatTime(form.waktu_selesai)} />
               </div>
 
               <div className="grid grid-cols-2 gap-4">

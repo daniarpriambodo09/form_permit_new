@@ -4,6 +4,11 @@
 // JsaUploadSection). license_sertifikasi TIDAK butuh migration baru —
 // kolom itu sudah ada, sekarang isinya URL file lisensi (bukan lagi teks
 // deskripsi), diisi dari komponen upload di frontend.
+// UPDATED: Bagian 11 sekarang menerima spvPemberiIzin { nama, nik } dari
+//   frontend (dropdown SPV, gaya sama seperti hot-work). Disimpan ke
+//   spv_terkait_pj (nama, kolom lama) dan nik_spv_terkait_pj (kolom baru,
+//   lihat migration-spv-terkait-ijin-kerja.sql) supaya lib/approval-email.ts
+//   bisa mencocokkan & mengirim notifikasi hanya ke SPV yang dipilih.
 
 import { NextRequest, NextResponse } from 'next/server';
 import { query, queryOne } from '@/lib/db';
@@ -57,7 +62,7 @@ export async function GET(req: NextRequest) {
       : `id_form, tanggal, tanggal_pelaksanaan, status,
          nama_kontraktor_pekerja, lokasi_pekerjaan, tgl_mulai_kerja,
          current_stage, security_approved, sfo_approved, pga_approved,
-         perlu_jsa, jsa_file_url`;
+         perlu_jsa, jsa_file_url, spv_terkait_pj, nik_spv_terkait_pj`;
 
     let sql = `SELECT ${selectCols} FROM form_ijin_kerja`;
     const params: any[] = [];
@@ -129,6 +134,16 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // ── Bagian 11: SPV Terkait — nama + NIK, dikirim sebagai spvPemberiIzin ──
+    const selectedSpvName = (f.spvPemberiIzin?.nama ?? null)?.toString().trim() || null;
+    const selectedSpvNik  = (f.spvPemberiIzin?.nik  ?? null)?.toString().trim() || null;
+    if (isSubmit && (!selectedSpvName || !selectedSpvNik)) {
+      return NextResponse.json(
+        { error: 'SPV Terkait (Bagian 11) wajib dipilih.' },
+        { status: 400 }
+      );
+    }
+
     // ── Lisensi/Sertifikasi files (Bagian 9) — wajib, bisa banyak file ──
     const licenseFiles = Array.isArray(f.licenseFiles)
       ? f.licenseFiles.filter((x: any) => x && typeof x.url === 'string')
@@ -182,7 +197,7 @@ export async function POST(req: NextRequest) {
         apar_dry_powder, apar_gas_cair, apar_tidak_perlu, apar_lainnya,
         limbah_kontraktor, limbah_pt_jai, limbah_lokasi_pt, limbah_luar_jai,
         izin_kerja_dari, izin_kerja_sampai,
-        kontraktor_pj, spv_terkait_pj,
+        kontraktor_pj, spv_terkait_pj, nik_spv_terkait_pj,
         pernyataan_diperiksa, pengawas_pekerjaan_user,
         edit_token, user_id, perlu_jsa, jsa_file_url, license_files,
         izin_kerja_tanggal_dari, izin_kerja_tanggal_sampai, safety_induction
@@ -218,9 +233,10 @@ export async function POST(req: NextRequest) {
         $80,$81,$82,$83,
         $84,$85,$86,$87,
         $88,$89,
-        $90,$91,
-        $92,$93,
-        $94,$95,$96,$97,$98,$99,$100,$101
+        $90,$91,$92,
+        $93,$94,
+        $95,$96,$97,$98,$99,
+        $100,$101,$102
       )`,
       [
         idForm, now, toIso(f.tglMulaiKerja), status,
@@ -297,7 +313,7 @@ export async function POST(req: NextRequest) {
         f.limbahLokasiPt || null,
         f.limbah?.luarJai    ?? false,
         f.izinKerjaDari    || null, f.izinKerjaSampai || null,
-        f.kontraktorPj || null, f.spvTerkaitPj || null,
+        f.kontraktorPj || null, selectedSpvName, selectedSpvNik,
         f.pernyataanDiperiksa ?? false, f.pengawasPekerjaanUser || null,
         editToken, userId, perluJsa, jsaFileUrl, JSON.stringify(licenseFiles),
         f.tglMulaiKerja || null, f.tglAkhirKerjaRencana || null, JSON.stringify(safetyInduction),

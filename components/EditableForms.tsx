@@ -896,14 +896,18 @@ export default function EditableForms({ formType, formData, onChange }: Editable
             <input type="text" value={localData.nama_pekerja_nik || ""} onChange={(e) => handleLocalChange("nama_pekerja_nik", e.target.value)} onBlur={(e) => handleBlur("nama_pekerja_nik", e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm text-black" />
           </div>
 
-          <div className="grid grid-cols-2 gap-3 mt-3">
+          <div className="grid grid-cols-3 gap-3 mt-3">
             <div>
               <label className="block text-xs font-medium text-slate-600 mb-1">Lokasi Pekerjaan</label>
               <input type="text" value={localData.lokasi_pekerjaan || ""} onChange={(e) => handleLocalChange("lokasi_pekerjaan", e.target.value)} onBlur={(e) => handleBlur("lokasi_pekerjaan", e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm text-black" />
             </div>
             <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">Waktu Pukul</label>
+              <label className="block text-xs font-medium text-slate-600 mb-1">Waktu Mulai</label>
               <input type="time" value={localData.waktu_pukul || ""} onChange={(e) => handleLocalChange("waktu_pukul", e.target.value)} onBlur={(e) => handleBlur("waktu_pukul", e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm text-black" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">Waktu Selesai</label>
+              <input type="time" value={localData.waktu_selesai || ""} onChange={(e) => handleLocalChange("waktu_selesai", e.target.value)} onBlur={(e) => handleBlur("waktu_selesai", e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm text-black" />
             </div>
           </div>
 
@@ -1058,14 +1062,18 @@ export default function EditableForms({ formType, formData, onChange }: Editable
             <input type="text" value={localData.nama_pekerja_nik || ""} onChange={(e) => handleLocalChange("nama_pekerja_nik", e.target.value)} onBlur={(e) => handleBlur("nama_pekerja_nik", e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm text-black" />
           </div>
 
-          <div className="grid grid-cols-2 gap-3 mt-3">
+          <div className="grid grid-cols-3 gap-3 mt-3">
             <div>
               <label className="block text-xs font-medium text-slate-600 mb-1">Lokasi Pekerjaan</label>
               <input type="text" value={localData.lokasi_pekerjaan || ""} onChange={(e) => handleLocalChange("lokasi_pekerjaan", e.target.value)} onBlur={(e) => handleBlur("lokasi_pekerjaan", e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm text-black" />
             </div>
             <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">Waktu Pukul</label>
+              <label className="block text-xs font-medium text-slate-600 mb-1">Waktu Mulai</label>
               <input type="time" value={localData.waktu_pukul || ""} onChange={(e) => handleLocalChange("waktu_pukul", e.target.value)} onBlur={(e) => handleBlur("waktu_pukul", e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm text-black" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">Waktu Selesai</label>
+              <input type="time" value={localData.waktu_selesai || ""} onChange={(e) => handleLocalChange("waktu_selesai", e.target.value)} onBlur={(e) => handleBlur("waktu_selesai", e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm text-black" />
             </div>
           </div>
 
