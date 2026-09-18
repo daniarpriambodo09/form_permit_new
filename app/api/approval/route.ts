@@ -6,6 +6,15 @@
 //        sekarang ikut muncul untuk role SPV (stage 2), SFO (stage 4),
 //        dan SMR (stage 5) — sesuai stage map:
 //          1=Kontraktor(TTD di /my-forms) 2=SPV 3=Security(TTD) 4=SFO 5=SMR
+// FIXED: queryGeneralPermitByStage/countGeneralPermitByStage sebelumnya
+//        hanya memfilter berdasarkan departemen pembuat form (creator.departmen),
+//        TANPA mencocokkan SPV Terkait (spv_terkait_pj/nik_spv_terkait_pj) yang
+//        dipilih di Bagian 11 form Ijin Kerja Eksternal. Akibatnya SEMUA SPV di
+//        departemen yang sama ikut melihat form tsb di antrian "submitted",
+//        padahal harusnya hanya SPV yang benar-benar dipilih. Sekarang kedua
+//        fungsi menerima spvNama & spvNik lalu mencocokkannya ke
+//        gp.spv_terkait_pj / gp.nik_spv_terkait_pj — sama pola dengan
+//        spvAssignment yang sudah dipakai hot-work/workshop di bawah.
 
 import { NextRequest, NextResponse } from 'next/server';
 import { query, queryOne } from '@/lib/db';
@@ -179,7 +188,17 @@ async function countByQuery(
 }
 
 // ── ADDED: query khusus form_ijin_kerja (general-permit) by stage ──
-async function queryGeneralPermitByStage(stage: number, spvDepartmen?: string | null) {
+// FIXED: sekarang menerima spvNama & spvNik — saat dipanggil dengan
+// spvDepartmen (khusus role SPV di stage 2), hasil difilter agar HANYA
+// form yang SPV Terkait-nya (Bagian 11) cocok dengan SPV yang login yang
+// muncul. Pemanggilan tanpa spvDepartmen (role SFO/SMR/admin di stage
+// lain) tidak terpengaruh sama sekali — tetap global seperti sebelumnya.
+async function queryGeneralPermitByStage(
+  stage: number,
+  spvDepartmen?: string | null,
+  spvNama?: string | null,
+  spvNik?: string | null
+) {
   if (spvDepartmen != null) {
     return query(
       `SELECT gp.id_form, gp.tanggal, gp.tanggal_pelaksanaan, gp.status, gp.current_stage,
@@ -194,8 +213,12 @@ async function queryGeneralPermitByStage(stage: number, spvDepartmen?: string | 
          FROM form_ijin_kerja gp
          JOIN users creator ON creator.id = gp.user_id
         WHERE gp.status = 'submitted' AND gp.current_stage = $1 AND creator.departmen = $2
+          AND (
+            LOWER(TRIM(gp.spv_terkait_pj)) = LOWER(TRIM($3))
+            OR ($4::text IS NOT NULL AND gp.nik_spv_terkait_pj = $4)
+          )
         ORDER BY gp.tanggal ASC`,
-      [stage, spvDepartmen]
+      [stage, spvDepartmen, spvNama ?? '', spvNik ?? null]
     );
   }
   return query(
@@ -254,14 +277,23 @@ async function queryGeneralPermitApproved(
   );
 }
 
-async function countGeneralPermitByStage(stage: number, spvDepartmen?: string | null): Promise<number> {
+async function countGeneralPermitByStage(
+  stage: number,
+  spvDepartmen?: string | null,
+  spvNama?: string | null,
+  spvNik?: string | null
+): Promise<number> {
   if (spvDepartmen != null) {
     const res = await query(
       `SELECT COUNT(*) AS count
          FROM form_ijin_kerja gp
          JOIN users creator ON creator.id = gp.user_id
-        WHERE gp.status = 'submitted' AND gp.current_stage = $1 AND creator.departmen = $2`,
-      [stage, spvDepartmen]
+        WHERE gp.status = 'submitted' AND gp.current_stage = $1 AND creator.departmen = $2
+          AND (
+            LOWER(TRIM(gp.spv_terkait_pj)) = LOWER(TRIM($3))
+            OR ($4::text IS NOT NULL AND gp.nik_spv_terkait_pj = $4)
+          )`,
+      [stage, spvDepartmen, spvNama ?? '', spvNik ?? null]
     );
     return parseInt(res[0].count);
   }
@@ -366,12 +398,13 @@ export async function GET(req: NextRequest) {
 
     // ── SPV ──────────────────────────────────────────────────────
     if (userRole === 'spv') {
-      const spvRow = await queryOne<{ departmen: string | null; nama: string | null }>(
-        `SELECT departmen, nama FROM users WHERE id = $1`,
+      const spvRow = await queryOne<{ departmen: string | null; nama: string | null; nik: string | null }>(
+        `SELECT departmen, nama, nik FROM users WHERE id = $1`,
         [user.userId]
       );
       const spvDepartmen = spvRow?.departmen ?? null;
       const spvNama = spvRow?.nama ?? null;
+      const spvNik = spvRow?.nik ?? null;
       const spvAssignment = spvNama
         ? ` AND LOWER(TRIM(spv_terkait)) = LOWER(TRIM($4))`
         : '';
@@ -387,7 +420,7 @@ export async function GET(req: NextRequest) {
             ...FW_FORMS.map(f => countByQuery(f, `status = $1 AND current_stage = $2 AND (${TIPE_EXPR_FW}) = $3${spvAssignment}`, withSpvAssignment(['submitted', 2, 'eksternal']), spvDepartmen)),
             countByQuery('height-work', `status = $1 AND current_stage = $2 AND (${TIPE_EXPR}) = $3${spvAssignment}`, withSpvAssignment(['submitted', 1, 'internal']), spvDepartmen),
             countByQuery('height-work', `status = $1 AND current_stage = $2 AND (${TIPE_EXPR}) = $3${spvAssignment}`, withSpvAssignment(['submitted', 2, 'eksternal']), spvDepartmen),
-            countGeneralPermitByStage(2, spvDepartmen),
+            countGeneralPermitByStage(2, spvDepartmen, spvNama, spvNik),
           ]),
           Promise.all([
             ...allFormTypes.map(f => countByQuery(f, `spv_approved = TRUE`, [], spvDepartmen)),
@@ -405,7 +438,7 @@ export async function GET(req: NextRequest) {
           ...FW_FORMS.map(f => query(...buildSelectQuery(f, `status = $1 AND current_stage = $2 AND (${TIPE_EXPR_FW}) = $3${spvAssignment}`, withSpvAssignment(['submitted', 2, 'eksternal']), spvDepartmen))),
           query(...buildSelectQuery('height-work', `status = $1 AND current_stage = $2 AND (${TIPE_EXPR}) = $3${spvAssignment}`, withSpvAssignment(['submitted', 1, 'internal']), spvDepartmen)),
           query(...buildSelectQuery('height-work', `status = $1 AND current_stage = $2 AND (${TIPE_EXPR}) = $3${spvAssignment}`, withSpvAssignment(['submitted', 2, 'eksternal']), spvDepartmen)),
-          queryGeneralPermitByStage(2, spvDepartmen),
+          queryGeneralPermitByStage(2, spvDepartmen, spvNama, spvNik),
         ]);
         return NextResponse.json({ data: results.flat(), total: results.flat().length });
       }
