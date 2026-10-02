@@ -205,6 +205,7 @@ async function queryGeneralPermitByStage(
               gp.nama_kontraktor_pekerja AS nama_kontraktor_nik,
               gp.lokasi_pekerjaan, gp.catatan_reject, gp.approved_by, gp.approved_at,
               gp.spv_approved, gp.spv_approved_by,
+              gp.security_approved, gp.security_approved_by,
               gp.sfo_approved, gp.sfo_approved_by,
               gp.pga_approved AS mr_pga_approved, gp.pga_approved_by AS mr_pga_approved_by,
               NULL::boolean AS kontraktor_approved, NULL::boolean AS admin_k3_approved,
@@ -226,13 +227,19 @@ async function queryGeneralPermitByStage(
             nama_kontraktor_pekerja AS nama_kontraktor_nik,
             lokasi_pekerjaan, catatan_reject, approved_by, approved_at,
             spv_approved, spv_approved_by,
+            security_approved, security_approved_by,
             sfo_approved, sfo_approved_by,
             pga_approved AS mr_pga_approved, pga_approved_by AS mr_pga_approved_by,
             NULL::boolean AS kontraktor_approved, NULL::boolean AS admin_k3_approved,
             NULL::text AS tipe_perusahaan, NULL::text AS id_ijin_kerja,
             'general-permit' AS jenis_form
        FROM form_ijin_kerja
-      WHERE status = 'submitted' AND current_stage = $1
+      WHERE status = 'submitted'
+        AND (
+          current_stage = $1
+          OR ($1 = 4 AND security_approved = TRUE AND sfo_approved = FALSE)
+          OR ($1 = 5 AND sfo_approved = TRUE AND pga_approved = FALSE)
+        )
       ORDER BY tanggal ASC`,
     [stage]
   );
@@ -248,6 +255,7 @@ async function queryGeneralPermitApproved(
               gp.nama_kontraktor_pekerja AS nama_kontraktor_nik, gp.lokasi_pekerjaan,
               gp.catatan_reject, gp.approved_by, gp.approved_at,
               gp.spv_approved, gp.spv_approved_by,
+              gp.security_approved, gp.security_approved_by,
               gp.sfo_approved, gp.sfo_approved_by,
               gp.pga_approved AS mr_pga_approved, gp.pga_approved_by AS mr_pga_approved_by,
               NULL::boolean AS kontraktor_approved, NULL::boolean AS admin_k3_approved,
@@ -265,6 +273,7 @@ async function queryGeneralPermitApproved(
             nama_kontraktor_pekerja AS nama_kontraktor_nik, lokasi_pekerjaan,
             catatan_reject, approved_by, approved_at,
             spv_approved, spv_approved_by,
+            security_approved, security_approved_by,
             sfo_approved, sfo_approved_by,
             pga_approved AS mr_pga_approved, pga_approved_by AS mr_pga_approved_by,
             NULL::boolean AS kontraktor_approved, NULL::boolean AS admin_k3_approved,
@@ -298,7 +307,14 @@ async function countGeneralPermitByStage(
     return parseInt(res[0].count);
   }
   const res = await query(
-    `SELECT COUNT(*) AS count FROM form_ijin_kerja WHERE status = 'submitted' AND current_stage = $1`,
+    `SELECT COUNT(*) AS count
+       FROM form_ijin_kerja
+      WHERE status = 'submitted'
+        AND (
+          current_stage = $1
+          OR ($1 = 4 AND security_approved = TRUE AND sfo_approved = FALSE)
+          OR ($1 = 5 AND sfo_approved = TRUE AND pga_approved = FALSE)
+        )`,
     [stage]
   );
   return parseInt(res[0].count);

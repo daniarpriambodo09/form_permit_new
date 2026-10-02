@@ -16,7 +16,13 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   const { id } = await params;
   try {
     const general = await queryOne(
-      `SELECT f.*, u.nama AS pembuat_nama, u.departmen AS pembuat_departmen
+      `SELECT f.*,
+              COALESCE(f.pga_approved, false) AS mr_pga_approved,
+              f.pga_approved_by AS mr_pga_approved_by,
+              f.pga_approved_at AS mr_pga_approved_at,
+              f.pga_nik AS mr_pga_nik,
+              u.nama AS pembuat_nama,
+              u.departmen AS pembuat_departmen
          FROM form_ijin_kerja f
          LEFT JOIN users u ON u.id = f.user_id
         WHERE f.id_form = $1`,
@@ -29,21 +35,24 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
               tipe_perusahaan, tanggal, tanggal_pelaksanaan, lokasi_pekerjaan,
               nama_kontraktor_nik, nama_pekerja_nik, perlu_jsa, jsa_file_url,
               kontraktor_approved, spv_approved, admin_k3_approved, sfo_approved,
-              mr_pga_approved
+              COALESCE(mr_pga_approved, pga_approved, false) AS mr_pga_approved,
+              COALESCE(pga_approved, mr_pga_approved, false) AS pga_approved
          FROM form_kerja_panas WHERE id_ijin_kerja = $1
        UNION ALL
        SELECT 'height-work' AS jenis_form, id_form, id_ijin_kerja, status, current_stage,
               tipe_perusahaan, tanggal, tanggal_pelaksanaan, lokasi,
               NULL, NULL, perlu_jsa, jsa_file_url,
               kontraktor_approved, spv_approved, admin_k3_approved, sfo_approved,
-              mr_pga_approved
+              COALESCE(mr_pga_approved, false) AS mr_pga_approved,
+              COALESCE(mr_pga_approved, false) AS pga_approved
          FROM form_kerja_ketinggian WHERE id_ijin_kerja = $1
        UNION ALL
        SELECT 'workshop' AS jenis_form, id_form, id_ijin_kerja, status, current_stage,
               tipe_perusahaan, tanggal, tanggal_pelaksanaan, lokasi_pekerjaan,
               nama_kontraktor_nik, nama_pekerja_nik, perlu_jsa, jsa_file_url,
               kontraktor_approved, spv_approved, admin_k3_approved, sfo_approved,
-              mr_pga_approved
+              COALESCE(mr_pga_approved, pga_approved, false) AS mr_pga_approved,
+              COALESCE(pga_approved, mr_pga_approved, false) AS pga_approved
          FROM form_kerja_workshop WHERE id_ijin_kerja = $1
        ORDER BY tanggal ASC`,
       [id]

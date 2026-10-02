@@ -45,7 +45,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "Parameter jenisKerja wajib diisi dan valid" }, { status: 400 });
     }
 
-    const conditions: string[] = ["jenis_kerja = $1"];
+    const conditions: string[] = ["jenis_kerja = $1", "(is_active IS NULL OR is_active = true)"];
     const params: any[] = [jenisKerja];
 
     if (departemen) {

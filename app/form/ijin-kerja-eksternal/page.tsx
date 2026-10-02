@@ -360,7 +360,7 @@ export default function IjinKerjaEksternalPage() {
             <CheckCircle className="w-8 h-8 text-green-600" />
           </div>
           <h2 className="text-2xl font-bold text-slate-900 mb-2">Ijin Kerja Eksternal Berhasil Dikirim!</h2>
-          <p className="text-slate-500 text-sm mb-2">Sedang menunggu persetujuan Security → SFO → PGA Manager.</p>
+          <p className="text-slate-500 text-sm mb-2">Sedang menunggu persetujuan SPV → Security → SFO → MGR.</p>
           {successId && (
             <p className="text-xs text-slate-400 mb-6">ID Form: <span className="font-mono font-bold text-slate-700">{successId}</span></p>
           )}
@@ -721,7 +721,7 @@ export default function IjinKerjaEksternalPage() {
 
           <div className="px-4 py-3 rounded-xl text-xs bg-blue-50 text-blue-700 border border-blue-200">
             <strong>Alur approval Ijin Kerja (Bagian 12) yang akan diterapkan:</strong>
-            <span className="ml-1">Security → SFO → PGA Manager</span>
+            <span className="ml-1">SPV → Security → SFO → MGR</span>
           </div>
 
           {/* ═══ BAGIAN 15 (dulu 14) ═══ */}

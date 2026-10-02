@@ -79,6 +79,13 @@ function getStageLabelForForm(form: FormItem): string {
   const stage = form.current_stage ?? 0;
   const isEksternal = form.tipe_perusahaan === "eksternal";
 
+  if (form.jenis_form === "general-permit") {
+    const map: Record<number, string> = {
+      2: "SPV", 3: "Security", 4: "SFO", 5: "MGR",
+    };
+    return map[stage] ?? `Tahap ${stage}`;
+  }
+
   if (isEksternal) {
     const map: Record<number, string> = {
       1: "Kontraktor", 2: "SPV", 3: "Admin K3", 4: "SFO", 5: "SMR",
@@ -93,6 +100,15 @@ function getStageLabelForForm(form: FormItem): string {
 
 function getApprovalStages(form: FormItem): { key: keyof FormItem; label: string }[] {
   const isEksternal = form.tipe_perusahaan === "eksternal";
+
+  if (form.jenis_form === "general-permit") {
+    return [
+      { key: "spv_approved", label: "SPV" },
+      { key: "security_approved", label: "Security" },
+      { key: "sfo_approved", label: "SFO" },
+      { key: "mr_pga_approved", label: "MGR" },
+    ];
+  }
 
   // Form Safety Induction (external-permit) — hanya satu stage: Security
   if (form.jenis_form === "external-permit") {
@@ -484,6 +500,11 @@ export default function ApprovalPage() {
                             Alur: {isEksternal
                               ? "Kontraktor → SPV → Admin K3 → SFO → SMR"
                               : "SPV → Admin K3 → SFO → SMR"}
+                          </p>
+                        )}
+                        {form.jenis_form === "general-permit" && (
+                          <p className="text-[10px] text-slate-400 mt-1">
+                            Alur: SPV → Security → SFO → MGR
                           </p>
                         )}
 

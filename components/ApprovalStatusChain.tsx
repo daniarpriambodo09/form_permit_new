@@ -13,7 +13,7 @@ interface ApprovalStage {
 interface ApprovalStatusChainProps {
   formStatus: "draft" | "submitted" | "approved" | "rejected";
   currentStage?: number;
-  formType: "hot-work" | "height-work" | "workshop";
+  formType: "hot-work" | "height-work" | "workshop" | "general-permit";
   /** Hanya relevan untuk height-work: "internal" | "eksternal" */
   tipePerusahaan?: "internal" | "eksternal";
 }
@@ -23,10 +23,20 @@ interface ApprovalStatusChainProps {
 // SignatureBox di DetailModal), bukan lagi salah satu "stage" di sini.
 // Internal & eksternal sekarang punya urutan stage yang SAMA:
 // SPV → Admin K3 → SFO → SMR, untuk hot-work, height-work, maupun workshop.
+// Untuk general-permit (ijin kerja eksternal): SPV → Security → SFO → SMR.
 const getStages = (
   formType: string,
   tipePerusahaan?: string
 ): ApprovalStage[] => {
+  if (formType === "general-permit") {
+    return [
+      { role: "spv",      label: "SPV",      isApproved: false },
+      { role: "security", label: "Security", isApproved: false },
+      { role: "sfo",      label: "SFO",      isApproved: false },
+      { role: "smr",      label: "SMR",      isApproved: false },
+    ];
+  }
+
   return [
     { role: "spv",      label: "SPV",      isApproved: false },
     { role: "admin_k3", label: "Admin K3", isApproved: false },
@@ -47,10 +57,7 @@ export default function ApprovalStatusChain({
   const isRejected = formStatus === "rejected";
   const isSubmitted = formStatus === "submitted";
 
-  // REFACTOR: Kontraktor sudah tidak menjadi bagian dari current_stage.
-  // Internal & eksternal kini sama-sama mulai dari stage 1 = SPV, jadi
-  // pemetaan index-nya seragam untuk semua formType/tipePerusahaan.
-  // stages[0]=spv(stage1), stages[1]=admin_k3(stage2), stages[2]=sfo(stage3), stages[3]=smr(stage4)
+  // stages[0]=spv(stage1), stages[1]=admin_k3/security(stage2), stages[2]=sfo(stage3), stages[3]=smr(stage4)
   const currentIndex = currentStage - 1;
 
   return (
@@ -58,7 +65,7 @@ export default function ApprovalStatusChain({
       <div className="flex items-center justify-between gap-2">
         {stages.map((stage, idx) => {
           const isCurrentOrPast = isApproved || idx < currentIndex;
-          const isCurrent = idx === currentIndex;
+          const isCurrent = !isApproved && idx === currentIndex;
 
           return (
             <React.Fragment key={stage.role}>

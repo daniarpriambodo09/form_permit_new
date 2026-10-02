@@ -1,7 +1,7 @@
-// app/api/approval/external/[id]/safety-induction/sign/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { query, queryOne } from "@/lib/db";
 import { verifyToken, COOKIE_NAME } from "@/lib/auth";
+import { notifyGeneralPermitNextApprover } from "@/lib/approval-email";
 
 function getUser(req: NextRequest) {
   const token = req.cookies.get(COOKIE_NAME)?.value;
@@ -59,12 +59,21 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
             security_approved_by = $2,
             security_approved_at = NOW(),
             security_signature_url = $3,
+            current_stage = 4,
             updated_at = NOW()
       WHERE id_form = $4`,
     [JSON.stringify(finalData), user.nama || user.username, signatureUrl, id]
   );
 
-  // TODO: notify SFO next — tergantung stage map final general-permit (lihat catatan di atas)
+  notifyGeneralPermitNextApprover({
+    idForm: id,
+    nextStage: 4,
+    userId: existing.user_id,
+    namaPemohon: existing.nama_kontraktor_pekerja || "-",
+    tanggal: existing.tanggal,
+  }).catch((err) => {
+    console.error(`[EMAIL] notify sfo after security sign ${id}:`, err);
+  });
 
   return NextResponse.json({ success: true, data: finalData });
 }

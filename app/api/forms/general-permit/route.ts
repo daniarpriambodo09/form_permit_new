@@ -61,7 +61,7 @@ export async function GET(req: NextRequest) {
       ? '*'
       : `id_form, tanggal, tanggal_pelaksanaan, status,
          nama_kontraktor_pekerja, lokasi_pekerjaan, tgl_mulai_kerja,
-         current_stage, security_approved, sfo_approved, pga_approved,
+         current_stage, spv_approved, security_approved, sfo_approved, pga_approved,
          perlu_jsa, jsa_file_url, spv_terkait_pj, nik_spv_terkait_pj`;
 
     let sql = `SELECT ${selectCols} FROM form_ijin_kerja`;

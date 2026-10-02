@@ -283,7 +283,7 @@ export default function GeneralPermitFormPage() {
           </p>
           <div className="text-xs px-3 py-2 rounded-lg mb-4 bg-blue-50 text-blue-700 border border-blue-200">
             <strong>Alur Approval:</strong>
-            <p className="mt-1">Security → SFO → PGA Manager</p>
+            <p className="mt-1">SPV → Security → SFO → MGR</p>
           </div>
           {successId && (
             <p className="text-xs text-slate-400 mb-6">
@@ -585,7 +585,7 @@ export default function GeneralPermitFormPage() {
           {/* Info alur approval (Bagian 12 — diproses di halaman approval) */}
           <div className="px-4 py-3 rounded-xl text-xs bg-blue-50 text-blue-700 border border-blue-200">
             <strong>Alur approval (Bagian 12) yang akan diterapkan:</strong>
-            <span className="ml-1">Security → SFO → PGA Manager</span>
+            <span className="ml-1">SPV → Security → SFO → MGR</span>
           </div>
 
           {/* BAGIAN 14 */}

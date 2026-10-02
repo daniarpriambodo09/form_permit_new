@@ -112,39 +112,43 @@ export default function PenilaianSubkontraktorSection({
   const [saving, setSaving] = useState(false);
   const [savingIdx, setSavingIdx] = useState<number | null>(null);
 
+  const safeValue = value ?? createEmptyPenilaianSubkontraktor();
+  const entries = Array.isArray(safeValue.entries) ? safeValue.entries : [];
+  const mengetahui = safeValue.mengetahui ?? createEmptyPenilaianSubkontraktor().mengetahui;
+
   const updateEntry = (idx: number, patch: Partial<PenilaianEntry>) => {
-    const entries = [...value.entries];
-    entries[idx] = { ...entries[idx], ...patch };
-    setValue({ ...value, entries });
+    const nextEntries = [...entries];
+    nextEntries[idx] = { ...nextEntries[idx], ...patch };
+    setValue({ ...safeValue, entries: nextEntries, mengetahui });
   };
 
   const updateItem = (idx: number, key: keyof PenilaianItems, rating: PenilaianRating) => {
-    const entries = [...value.entries];
-    entries[idx] = { ...entries[idx], items: { ...entries[idx].items, [key]: rating } };
-    setValue({ ...value, entries });
+    const nextEntries = [...entries];
+    nextEntries[idx] = { ...nextEntries[idx], items: { ...(nextEntries[idx]?.items ?? {}), [key]: rating } };
+    setValue({ ...safeValue, entries: nextEntries, mengetahui });
   };
 
   const addEntry = () => {
-    if (value.entries.length >= MAX_ENTRIES) return;
-    setValue({ ...value, entries: [...value.entries, createEmptyPenilaianEntry()] });
+    if (entries.length >= MAX_ENTRIES) return;
+    setValue({ ...safeValue, entries: [...entries, createEmptyPenilaianEntry()], mengetahui });
   };
 
   const removeEntry = (idx: number) => {
-    const entries = value.entries.filter((_, i) => i !== idx);
-    setValue({ ...value, entries });
+    const nextEntries = entries.filter((_, i) => i !== idx);
+    setValue({ ...safeValue, entries: nextEntries, mengetahui });
   };
 
   const saveEntry = async (idx: number) => {
     if (!onSave) return;
     setSavingIdx(idx);
     try {
-      const entries = [...value.entries];
-      entries[idx] = {
-        ...entries[idx],
-        filledBy: currentUserName ?? entries[idx].filledBy ?? null,
+      const nextEntries = [...entries];
+      nextEntries[idx] = {
+        ...nextEntries[idx],
+        filledBy: currentUserName ?? nextEntries[idx]?.filledBy ?? null,
         filledAt: new Date().toISOString(),
       };
-      const next = { ...value, entries };
+      const next = { ...safeValue, entries: nextEntries, mengetahui };
       setValue(next);
       await onSave(next);
     } finally {
@@ -153,14 +157,21 @@ export default function PenilaianSubkontraktorSection({
   };
 
   const updateMengetahui = (row: "sfo" | "purchasing" | "picDept", patch: Partial<MengetahuiRow>) => {
-    setValue({ ...value, mengetahui: { ...value.mengetahui, [row]: { ...value.mengetahui[row], ...patch } } });
+    setValue({
+      ...safeValue,
+      entries,
+      mengetahui: {
+        ...mengetahui,
+        [row]: { ...(mengetahui[row] ?? { nama: "", tanggal: "" }), ...patch },
+      },
+    });
   };
 
   const saveMengetahui = async () => {
     if (!onSave) return;
     setSaving(true);
     try {
-      await onSave(value);
+      await onSave({ ...safeValue, entries, mengetahui });
     } finally {
       setSaving(false);
     }
@@ -177,13 +188,13 @@ export default function PenilaianSubkontraktorSection({
       </div>
 
       <div className="p-5 space-y-6">
-        {value.entries.length === 0 && (
+        {entries.length === 0 && (
           <p className="text-sm text-slate-400 italic text-center py-6 border border-dashed border-slate-200 rounded-lg">
             Belum ada checklist. Klik &quot;Tambah Waktu Inspeksi&quot; untuk mulai.
           </p>
         )}
 
-        {value.entries.map((entry, idx) => (
+        {entries.map((entry, idx) => (
           <div key={idx} className="border border-slate-200 rounded-xl overflow-hidden">
             <div className="bg-slate-50 border-b border-slate-200 px-4 py-3 flex flex-wrap items-center gap-3 justify-between">
               <div className="flex items-center gap-2">
@@ -292,13 +303,13 @@ export default function PenilaianSubkontraktorSection({
           </div>
         ))}
 
-        {!readOnly && value.entries.length < MAX_ENTRIES && (
+        {!readOnly && entries.length < MAX_ENTRIES && (
           <button
             type="button"
             onClick={addEntry}
             className="w-full flex items-center justify-center gap-2 py-3 border-2 border-dashed border-slate-200 rounded-xl text-sm font-semibold text-slate-500 hover:border-orange-300 hover:text-orange-600 transition-colors"
           >
-            <Plus className="w-4 h-4" /> Tambah Waktu Inspeksi ({value.entries.length}/{MAX_ENTRIES})
+            <Plus className="w-4 h-4" /> Tambah Waktu Inspeksi ({entries.length}/{MAX_ENTRIES})
           </button>
         )}
 
@@ -308,25 +319,48 @@ export default function PenilaianSubkontraktorSection({
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             {(["sfo", "purchasing", "picDept"] as const).map((roleKey) => {
               const labelMap = { sfo: "SFO", purchasing: "Purchasing", picDept: "PIC Dept" };
-              const row = value.mengetahui[roleKey];
+              const row = mengetahui?.[roleKey] ?? { nama: "", tanggal: "" };
+              const isSfo = roleKey === "sfo";
+              const isFieldDisabled = readOnly || isSfo;
               return (
-                <div key={roleKey} className="border border-slate-200 rounded-lg p-3 space-y-2">
-                  <p className="text-xs font-bold text-slate-500 uppercase">{labelMap[roleKey]}</p>
+                <div
+                  key={roleKey}
+                  className={`border rounded-lg p-3 space-y-2 ${
+                    isSfo ? "bg-slate-50/80 border-slate-200" : "border-slate-200"
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-bold text-slate-500 uppercase">{labelMap[roleKey]}</p>
+                    {isSfo && (
+                      row.nama ? (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
+                          ✓ Disetujui SFO
+                        </span>
+                      ) : (
+                        <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-200 text-slate-600">
+                          Disabled
+                        </span>
+                      )
+                    )}
+                  </div>
                   <input
                     type="text"
-                    placeholder="Nama"
-                    disabled={readOnly}
+                    placeholder={isSfo ? (row.nama ? "Nama SFO" : "Menunggu approval SFO...") : "Nama"}
+                    disabled={isFieldDisabled}
                     value={row.nama}
                     onChange={(e) => updateMengetahui(roleKey, { nama: e.target.value })}
-                    className={inputCls}
+                    className={`${inputCls} ${isFieldDisabled ? "bg-slate-100 text-slate-500 cursor-not-allowed" : ""}`}
                   />
                   <input
                     type="date"
-                    disabled={readOnly}
+                    disabled={isFieldDisabled}
                     value={row.tanggal}
                     onChange={(e) => updateMengetahui(roleKey, { tanggal: e.target.value })}
-                    className={inputCls}
+                    className={`${inputCls} ${isFieldDisabled ? "bg-slate-100 text-slate-500 cursor-not-allowed" : ""}`}
                   />
+                  {isSfo && !row.nama && (
+                    <p className="text-[10px] text-slate-400 italic">Disetujui melalui halaman Approval SFO</p>
+                  )}
                 </div>
               );
             })}

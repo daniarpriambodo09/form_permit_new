@@ -301,7 +301,11 @@ const renderApprovalChain = (form: any, jenisForm: string) => {
         {stages.map((stage, idx) => {
           const approvedKey   = `${stage.key}_approved`;
           const approvedByKey = `${stage.key}_approved_by`;
-          const isApproved    = isTruthy(form[approvedKey]);
+          const isApproved    = isTruthy(form[approvedKey]) ||
+            (stage.key === "mr_pga" && isTruthy(form.pga_approved)) ||
+            (stage.key === "pga" && isTruthy(form.mr_pga_approved)) ||
+            form.status === "approved" ||
+            currentDbStage > stage.dbStage;
           const approvedBy    = form[approvedByKey];
           const isCurrent     = currentDbStage === stage.dbStage && form.status === "submitted";
           const isRejected    = form.status === "rejected";

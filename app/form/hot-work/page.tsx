@@ -3,13 +3,22 @@
 import { useState, useEffect, Suspense } from "react";
 import Link from "next/link";
 import { ChevronDown, ChevronUp, Home, Flame, Save, Send, AlertCircle, Lock } from "lucide-react";
-import { getFireWatchByDept } from "@/lib/firewatch";
 import JsaMethodSection, { type JsaMode } from "@/components/JsaMethodSection";
 import { type JsaFileInfo, type JsaUploadStatus as JsaStatus } from "@/components/JsaUploadSection";
 import LinkedJsaSection, { createEmptyJsa } from "@/components/LinkedJsaSection";
 import type { JsaData } from "@/components/JsaBuilderSection";
 import TimeInput24, { normalizeTo24h } from "@/components/Time24Input";
 import { useSearchParams } from "next/navigation";
+
+interface WorkerOption {
+  nik: string;
+  nama: string;
+  departemen: string | null;
+  jenis_kerja: string;
+  file_url: string | null;
+  file_type: string | null;
+  tanggal_exp: string | null;
+}
 
 type WorkDetail = { detail: string; mulai: string; selesai: string };
 
@@ -173,7 +182,8 @@ function HotWorkPermitFormInner() {
   const [submitting, setSubmitting] = useState(false);
   const [expanded, setExpanded] = useState({ bagian1: true, bagian2: true, bagian3: true, bagian4: true });
   const [user, setUser] = useState<any>(null);
-  const [fireWatchList, setFireWatchList] = useState<Array<{ nama: string; nik: string }>>([]);
+  const [workerOptions, setWorkerOptions] = useState<WorkerOption[]>([]);
+  const [loadingWorkers, setLoadingWorkers] = useState(false);
   const [spvOptions, setSpvOptions] = useState<Array<{ id: number; nama: string; nik: string | null; jabatan: string | null; departmen: string | null }>>([]);
   const [spvPemberiIzin, setSpvPemberiIzin] = useState<{ nama: string; nik: string; jabatan: string }>({ nama: "", nik: "", jabatan: "" });
   const [validationError, setValidationError] = useState<string>("");
@@ -210,9 +220,6 @@ function HotWorkPermitFormInner() {
         }
 
         if (data.user.departmen) {
-          const fwList = getFireWatchByDept(data.user.departmen);
-          setFireWatchList(fwList);
-
           const spvRes = await fetch("/form-permit/api/admin-users/approvers");
           if (spvRes.ok) {
             const spvData = await spvRes.json();
@@ -239,6 +246,25 @@ function HotWorkPermitFormInner() {
     fetchUser();
   }, []);
 
+  // ── Fetch pekerja Hot Work dari Master Lisence saat Internal ──
+  useEffect(() => {
+    if (formData.tipePerusahaan !== "internal") {
+      setWorkerOptions([]);
+      return;
+    }
+    setLoadingWorkers(true);
+    fetch("/form-permit/api/master-lisence/workers?jenisKerja=hot_work", {
+      credentials: "include",
+    })
+      .then((r) => (r.ok ? r.json() : { data: [] }))
+      .then((d) => setWorkerOptions(d.data || []))
+      .catch((err) => {
+        console.error("Gagal memuat pekerja master lisence:", err);
+        setWorkerOptions([]);
+      })
+      .finally(() => setLoadingWorkers(false));
+  }, [formData.tipePerusahaan]);
+
   const toggle = (s: string) => setExpanded(prev => ({ ...prev, [s]: !prev[s as keyof typeof prev] }));
   const setJ = (patch: any) => setFormData(prev => ({ ...prev, jenisPekerjaan: { ...prev.jenisPekerjaan, ...patch } }));
   const setA = (patch: any) => setFormData(prev => ({ ...prev, areaBerisiko: { ...prev.areaBerisiko, ...patch } }));
@@ -263,6 +289,10 @@ function HotWorkPermitFormInner() {
 
   const submit = async (isSubmit: boolean) => {
     setValidationError("");
+    if (!formData.namaPekerjaNIK.trim()) {
+      setValidationError("Nama Pekerja / NIK wajib diisi");
+      return;
+    }
     // Validasi Fire Watch
     if (!formData.namaFireWatch || !formData.nikFireWatch) {
       setValidationError("Fire Watch wajib dipilih");
@@ -383,7 +413,7 @@ function HotWorkPermitFormInner() {
                     <div className="flex items-center gap-2">
                       <input type="radio" name="tipePerusahaan" value={opt.value}
                         checked={formData.tipePerusahaan === opt.value}
-                        onChange={() => setFormData(p => ({ ...p, tipePerusahaan: opt.value as any }))}
+                        onChange={() => setFormData(p => ({ ...p, tipePerusahaan: opt.value as any, namaPekerjaNIK: "" }))}
                         disabled={opt.value === "eksternal" || !!idIjinKerja}
                         className="text-orange-500" />
                       <span className="text-sm font-semibold text-slate-800">{opt.label}</span>
@@ -410,40 +440,83 @@ function HotWorkPermitFormInner() {
                 className={`${inputCls} ${isInternal ? "bg-slate-100 text-slate-400 cursor-not-allowed opacity-60" : ""}`} />
             </div>
 
-            <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-2">
-                {isInternal ? "Nama Pekerja / NIK *" : "Nama Pekerja / NIK *"}
-              </label>
-              {isInternal && fireWatchList.length > 0 ? (
-                <select
-                  value={formData.namaPekerjaNIK}
-                  onChange={(e) => {
-                    const selected = fireWatchList.find((fw) => `${fw.nama} / ${fw.nik}` === e.target.value);
-                    setFormData((p) => ({
-                      ...p,
-                      namaPekerjaNIK: selected ? `${selected.nama} / ${selected.nik}` : "",
-                    }));
-                    setValidationError("");
-                  }}
-                  className={inputCls}
-                >
-                  <option value="">-- Pilih Nama / NIK --</option>
-                  {fireWatchList.map((fw) => (
-                    <option key={`${fw.nama}-${fw.nik}`} value={`${fw.nama} / ${fw.nik}`}>
-                      {`${fw.nama} / ${fw.nik}`}
-                    </option>
-                  ))}
-                </select>
-              ) : (
+            {isInternal ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-2">
+                    Nama Pekerja / NIK <span className="text-red-500">*</span>
+                  </label>
+                  {loadingWorkers ? (
+                    <div className="w-full px-4 py-2.5 border border-slate-300 rounded-lg bg-slate-50 text-slate-400 text-sm flex items-center gap-2">
+                      <span className="w-4 h-4 border-2 border-orange-500 border-t-transparent rounded-full animate-spin"></span>
+                      <span>Memuat pekerja dari Master Lisence...</span>
+                    </div>
+                  ) : workerOptions.length > 0 ? (
+                    <select
+                      value={formData.namaPekerjaNIK}
+                      onChange={(e) => {
+                        const selected = workerOptions.find((w) => `${w.nama} / ${w.nik}` === e.target.value);
+                        setFormData((p) => ({
+                          ...p,
+                          namaPekerjaNIK: selected ? `${selected.nama} / ${selected.nik}` : e.target.value,
+                        }));
+                        setValidationError("");
+                      }}
+                      required
+                      className={inputCls}
+                    >
+                      <option value="">-- Pilih Pekerja (Master Lisence) --</option>
+                      {workerOptions.map((w) => {
+                        const isExpired = w.tanggal_exp ? new Date(w.tanggal_exp).getTime() < new Date().setHours(0, 0, 0, 0) : false;
+                        return (
+                          <option key={`${w.nama}-${w.nik}`} value={`${w.nama} / ${w.nik}`}>
+                            {`${w.nama} / ${w.nik}`}{w.departemen ? ` (${w.departemen})` : ""}{isExpired ? " [Lisensi Kadaluarsa]" : ""}
+                          </option>
+                        );
+                      })}
+                    </select>
+                  ) : (
+                    <div>
+                      <input
+                        type="text"
+                        value={formData.namaPekerjaNIK}
+                        onChange={(e) => setFormData((p) => ({ ...p, namaPekerjaNIK: e.target.value }))}
+                        className={inputCls}
+                        placeholder="Nama lengkap atau NIK (Ketik manual)"
+                        required
+                      />
+                      <p className="text-xs text-amber-600 mt-1">
+                        Belum ada pekerja Hot Work terdaftar di Master Lisence. Anda dapat mengetik manual atau mendaftarkannya di menu Master Lisence.
+                      </p>
+                    </div>
+                  )}
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-2">NIK Pekerja</label>
+                  <input
+                    type="text"
+                    value={formData.namaPekerjaNIK.includes(" / ") ? formData.namaPekerjaNIK.split(" / ")[1].trim() : (formData.namaPekerjaNIK || "")}
+                    readOnly
+                    placeholder="NIK akan terisi otomatis"
+                    className="w-full px-4 py-2.5 border border-slate-300 rounded-lg bg-slate-100 text-slate-600 text-sm cursor-not-allowed"
+                  />
+                </div>
+              </div>
+            ) : (
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">
+                  Nama Pekerja / NIK <span className="text-red-500">*</span>
+                </label>
                 <input
                   type="text"
                   value={formData.namaPekerjaNIK}
                   onChange={(e) => setFormData((p) => ({ ...p, namaPekerjaNIK: e.target.value }))}
                   className={inputCls}
                   placeholder="Nama lengkap atau NIK"
+                  required
                 />
-              )}
-            </div>
+              </div>
+            )}
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>

@@ -179,6 +179,7 @@ export async function PUT(
         perlu_jsa = $91, jsa_file_url = $92, license_files = $93,
         status = $94,
         current_stage = 1,
+        spv_approved = false, spv_approved_by = NULL, spv_approved_at = NULL, spv_nik = NULL,
         security_approved = false, security_approved_by = NULL, security_approved_at = NULL,
         sfo_approved = false, sfo_approved_by = NULL, sfo_approved_at = NULL,
         pga_approved = false, pga_approved_by = NULL, pga_approved_at = NULL,
