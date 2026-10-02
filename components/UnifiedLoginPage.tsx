@@ -213,9 +213,9 @@ export default function UnifiedLoginPage({ defaultRole = "worker" }: UnifiedLogi
           <div className="lg:col-span-5 relative min-h-[380px] lg:min-h-full overflow-hidden flex flex-col justify-between p-6 sm:p-8 border-b lg:border-b-0 lg:border-r border-slate-800">
             {/* Background Photography */}
             <img
-              src="/form-permit/images/k3_login_banner.jpg"
+              src="/form-permit/images/k3_login_banner.jpg?v=2"
               alt="K3 HSE Safety Inspection"
-              className="absolute inset-0 w-full h-full object-cover object-center filter brightness-[0.85] contrast-[1.05] transition-transform duration-700 hover:scale-105"
+              className="absolute inset-0 w-full h-full object-cover object-center filter brightness-[0.88] contrast-[1.05] transition-transform duration-700 hover:scale-105"
             />
 
             {/* Gradient Overlays for Readability & Depth */}
