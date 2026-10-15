@@ -237,8 +237,9 @@ async function queryGeneralPermitByStage(
       WHERE status = 'submitted'
         AND (
           current_stage = $1
-          OR ($1 = 4 AND security_approved = TRUE AND sfo_approved = FALSE)
-          OR ($1 = 5 AND sfo_approved = TRUE AND pga_approved = FALSE)
+          OR ($1 = 1 AND spv_approved = FALSE)
+          OR ($1 = 3 AND security_approved = TRUE AND sfo_approved = FALSE)
+          OR ($1 = 4 AND sfo_approved = TRUE AND pga_approved = FALSE)
         )
       ORDER BY tanggal ASC`,
     [stage]
@@ -312,8 +313,9 @@ async function countGeneralPermitByStage(
       WHERE status = 'submitted'
         AND (
           current_stage = $1
-          OR ($1 = 4 AND security_approved = TRUE AND sfo_approved = FALSE)
-          OR ($1 = 5 AND sfo_approved = TRUE AND pga_approved = FALSE)
+          OR ($1 = 1 AND spv_approved = FALSE)
+          OR ($1 = 3 AND security_approved = TRUE AND sfo_approved = FALSE)
+          OR ($1 = 4 AND sfo_approved = TRUE AND pga_approved = FALSE)
         )`,
     [stage]
   );
@@ -382,13 +384,14 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ data: [], total: 0, message: 'Fire Watch tidak memiliki antrian approval.' });
     }
 
-    // ── SECURITY: mengisi dan menyetujui Safety Induction (stage 3) ──
+    // ── SECURITY: mengisi dan menyetujui Safety Induction (stage 4) ──
     if (userRole === 'security') {
       if (countOnly) {
-        const result = await query(
-          `SELECT COUNT(*) FROM form_ijin_kerja WHERE status = 'submitted' AND current_stage = 3`
-        );
-        return NextResponse.json({ counts: { submitted: Number(result[0].count), approved: 0, rejected: 0 } });
+        const [subm, appr] = await Promise.all([
+          query(`SELECT COUNT(*) FROM form_ijin_kerja WHERE status = 'submitted' AND current_stage = 4`),
+          query(`SELECT COUNT(*) FROM form_ijin_kerja WHERE security_approved = TRUE`),
+        ]);
+        return NextResponse.json({ counts: { submitted: Number(subm[0].count), approved: Number(appr[0].count), rejected: 0 } });
       }
       if (statusFilter === 'submitted') {
         const rows = await query(
@@ -405,8 +408,27 @@ export async function GET(req: NextRequest) {
                   NULL::text AS id_ijin_kerja,
                   'external-permit' AS jenis_form
              FROM form_ijin_kerja
-            WHERE status = 'submitted' AND current_stage = 3
+            WHERE status = 'submitted' AND current_stage = 4
             ORDER BY tanggal ASC`);
+        return NextResponse.json({ data: rows, total: rows.length });
+      }
+      if (statusFilter === 'approved') {
+        const rows = await query(
+          `SELECT id_form, tanggal, tanggal_pelaksanaan, status,
+                  nama_kontraktor_pekerja AS nama_kontraktor_nik,
+                  lokasi_pekerjaan, current_stage,
+                  security_approved,
+                  NULL::boolean AS spv_approved,
+                  NULL::boolean AS kontraktor_approved,
+                  NULL::boolean AS admin_k3_approved,
+                  NULL::boolean AS sfo_approved,
+                  NULL::boolean AS mr_pga_approved,
+                  NULL::text AS tipe_perusahaan,
+                  NULL::text AS id_ijin_kerja,
+                  'external-permit' AS jenis_form
+             FROM form_ijin_kerja
+            WHERE security_approved = TRUE
+            ORDER BY tanggal DESC`);
         return NextResponse.json({ data: rows, total: rows.length });
       }
       return NextResponse.json({ data: [], total: 0 });
@@ -436,7 +458,7 @@ export async function GET(req: NextRequest) {
             ...FW_FORMS.map(f => countByQuery(f, `status = $1 AND current_stage = $2 AND (${TIPE_EXPR_FW}) = $3${spvAssignment}`, withSpvAssignment(['submitted', 2, 'eksternal']), spvDepartmen)),
             countByQuery('height-work', `status = $1 AND current_stage = $2 AND (${TIPE_EXPR}) = $3${spvAssignment}`, withSpvAssignment(['submitted', 1, 'internal']), spvDepartmen),
             countByQuery('height-work', `status = $1 AND current_stage = $2 AND (${TIPE_EXPR}) = $3${spvAssignment}`, withSpvAssignment(['submitted', 2, 'eksternal']), spvDepartmen),
-            countGeneralPermitByStage(2, spvDepartmen, spvNama, spvNik),
+            countGeneralPermitByStage(1, spvDepartmen, spvNama, spvNik),
           ]),
           Promise.all([
             ...allFormTypes.map(f => countByQuery(f, `spv_approved = TRUE`, [], spvDepartmen)),
@@ -454,7 +476,7 @@ export async function GET(req: NextRequest) {
           ...FW_FORMS.map(f => query(...buildSelectQuery(f, `status = $1 AND current_stage = $2 AND (${TIPE_EXPR_FW}) = $3${spvAssignment}`, withSpvAssignment(['submitted', 2, 'eksternal']), spvDepartmen))),
           query(...buildSelectQuery('height-work', `status = $1 AND current_stage = $2 AND (${TIPE_EXPR}) = $3${spvAssignment}`, withSpvAssignment(['submitted', 1, 'internal']), spvDepartmen)),
           query(...buildSelectQuery('height-work', `status = $1 AND current_stage = $2 AND (${TIPE_EXPR}) = $3${spvAssignment}`, withSpvAssignment(['submitted', 2, 'eksternal']), spvDepartmen)),
-          queryGeneralPermitByStage(2, spvDepartmen, spvNama, spvNik),
+          queryGeneralPermitByStage(1, spvDepartmen, spvNama, spvNik),
         ]);
         return NextResponse.json({ data: results.flat(), total: results.flat().length });
       }
@@ -551,7 +573,7 @@ export async function GET(req: NextRequest) {
             ...FW_FORMS.map(f => countByQuery(f, `status = $1 AND current_stage = $2 AND (${TIPE_EXPR_FW}) = $3`, ['submitted', 4, 'eksternal'])),
             countByQuery('height-work', `status = $1 AND current_stage = $2 AND (${TIPE_EXPR}) = $3`, ['submitted', 3, 'internal']),
             countByQuery('height-work', `status = $1 AND current_stage = $2 AND (${TIPE_EXPR}) = $3`, ['submitted', 4, 'eksternal']),
-            countGeneralPermitByStage(4),
+            countGeneralPermitByStage(2),
           ]),
           Promise.all([
             ...allFormTypes.map(f => countByQuery(f, `sfo_approved = TRUE`)),
@@ -567,7 +589,7 @@ export async function GET(req: NextRequest) {
           ...FW_FORMS.map(f => query(...buildSelectQuery(f, `status = $1 AND current_stage = $2 AND (${TIPE_EXPR_FW}) = $3`, ['submitted', 4, 'eksternal']))),
           query(...buildSelectQuery('height-work', `status = $1 AND current_stage = $2 AND (${TIPE_EXPR}) = $3`, ['submitted', 3, 'internal'])),
           query(...buildSelectQuery('height-work', `status = $1 AND current_stage = $2 AND (${TIPE_EXPR}) = $3`, ['submitted', 4, 'eksternal'])),
-          queryGeneralPermitByStage(4),
+          queryGeneralPermitByStage(2),
         ]);
         return NextResponse.json({ data: results.flat(), total: results.flat().length });
       }
@@ -594,7 +616,7 @@ export async function GET(req: NextRequest) {
             ...FW_FORMS.map(f => countByQuery(f, `status = $1 AND current_stage = $2 AND (${TIPE_EXPR_FW}) = $3`, ['submitted', 5, 'eksternal'])),
             countByQuery('height-work', `status = $1 AND current_stage = $2 AND (${TIPE_EXPR}) = $3`, ['submitted', 4, 'internal']),
             countByQuery('height-work', `status = $1 AND current_stage = $2 AND (${TIPE_EXPR}) = $3`, ['submitted', 5, 'eksternal']),
-            countGeneralPermitByStage(5),
+            countGeneralPermitByStage(3),
           ]),
           Promise.all([
             ...FW_FORMS.map(f => countByQuery(f, `mr_pga_approved = TRUE`)),
@@ -611,7 +633,7 @@ export async function GET(req: NextRequest) {
           ...FW_FORMS.map(f => query(...buildSelectQuery(f, `status = $1 AND current_stage = $2 AND (${TIPE_EXPR_FW}) = $3`, ['submitted', 5, 'eksternal']))),
           query(...buildSelectQuery('height-work', `status = $1 AND current_stage = $2 AND (${TIPE_EXPR}) = $3`, ['submitted', 4, 'internal'])),
           query(...buildSelectQuery('height-work', `status = $1 AND current_stage = $2 AND (${TIPE_EXPR}) = $3`, ['submitted', 5, 'eksternal'])),
-          queryGeneralPermitByStage(5),
+          queryGeneralPermitByStage(3),
         ]);
         return NextResponse.json({ data: results.flat(), total: results.flat().length });
       }

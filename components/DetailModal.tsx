@@ -1246,12 +1246,32 @@ export default function DetailModal({ isOpen, onClose, formId, formType, initial
                   <span className="px-3 py-2 text-sm text-slate-600 uppercase">{p[kondisiKey] || "-"}</span>
                 </div>
               ))}
-              {p.alat_lainnya && (
-                <div className="grid grid-cols-[1fr_auto] items-center">
-                  <span className="px-3 py-2 text-sm text-slate-700">{p.alat_lainnya}</span>
-                  <span className="px-3 py-2 text-sm text-slate-600 uppercase">{p.alat_lainnya_kondisi || "-"}</span>
-                </div>
-              )}
+              {(() => {
+                if (!p.alat_lainnya) return null;
+                let parsed: Array<{ nama: string; kondisi?: string }> = [];
+                try {
+                  if (typeof p.alat_lainnya === "string" && p.alat_lainnya.trim().startsWith("[")) {
+                    const res = JSON.parse(p.alat_lainnya);
+                    if (Array.isArray(res)) parsed = res;
+                  }
+                } catch {}
+
+                if (parsed.length > 0) {
+                  return parsed.map((item, idx) => (
+                    <div key={idx} className="grid grid-cols-[1fr_auto] border-b border-slate-200 last:border-0 items-center">
+                      <span className="px-3 py-2 text-sm text-slate-700">{item.nama}</span>
+                      <span className="px-3 py-2 text-sm text-slate-600 uppercase">{item.kondisi || "-"}</span>
+                    </div>
+                  ));
+                }
+
+                return (
+                  <div className="grid grid-cols-[1fr_auto] items-center">
+                    <span className="px-3 py-2 text-sm text-slate-700">{p.alat_lainnya}</span>
+                    <span className="px-3 py-2 text-sm text-slate-600 uppercase">{p.alat_lainnya_kondisi || "-"}</span>
+                  </div>
+                );
+              })()}
             </div>
           )}
         </MS>

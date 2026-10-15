@@ -240,6 +240,7 @@ export async function notifyNextApprover(params: {
           tanggal: formatTanggal(tanggal),
           approverName: routed.nama,
           approverEmail: routed.email,
+          formTypeSlug: formType,
         });
         console.log(`[EMAIL] Admin K3 routing aktif untuk ${formType} → dikirim ke ${routed.nama} (${routed.email})`);
         return;
@@ -260,6 +261,7 @@ export async function notifyNextApprover(params: {
           tanggal: formatTanggal(tanggal),
           approverName: selectedSpv.nama,
           approverEmail: selectedSpv.email,
+          formTypeSlug: formType,
         });
         console.log(`[EMAIL] SPV terpilih untuk ${formType} ${idForm} → ${selectedSpv.nama} (${selectedSpv.email})`);
         return;
@@ -284,6 +286,7 @@ export async function notifyNextApprover(params: {
         tanggal: formatTanggal(tanggal),
         approverName: approver.nama,
         approverEmail: approver.email,
+        formTypeSlug: formType,
       });
     }
 
@@ -346,6 +349,7 @@ export async function notifyFormRejected(params: {
       catatanReject,
       pembuatEmail: maker.email,
       pembuatName: maker.nama,
+      formTypeSlug: formType,
     });
 
   } catch (err) {
@@ -432,9 +436,10 @@ export async function notifyExternalPermit(params: {
 //   - SPV/SFO meng-approve lewat /api/approval/general-permit/[id] (nextStage = stage+1)
 
 const GP_STAGE_ROLE: Partial<Record<number, UserRole>> = {
-  2: 'spv',
-  4: 'sfo',
-  5: 'smr',
+  1: 'spv',
+  2: 'sfo',
+  3: 'smr',
+  4: 'security',
 };
 
 export async function notifyGeneralPermitNextApprover(params: {

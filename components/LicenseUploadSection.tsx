@@ -32,6 +32,7 @@ interface LicenseUploadSectionProps {
   sectionTitle?: string;
   /** Gaya header section — opsional, default mirip hot-work */
   sectionStyle?: "hot-work" | "height-work" | "workshop";
+  required?: boolean;
 }
 
 const ALLOWED_MIME = [
@@ -65,6 +66,7 @@ export default function LicenseUploadSection({
   jumlahTenagaKerja,
   sectionTitle = "BAGIAN 9: UPLOAD LISENSI / SERTIFIKASI",
   sectionStyle = "hot-work",
+  required = false,
 }: LicenseUploadSectionProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploadNotice, setUploadNotice] = useState("");
@@ -199,8 +201,12 @@ export default function LicenseUploadSection({
       />
 
       <p className="text-sm font-semibold text-slate-700 mb-3">
-        Dokumen Lisensi / Sertifikasi <span className="text-red-500">*</span>
-        <span className="text-xs font-normal text-slate-400 ml-2">Minimal satu file, maksimal sesuai jumlah tenaga kerja</span>
+        Dokumen Lisensi / Sertifikasi {required && <span className="text-red-500">*</span>}
+        <span className="text-xs font-normal text-slate-400 ml-2">
+          {required
+            ? "Minimal satu file, maksimal sesuai jumlah tenaga kerja"
+            : "Opsional (jika ada), maksimal sesuai jumlah tenaga kerja"}
+        </span>
       </p>
 
       {uploadNotice && <p className="text-xs text-red-600 mb-3">{uploadNotice}</p>}

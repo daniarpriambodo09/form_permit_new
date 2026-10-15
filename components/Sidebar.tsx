@@ -21,8 +21,11 @@ import {
   Menu,
   Shield,
   X,
+  Sun,
+  Moon,
 } from "lucide-react";
 import { getNavSections, ROLE_LABEL, UserRole } from "@/lib/nav-config";
+import { useTheme } from "@/components/ThemeProvider";
 
 const SIDEBAR_WIDTH_EXPANDED = 272;
 const SIDEBAR_WIDTH_COLLAPSED = 80;
@@ -45,6 +48,7 @@ export default function Sidebar() {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [ready, setReady] = useState(false);
+  const { theme, toggleTheme } = useTheme();
 
   // ── Auth: role & nama user (cache dulu, lalu refresh) ─────────
   useEffect(() => {
@@ -106,12 +110,16 @@ export default function Sidebar() {
   }, []);
 
   const handleLogout = async () => {
-    await fetch("/form-permit/api/auth/logout", {
-      method: "POST",
-      credentials: "include",
-    });
+    try {
+      await fetch("/form-permit/api/auth/logout", {
+        method: "POST",
+        credentials: "include",
+      });
+    } catch (e) {
+      console.error("Logout error:", e);
+    }
     sessionStorage.clear();
-    router.push("/");
+    window.location.href = "/form-permit";
   };
 
   const sections = role ? getNavSections(role) : [];
@@ -250,6 +258,28 @@ export default function Sidebar() {
               </div>
             )}
           </Link>
+          {/* Tombol Tema Dark / Light */}
+          <button
+            type="button"
+            onClick={toggleTheme}
+            title={theme === "dark" ? "Ganti ke Mode Terang" : "Ganti ke Mode Gelap"}
+            className={`w-full flex items-center gap-3 px-2 py-2 rounded-xl text-sm font-medium
+                        text-slate-400 hover:bg-slate-800 hover:text-amber-400 transition-colors cursor-pointer ${
+                          collapsed ? "justify-center" : ""
+                        }`}
+          >
+            {theme === "dark" ? (
+              <Sun className="w-[18px] h-[18px] text-amber-400 shrink-0" />
+            ) : (
+              <Moon className="w-[18px] h-[18px] text-slate-400 shrink-0" />
+            )}
+            {!collapsed && (
+              <span className="truncate">
+                {theme === "dark" ? "Mode Terang" : "Mode Gelap"}
+              </span>
+            )}
+          </button>
+
           <button
             onClick={handleLogout}
             className={`mt-1 w-full flex items-center gap-3 px-2 py-2 rounded-xl text-sm font-medium

@@ -59,7 +59,7 @@ export async function PATCH(
   if (existing.status !== "submitted") {
     return NextResponse.json({ error: `Form berstatus "${existing.status}".` }, { status: 409 });
   }
-  if (existing.current_stage !== 3 || existing.security_approved) {
+  if (existing.current_stage !== 4 || existing.security_approved) {
     return NextResponse.json(
       { error: "Belum giliran Security, atau Safety Induction sudah disetujui." },
       { status: 409 }
@@ -81,21 +81,14 @@ export async function PATCH(
             security_approved_by = $2,
             security_approved_at = NOW(),
             security_signature_url = $3,
+            status = 'approved',
+            approved_by = $2,
+            approved_at = NOW(),
             current_stage = 4,
             updated_at = NOW()
       WHERE id_form = $4`,
     [JSON.stringify(finalData), user.nama || user.username, signatureUrl, id]
   );
-
-  notifyGeneralPermitNextApprover({
-    idForm: id,
-    nextStage: 4,
-    userId: existing.user_id,
-    namaPemohon: existing.nama_kontraktor_pekerja || "-",
-    tanggal: existing.tanggal,
-  }).catch((err) => {
-    console.error(`[EMAIL] notify sfo after security sign ${id}:`, err);
-  });
 
   return NextResponse.json({ success: true, data: finalData });
 }

@@ -203,9 +203,19 @@ export default function GeneralPermitFormPage() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
   const [successId, setSuccessId] = useState("");
+  const [createdFormId, setCreatedFormId] = useState<string | null>(null);
 
-  const set = <K extends keyof FormState>(key: K, val: FormState[K]) =>
-    setForm((prev) => ({ ...prev, [key]: val }));
+  const set = <K extends keyof FormState>(key: K, val: FormState[K]) => {
+    if (key === "namaPengawasPicSubkont" || key === "pengawasPekerjaanUser") {
+      setForm((prev) => ({
+        ...prev,
+        namaPengawasPicSubkont: val as string,
+        pengawasPekerjaanUser: val as string,
+      }));
+    } else {
+      setForm((prev) => ({ ...prev, [key]: val }));
+    }
+  };
 
   const setGroup = <K extends keyof FormState>(key: K, patch: Partial<FormState[K]>) =>
     setForm((prev) => ({ ...prev, [key]: { ...(prev[key] as any), ...patch } }));
@@ -222,13 +232,18 @@ export default function GeneralPermitFormPage() {
     setSaving(true);
     setError("");
     try {
-      const res = await fetch("/form-permit/api/forms/general-permit", {
-        method: "POST",
+      const endpoint = createdFormId
+        ? `/form-permit/api/forms/general-permit/${createdFormId}`
+        : `/form-permit/api/forms/general-permit`;
+      const method = createdFormId ? "PUT" : "POST";
+      const res = await fetch(endpoint, {
+        method,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(buildBody(false)),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Gagal menyimpan draft");
+      setCreatedFormId(data.id_form || createdFormId);
       router.push("/my-forms");
     } catch (err: any) {
       setError(err.message);
@@ -246,22 +261,29 @@ export default function GeneralPermitFormPage() {
       document.getElementById("bagian-14")?.scrollIntoView({ behavior: "smooth", block: "center" });
       return;
     }
-    if (!form.pengawasPekerjaanUser.trim()) {
-      setError("Nama Pengawas Pekerjaan/User (Bagian 14) wajib diisi.");
-      document.getElementById("bagian-14")?.scrollIntoView({ behavior: "smooth", block: "center" });
+    const syncedPengawas = (form.pengawasPekerjaanUser || form.namaPengawasPicSubkont).trim();
+    if (!syncedPengawas) {
+      setError("Nama Pengawas Pekerjaan / PIC Subkontraktor wajib diisi.");
+      document.getElementById("bagian-1")?.scrollIntoView({ behavior: "smooth", block: "center" });
       return;
     }
 
     setSubmitting(true);
     try {
-      const res = await fetch("/form-permit/api/forms/general-permit", {
-        method: "POST",
+      const endpoint = createdFormId
+        ? `/form-permit/api/forms/general-permit/${createdFormId}`
+        : `/form-permit/api/forms/general-permit`;
+      const method = createdFormId ? "PUT" : "POST";
+      const res = await fetch(endpoint, {
+        method,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(buildBody(true)),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Gagal mengajukan form");
-      setSuccessId(data.id_form);
+      const savedId = data.id_form || createdFormId;
+      setCreatedFormId(savedId);
+      setSuccessId(savedId);
       setSuccess(true);
     } catch (err: any) {
       setError(err.message);
@@ -291,12 +313,19 @@ export default function GeneralPermitFormPage() {
             </p>
           )}
           <div className="flex gap-3">
-            <Link href="/my-forms" className="flex-1 py-2.5 bg-orange-600 hover:bg-orange-700 text-white font-semibold rounded-lg text-sm transition-colors">
+            <Link href="/my-forms" className="flex-1 py-2.5 bg-orange-600 hover:bg-orange-700 text-white font-semibold rounded-lg text-sm transition-colors text-center">
               Lihat Riwayat
             </Link>
-            <Link href="/home" className="flex-1 py-2.5 border border-slate-200 hover:bg-slate-50 text-slate-700 font-semibold rounded-lg text-sm transition-colors">
-              Kembali
-            </Link>
+            <button
+              type="button"
+              onClick={() => {
+                setSuccess(false);
+                window.scrollTo({ top: 0, behavior: "smooth" });
+              }}
+              className="flex-1 py-2.5 border border-slate-200 hover:bg-slate-50 text-slate-700 font-semibold rounded-lg text-sm transition-colors text-center cursor-pointer"
+            >
+              Kembali ke Formulir
+            </button>
           </div>
         </div>
       </div>
@@ -342,8 +371,9 @@ export default function GeneralPermitFormPage() {
               <input type="text" value={form.namaKontraktorPekerja} onChange={(e) => set("namaKontraktorPekerja", e.target.value)} required className={inputCls} placeholder="Nama kontraktor atau pekerja" />
             </div>
             <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-2">Nama Pengawas/PIC Subkont</label>
-              <input type="text" value={form.namaPengawasPicSubkont} onChange={(e) => set("namaPengawasPicSubkont", e.target.value)} className={inputCls} placeholder="Nama pengawas / PIC subkontraktor" />
+              <label className="block text-sm font-semibold text-slate-700 mb-2">Nama Pengawas/PIC Subkont <span className="text-red-500">*</span></label>
+              <input type="text" value={form.namaPengawasPicSubkont} onChange={(e) => set("namaPengawasPicSubkont", e.target.value)} required className={inputCls} placeholder="Nama pengawas / PIC subkontraktor" />
+              <p className="text-xs text-slate-400 mt-1">Terhubung otomatis dengan Pengawas Pekerjaan / User di Bagian 14.</p>
             </div>
             <div>
               <label className="block text-sm font-semibold text-slate-700 mb-2">Jumlah Tenaga Kerja</label>
@@ -607,16 +637,22 @@ export default function GeneralPermitFormPage() {
                 </span>
               </label>
               <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2">
-                  Nama Pengawas Pekerjaan / User <span className="text-red-500">*</span>
-                </label>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="block text-sm font-semibold text-slate-700">
+                    Nama Pengawas Pekerjaan / User <span className="text-red-500">*</span>
+                  </label>
+                  <span className="text-[10px] font-semibold text-slate-500 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded-md">
+                    Terkunci &amp; Otomatis
+                  </span>
+                </div>
                 <input
                   type="text"
-                  value={form.pengawasPekerjaanUser}
-                  onChange={(e) => set("pengawasPekerjaanUser", e.target.value)}
-                  className={inputCls}
-                  placeholder="Nama pengawas pekerjaan / user"
+                  value={form.namaPengawasPicSubkont || form.pengawasPekerjaanUser}
+                  disabled
+                  className={`${inputCls} bg-slate-100 text-slate-600 cursor-not-allowed border-slate-200 select-none shadow-none`}
+                  placeholder="Terisi otomatis dari Nama Pengawas/PIC Subkont di Bagian 1"
                 />
+                <p className="text-xs text-slate-400 mt-1">Kolom ini dinonaktifkan (disable) dan terhubung otomatis dengan Nama Pengawas/PIC Subkont di Bagian 1.</p>
               </div>
             </div>
           </section>

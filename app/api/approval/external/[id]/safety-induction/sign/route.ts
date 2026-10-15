@@ -32,16 +32,16 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   }
 
   const existing = await queryOne<any>(
-    `SELECT id_form, kontraktor_signature_url, security_approved
+    `SELECT id_form, status, current_stage, security_approved, user_id, nama_kontraktor_pekerja, tanggal
        FROM form_ijin_kerja WHERE id_form = $1`,
     [id]
   );
   if (!existing) return NextResponse.json({ error: "Form tidak ditemukan." }, { status: 404 });
-  if (!existing.kontraktor_signature_url) {
-    return NextResponse.json({ error: "Kontraktor belum menandatangani form ini." }, { status: 409 });
+  if (existing.status !== "submitted") {
+    return NextResponse.json({ error: `Form berstatus "${existing.status}".` }, { status: 409 });
   }
-  if (existing.security_approved) {
-    return NextResponse.json({ error: "Safety Induction ini sudah disetujui Security." }, { status: 409 });
+  if (existing.current_stage !== 4 || existing.security_approved) {
+    return NextResponse.json({ error: "Belum giliran Security, atau Safety Induction sudah disetujui." }, { status: 409 });
   }
 
   const finalData = {
@@ -59,21 +59,14 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
             security_approved_by = $2,
             security_approved_at = NOW(),
             security_signature_url = $3,
+            status = 'approved',
+            approved_by = $2,
+            approved_at = NOW(),
             current_stage = 4,
             updated_at = NOW()
       WHERE id_form = $4`,
     [JSON.stringify(finalData), user.nama || user.username, signatureUrl, id]
   );
-
-  notifyGeneralPermitNextApprover({
-    idForm: id,
-    nextStage: 4,
-    userId: existing.user_id,
-    namaPemohon: existing.nama_kontraktor_pekerja || "-",
-    tanggal: existing.tanggal,
-  }).catch((err) => {
-    console.error(`[EMAIL] notify sfo after security sign ${id}:`, err);
-  });
 
   return NextResponse.json({ success: true, data: finalData });
 }

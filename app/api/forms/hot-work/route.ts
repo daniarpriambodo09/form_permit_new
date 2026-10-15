@@ -19,14 +19,19 @@ import { generateEditToken, verifyToken, COOKIE_NAME } from '@/lib/auth';
 import { notifyFirstApprover } from '@/lib/approval-email';
 
 async function generateId(): Promise<string> {
-  const row = await queryOne<{ id_form: string }>(
-    `SELECT id_form FROM form_kerja_panas ORDER BY id_form DESC LIMIT 1`
+  const row = await queryOne<{ next_number: number }>(
+    `SELECT COALESCE(MAX(NULLIF(regexp_replace(id_form, '\\D', '', 'g'), '')::integer), 0) + 1 AS next_number
+     FROM form_kerja_panas`
   );
-  let next = 1;
-  if (row) {
-    const num = parseInt(row.id_form.replace('HW-', ''), 10);
-    if (!isNaN(num)) next = num + 1;
+  let next = Number(row?.next_number) || 1;
+
+  while (await queryOne<{ id_form: string }>(
+    `SELECT id_form FROM form_kerja_panas WHERE id_form = $1`,
+    [`HW-${String(next).padStart(4, '0')}`]
+  )) {
+    next += 1;
   }
+
   return `HW-${String(next).padStart(4, '0')}`;
 }
 

@@ -39,37 +39,27 @@ export async function PATCH(
   if (!existing) {
     return NextResponse.json({ error: "Form tidak ditemukan" }, { status: 404 });
   }
-  if (existing.status !== "submitted") {
+  if (existing.status !== "submitted" && existing.status !== "approved") {
     return NextResponse.json(
       { error: `Form berstatus "${existing.status}", tidak bisa ditandatangani.` },
       { status: 409 }
     );
   }
-  if (existing.current_stage !== 1 || existing.kontraktor_signature_url) {
+  if (existing.kontraktor_signature_url) {
     return NextResponse.json(
-      { error: "Form ini sudah ditandatangani Kontraktor atau bukan gilirannya." },
+      { error: "Form ini sudah ditandatangani Kontraktor." },
       { status: 409 }
     );
   }
 
+  // Kontraktor tanda tangan bebas kapan saja, tidak mengubah current_stage
   await query(
     `UPDATE form_ijin_kerja
         SET kontraktor_signature_url = $1,
-            current_stage = 2,
             updated_at = NOW()
       WHERE id_form = $2`,
     [signatureUrl, id]
   );
-
-  notifyGeneralPermitNextApprover({
-    idForm: id,
-    nextStage: 2,
-    userId: existing.user_id,
-    namaPemohon: existing.nama_kontraktor_pekerja || "-",
-    tanggal: existing.tanggal,
-  }).catch((err) => {
-    console.error(`[EMAIL] notify spv after kontraktor sign ${id}:`, err);
-  });
 
   return NextResponse.json({ success: true });
 }

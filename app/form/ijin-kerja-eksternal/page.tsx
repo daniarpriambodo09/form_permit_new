@@ -1,34 +1,35 @@
 // app/form/ijin-kerja-eksternal/page.tsx
-// Ijin Kerja Eksternal — general-permit murni (Bagian 1-3, 4=Upload JSA,
-// 5-8, 9=Upload Lisensi, 10-12, 15=Pernyataan). Reuse endpoint
-// POST /api/forms/general-permit yang sudah ada. Setelah submit, user
-// diarahkan ke 3 tombol untuk menambahkan form jenis kerja spesifik
-// (Hot Work / Height Work / Workshop) yang akan terhubung via id_ijin_kerja.
-//
-// UPDATED: Bagian 4 (baru) = Upload JSA, reuse komponen JsaUploadSection
-// yang sama dipakai di hot-work/height-work/workshop. Bagian "Informasi
-// Lokasi Proyek & Pengawas" yang sebelumnya Bagian 4 sekarang jadi
-// Bagian 5, dan seterusnya seluruh section di bawahnya bergeser +1
-// (termasuk Bagian 14 Pernyataan menjadi Bagian 15).
-// UPDATED: Bagian 9 (dulu Bagian 8 "License / Sertifikasi yang Dipunyai")
-// sekarang jadi Upload Lisensi (reuse JsaUploadSection juga) — hasil
-// upload disimpan ke kolom license_sertifikasi yang sudah ada (isinya
-// sekarang URL file, bukan lagi teks deskripsi bebas).
-// UPDATED: Bagian 11 sekarang punya input "SPV Terkait" (dropdown, gaya
-// sama seperti di /form/hot-work) — SPV difilter dari departemen user
-// yang login, supaya notifikasi email approval tertuju ke SPV yang benar
-// (bukan lagi seluruh SPV di departemen tsb). NIK SPV ikut dikirim &
-// disimpan supaya pencocokan approver di lib/approval-email.ts akurat.
 "use client";
-import { useEffect, useState } from "react";
+
+import { useEffect, useState, Suspense } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
-  Shield, ChevronRight, AlertCircle, AlertTriangle,
-  CheckCircle, Loader2, ClipboardList, Flame, Wrench, Lock,
+  Shield,
+  ChevronRight,
+  AlertCircle,
+  AlertTriangle,
+  CheckCircle,
+  Loader2,
+  ClipboardList,
+  Flame,
+  Wrench,
+  Lock,
+  HardHat,
+  Save,
+  Send,
+  Check,
+  UserCheck,
+  Calendar,
+  Clock,
+  FileText,
+  Plus,
+  Trash2,
 } from "lucide-react";
 import TimeInput24, { normalizeTo24h } from "@/components/Time24Input";
-import JsaBuilderSection, { createEmptyJsa, type JsaData } from "@/components/JsaBuilderSection";
+import JsaMethodSection, { type JsaMode } from "@/components/JsaMethodSection";
+import type { JsaFileInfo, JsaUploadStatus } from "@/components/JsaUploadSection";
+import { createEmptyJsa, type JsaData } from "@/components/JsaBuilderSection";
 import LicenseUploadSection, {
   type LicenseFileInfo,
 } from "@/components/LicenseUploadSection";
@@ -37,6 +38,12 @@ import { createEmptySafetyInduction, type SafetyInductionData } from "@/componen
 type Kondisi = "" | "ok" | "ng";
 interface AlatItem { pakai: boolean; kondisi: Kondisi }
 const emptyAlat = (): AlatItem => ({ pakai: false, kondisi: "" });
+
+export interface AlatLainnyaItem {
+  id: string;
+  nama: string;
+  kondisi: Kondisi;
+}
 
 interface FormState {
   namaKontraktorPekerja: string;
@@ -47,15 +54,23 @@ interface FormState {
   waktuKerja: string;
   actualTanggalKerja: string;
   spesifikasiPekerjaan: {
-    areaWorkshop: boolean; ruangTertutup: boolean; ketinggian: boolean;
-    teganganTinggi: boolean; pemakaianLoto: boolean; forklift: boolean;
+    areaWorkshop: boolean;
+    ruangTertutup: boolean;
+    ketinggian: boolean;
+    teganganTinggi: boolean;
+    pemakaianLoto: boolean;
+    forklift: boolean;
     temperaturTinggi: boolean;
   };
   deskripsiPekerjaan: string;
   spesifikasiLainnya: string;
   alat: {
-    mesinPotong: AlatItem; mesinLasGerinda: AlatItem; genset: AlatItem;
-    tabungGas: AlatItem; tanggaListrikAwp: AlatItem; forklift: AlatItem;
+    mesinPotong: AlatItem;
+    mesinLasGerinda: AlatItem;
+    genset: AlatItem;
+    tabungGas: AlatItem;
+    tanggaListrikAwp: AlatItem;
+    forklift: AlatItem;
     liftBarang: AlatItem;
   };
   alatLainnya: string;
@@ -69,18 +84,37 @@ interface FormState {
   bahan: { mudahTerbakar: boolean; mudahMeledak: boolean; kimiaBeracunIritan: boolean };
   bahanLainnya: string;
   dampak: {
-    ledakanKebakaran: boolean; jatuhKetinggian: boolean; kepalaTertimpa: boolean;
-    kakiTertimpa: boolean; tumpahanOliBbmB3: boolean; tersengatListrik: boolean;
-    terjepitMesin: boolean; tersayatTertusuk: boolean; infeksiPernafasan: boolean;
-    iritasiMata: boolean; radiasiSinarLas: boolean; iritasiKulit: boolean;
-    kebisingan: boolean; keracunanZatKimia: boolean;
+    ledakanKebakaran: boolean;
+    jatuhKetinggian: boolean;
+    kepalaTertimpa: boolean;
+    kakiTertimpa: boolean;
+    tumpahanOliBbmB3: boolean;
+    tersengatListrik: boolean;
+    terjepitMesin: boolean;
+    tersayatTertusuk: boolean;
+    infeksiPernafasan: boolean;
+    iritasiMata: boolean;
+    radiasiSinarLas: boolean;
+    iritasiKulit: boolean;
+    kebisingan: boolean;
+    keracunanZatKimia: boolean;
   };
   dampakLainnya: string;
   apd: {
-    masker: boolean; maskerKimia: boolean; kacamataBiasa: boolean; kacamataLas: boolean;
-    earPlug: boolean; gloves: boolean; fullBodyHarness: boolean;
-    sarungTanganBintil: boolean; sarungTanganListrik: boolean; sarungTanganKulit: boolean;
-    helm: boolean; safetyShoes: boolean; sepatuKaret: boolean; topiKerja: boolean;
+    masker: boolean;
+    maskerKimia: boolean;
+    kacamataBiasa: boolean;
+    kacamataLas: boolean;
+    earPlug: boolean;
+    gloves: boolean;
+    fullBodyHarness: boolean;
+    sarungTanganBintil: boolean;
+    sarungTanganListrik: boolean;
+    sarungTanganKulit: boolean;
+    helm: boolean;
+    safetyShoes: boolean;
+    sepatuKaret: boolean;
+    topiKerja: boolean;
   };
   apdLainnya: string;
   apar: { dryPowder: boolean; gasCair: boolean; tidakPerlu: boolean };
@@ -93,37 +127,75 @@ interface FormState {
 }
 
 const defaultForm = (): FormState => ({
-  namaKontraktorPekerja: "", namaPengawasPicSubkont: "", jumlahTenagaKerja: "",
-  tglMulaiKerja: "", tglAkhirKerjaRencana: "", waktuKerja: "", actualTanggalKerja: "",
+  namaKontraktorPekerja: "",
+  namaPengawasPicSubkont: "",
+  jumlahTenagaKerja: "",
+  tglMulaiKerja: "",
+  tglAkhirKerjaRencana: "",
+  waktuKerja: "",
+  actualTanggalKerja: "",
   spesifikasiPekerjaan: {
-    areaWorkshop: false, ruangTertutup: false, ketinggian: false,
-    teganganTinggi: false, pemakaianLoto: false, forklift: false, temperaturTinggi: false,
+    areaWorkshop: false,
+    ruangTertutup: false,
+    ketinggian: false,
+    teganganTinggi: false,
+    pemakaianLoto: false,
+    forklift: false,
+    temperaturTinggi: false,
   },
-  deskripsiPekerjaan: "", spesifikasiLainnya: "",
+  deskripsiPekerjaan: "",
+  spesifikasiLainnya: "",
   alat: {
-    mesinPotong: emptyAlat(), mesinLasGerinda: emptyAlat(), genset: emptyAlat(),
-    tabungGas: emptyAlat(), tanggaListrikAwp: emptyAlat(), forklift: emptyAlat(),
+    mesinPotong: emptyAlat(),
+    mesinLasGerinda: emptyAlat(),
+    genset: emptyAlat(),
+    tabungGas: emptyAlat(),
+    tanggaListrikAwp: emptyAlat(),
+    forklift: emptyAlat(),
     liftBarang: emptyAlat(),
   },
-  alatLainnya: "", alatLainnyaKondisi: "",
+  alatLainnya: "",
+  alatLainnyaKondisi: "",
   lokasiPekerjaan: "",
   lokasiTipe: { dalamGedung: false, luarGedung: false, luarPagarGedung: false, diAtasGedung: false },
-  lokasiLainnya: "", pengawasBagian: "", departemenPengawas: "", picLotoStationLoto: "",
+  lokasiLainnya: "",
+  pengawasBagian: "",
+  departemenPengawas: "",
+  picLotoStationLoto: "",
   bahan: { mudahTerbakar: false, mudahMeledak: false, kimiaBeracunIritan: false },
   bahanLainnya: "",
   dampak: {
-    ledakanKebakaran: false, jatuhKetinggian: false, kepalaTertimpa: false,
-    kakiTertimpa: false, tumpahanOliBbmB3: false, tersengatListrik: false,
-    terjepitMesin: false, tersayatTertusuk: false, infeksiPernafasan: false,
-    iritasiMata: false, radiasiSinarLas: false, iritasiKulit: false,
-    kebisingan: false, keracunanZatKimia: false,
+    ledakanKebakaran: false,
+    jatuhKetinggian: false,
+    kepalaTertimpa: false,
+    kakiTertimpa: false,
+    tumpahanOliBbmB3: false,
+    tersengatListrik: false,
+    terjepitMesin: false,
+    tersayatTertusuk: false,
+    infeksiPernafasan: false,
+    iritasiMata: false,
+    radiasiSinarLas: false,
+    iritasiKulit: false,
+    kebisingan: false,
+    keracunanZatKimia: false,
   },
   dampakLainnya: "",
   apd: {
-    masker: false, maskerKimia: false, kacamataBiasa: false, kacamataLas: false,
-    earPlug: false, gloves: false, fullBodyHarness: false,
-    sarungTanganBintil: false, sarungTanganListrik: false, sarungTanganKulit: false,
-    helm: false, safetyShoes: false, sepatuKaret: false, topiKerja: false,
+    masker: false,
+    maskerKimia: false,
+    kacamataBiasa: false,
+    kacamataLas: false,
+    earPlug: false,
+    gloves: false,
+    fullBodyHarness: false,
+    sarungTanganBintil: false,
+    sarungTanganListrik: false,
+    sarungTanganKulit: false,
+    helm: false,
+    safetyShoes: false,
+    sepatuKaret: false,
+    topiKerja: false,
   },
   apdLainnya: "",
   apar: { dryPowder: false, gasCair: false, tidakPerlu: false },
@@ -131,56 +203,152 @@ const defaultForm = (): FormState => ({
   limbah: { kontraktor: false, ptJai: false, luarJai: false },
   limbahLokasiPt: "",
   kontraktorPj: "",
-  pernyataanDiperiksa: false, pengawasPekerjaanUser: "",
+  pernyataanDiperiksa: false,
+  pengawasPekerjaanUser: "",
 });
 
-const inputCls = "w-full px-4 py-3 border border-slate-200 rounded-xl text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent placeholder-slate-400";
-const sectionHead = "bg-slate-50 border-b border-slate-200 px-6 py-4";
-const cb = "w-5 h-5 rounded border-slate-300 text-orange-500 focus:ring-orange-400 shrink-0";
+const inputCls =
+  "w-full px-4 py-2.5 sm:py-3 border border-slate-200 rounded-xl text-xs sm:text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent placeholder-slate-400 transition-all bg-white";
 
-function SectionCard({ nomor, title, children }: { nomor: number; title: string; children: React.ReactNode }) {
+function SectionCard({
+  nomor,
+  title,
+  description,
+  badge,
+  children,
+  id,
+}: {
+  nomor: number;
+  title: string;
+  description?: string;
+  badge?: string;
+  children: React.ReactNode;
+  id?: string;
+}) {
   return (
-    <section className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-      <div className={sectionHead}><h2 className="font-bold text-slate-800">Bagian {nomor}: {title}</h2></div>
-      <div className="p-6 space-y-4">{children}</div>
+    <section id={id} className="bg-white rounded-2xl border border-slate-200/90 shadow-xs hover:shadow-sm transition-shadow overflow-hidden mb-6">
+      <div className="bg-slate-50/80 border-b border-slate-200 px-5 sm:px-7 py-4 flex items-center justify-between">
+        <div className="flex items-center gap-3.5">
+          <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-orange-600 text-white flex items-center justify-center font-bold text-xs sm:text-sm shadow-md shadow-orange-600/20 shrink-0">
+            {nomor}
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <h2 className="font-bold text-slate-900 text-sm sm:text-base tracking-tight">{title}</h2>
+              {badge && (
+                <span className="hidden sm:inline-block text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-orange-100 text-orange-700">
+                  {badge}
+                </span>
+              )}
+            </div>
+            {description && <p className="text-xs text-slate-500 mt-0.5 leading-snug">{description}</p>}
+          </div>
+        </div>
+      </div>
+      <div className="p-5 sm:p-7 space-y-4">{children}</div>
     </section>
   );
 }
 
-function CheckboxRow({ checked, onChange, label }: { checked: boolean; onChange: (v: boolean) => void; label: string }) {
+function CheckboxRow({
+  checked,
+  onChange,
+  label,
+}: {
+  checked: boolean;
+  onChange: (v: boolean) => void;
+  label: string;
+}) {
   return (
-    <label className="flex items-center gap-3 cursor-pointer p-2.5 rounded-lg hover:bg-slate-50 transition-colors">
-      <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} className={cb} />
-      <span className="text-sm text-slate-700">{label}</span>
+    <label
+      className={`flex items-start gap-3 cursor-pointer p-3 sm:p-3.5 rounded-xl border transition-all ${
+        checked
+          ? "bg-orange-50/80 border-orange-300 text-orange-950 font-medium shadow-xs"
+          : "bg-white border-slate-200 hover:border-slate-300 text-slate-700 hover:bg-slate-50"
+      }`}
+    >
+      <div
+        className={`w-5 h-5 rounded-md border flex items-center justify-center mt-0.5 shrink-0 transition-colors ${
+          checked ? "bg-orange-600 border-orange-600 text-white" : "border-slate-300 bg-white"
+        }`}
+      >
+        {checked && <Check className="w-3.5 h-3.5 stroke-[3]" />}
+      </div>
+      <span className="text-xs sm:text-sm select-none leading-snug">{label}</span>
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(e) => onChange(e.target.checked)}
+        className="sr-only"
+      />
     </label>
   );
 }
 
-function AlatRow({ label, item, onChange }: { label: string; item: AlatItem; onChange: (v: AlatItem) => void }) {
+function AlatRow({
+  label,
+  item,
+  onChange,
+}: {
+  label: string;
+  item: AlatItem;
+  onChange: (v: AlatItem) => void;
+}) {
   return (
-    <div className="flex items-center gap-3 p-2.5 rounded-lg hover:bg-slate-50 transition-colors flex-wrap">
-      <label className="flex items-center gap-3 cursor-pointer flex-1 min-w-[160px]">
-        <input type="checkbox" checked={item.pakai}
-          onChange={(e) => onChange({ pakai: e.target.checked, kondisi: e.target.checked ? item.kondisi : "" })}
-          className={cb} />
-        <span className="text-sm text-slate-700">{label}</span>
-      </label>
-      {item.pakai && (
-        <div className="flex gap-3 ml-8 sm:ml-0">
-          {(["ok", "ng"] as const).map((k) => (
-            <label key={k} className="flex items-center gap-1.5 cursor-pointer">
-              <input type="radio" name={`kondisi-${label}`} checked={item.kondisi === k}
-                onChange={() => onChange({ ...item, kondisi: k })} className="w-4 h-4 text-orange-500" />
-              <span className={`text-xs font-semibold ${k === "ok" ? "text-green-600" : "text-red-500"}`}>{k.toUpperCase()}</span>
-            </label>
-          ))}
-        </div>
-      )}
+    <div
+      className={`p-3.5 rounded-xl border transition-all ${
+        item.pakai
+          ? "bg-white border-orange-300 shadow-xs"
+          : "bg-slate-50/50 border-slate-200 hover:border-slate-300"
+      }`}
+    >
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <label className="flex items-center gap-3 cursor-pointer flex-1 min-w-[160px]">
+          <div
+            className={`w-5 h-5 rounded-md border flex items-center justify-center shrink-0 transition-colors ${
+              item.pakai ? "bg-orange-600 border-orange-600 text-white" : "border-slate-300 bg-white"
+            }`}
+          >
+            {item.pakai && <Check className="w-3.5 h-3.5 stroke-[3]" />}
+          </div>
+          <span className="text-xs sm:text-sm font-semibold text-slate-800">{label}</span>
+          <input
+            type="checkbox"
+            checked={item.pakai}
+            onChange={(e) =>
+              onChange({ pakai: e.target.checked, kondisi: e.target.checked ? item.kondisi || "ok" : "" })
+            }
+            className="sr-only"
+          />
+        </label>
+
+        {item.pakai && (
+          <div className="flex items-center gap-2 pl-8 sm:pl-0 self-end sm:self-auto shrink-0 animate-in fade-in duration-150">
+            <span className="text-xs text-slate-400 font-medium mr-1">Kondisi:</span>
+            {(["ok", "ng"] as const).map((k) => (
+              <button
+                type="button"
+                key={k}
+                onClick={() => onChange({ ...item, kondisi: k })}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  item.kondisi === k
+                    ? k === "ok"
+                      ? "bg-emerald-600 text-white shadow-xs ring-1 ring-emerald-500"
+                      : "bg-rose-600 text-white shadow-xs ring-1 ring-rose-500"
+                    : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                }`}
+              >
+                {k.toUpperCase()}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
 
-export default function IjinKerjaEksternalPage() {
+function IjinKerjaEksternalPageInner() {
   const router = useRouter();
   const [form, setForm] = useState<FormState>(defaultForm);
   const [submitting, setSubmitting] = useState(false);
@@ -188,25 +356,57 @@ export default function IjinKerjaEksternalPage() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
   const [successId, setSuccessId] = useState("");
+  const [createdFormId, setCreatedFormId] = useState<string | null>(null);
 
   // ── JSA state (Bagian 4) ────────────────────────────────────────────
+  const [jsaMode, setJsaMode] = useState<JsaMode>("build");
   const [perluJsa, setPerluJsa] = useState(false);
   const [jsa, setJsa] = useState<JsaData>(createEmptyJsa());
+  const [jsaFile, setJsaFile] = useState<JsaFileInfo | null>(null);
+  const [jsaUploadStatus, setJsaUploadStatus] = useState<JsaUploadStatus>("idle");
+  const [jsaUploadError, setJsaUploadError] = useState("");
   const [safetyInduction, setSafetyInduction] = useState<SafetyInductionData>(createEmptySafetyInduction);
 
-  // ── Upload Lisensi state (Bagian 9) — wajib, bisa lebih dari 1 file ──
+  // ── Peralatan Lainnya dinamis (Bagian 3) ─────────────────────────────
+  const [alatLainnyaList, setAlatLainnyaList] = useState<AlatLainnyaItem[]>([]);
+
+  const handleAddAlatLainnya = () => {
+    setAlatLainnyaList((prev) => [
+      ...prev,
+      { id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, nama: "", kondisi: "ok" },
+    ]);
+  };
+
+  const handleUpdateAlatLainnya = (id: string, patch: Partial<AlatLainnyaItem>) => {
+    setAlatLainnyaList((prev) =>
+      prev.map((item) => (item.id === id ? { ...item, ...patch } : item))
+    );
+  };
+
+  const handleRemoveAlatLainnya = (id: string) => {
+    setAlatLainnyaList((prev) => prev.filter((item) => item.id !== id));
+  };
+
+  // ── Upload Lisensi state (Bagian 9) ─────────────────────────────────
   const [licenseFiles, setLicenseFiles] = useState<LicenseFileInfo[]>([]);
   const [pengawasOptions, setPengawasOptions] = useState<Array<{ id: number; nama: string; nik: string; departemen: string }>>([]);
   const [departemenOptions, setDepartemenOptions] = useState<string[]>([]);
+  const [isPengawasOther, setIsPengawasOther] = useState(false);
+  const [pengawasOtherManual, setPengawasOtherManual] = useState("");
 
-  // ── SPV Terkait (Bagian 11) — difilter dari departemen user yang login,
-  //    gaya sama seperti "Pemberi Izin (SPV)" di /form/hot-work ──────────
-  const [spvOptions, setSpvOptions] = useState<Array<{ id: number; nama: string; nik: string | null; jabatan: string | null; departmen: string | null }>>([]);
-  const [spvPemberiIzin, setSpvPemberiIzin] = useState<{ nama: string; nik: string; jabatan: string }>({ nama: "", nik: "", jabatan: "" });
+  // ── SPV Terkait (Bagian 11) ─────────────────────────────────────────
+  const [spvOptions, setSpvOptions] = useState<
+    Array<{ id: number; nama: string; nik: string | null; jabatan: string | null; departmen: string | null }>
+  >([]);
+  const [spvPemberiIzin, setSpvPemberiIzin] = useState<{ nama: string; nik: string; jabatan: string }>({
+    nama: "",
+    nik: "",
+    jabatan: "",
+  });
 
   useEffect(() => {
     fetch("/form-permit/api/auth/me", { credentials: "include" })
-      .then((res) => res.ok ? res.json() : null)
+      .then((res) => (res.ok ? res.json() : null))
       .then(async (data) => {
         const departmen = data?.user?.departmen ?? "";
         setJsa((prev) => ({ ...prev, sectDept: departmen }));
@@ -231,7 +431,7 @@ export default function IjinKerjaEksternalPage() {
             });
           }
         } catch {
-          // Tidak kritikal — SPV tetap bisa dipilih manual jika daftar gagal dimuat
+          // Ignored
         }
       })
       .catch(() => undefined);
@@ -239,46 +439,90 @@ export default function IjinKerjaEksternalPage() {
 
   useEffect(() => {
     Promise.all([
-      fetch("/form-permit/api/pengawas-departemen", { credentials: "include" }).then((res) => res.ok ? res.json() : { data: [] }),
-      fetch("/form-permit/api/departemen?activeOnly=1", { credentials: "include" }).then((res) => res.ok ? res.json() : { data: [] }),
-    ]).then(([pengawas, departemen]) => {
-      setPengawasOptions(pengawas.data ?? []);
-      setDepartemenOptions((departemen.data ?? []).map((item: { nama_departemen: string }) => item.nama_departemen));
-    }).catch(() => {
-      setPengawasOptions([]);
-      setDepartemenOptions([]);
-    });
+      fetch("/form-permit/api/pengawas-departemen", { credentials: "include" }).then((res) =>
+        res.ok ? res.json() : { data: [] }
+      ),
+      fetch("/form-permit/api/departemen?activeOnly=1", { credentials: "include" }).then((res) =>
+        res.ok ? res.json() : { data: [] }
+      ),
+    ])
+      .then(([pengawas, departemen]) => {
+        setPengawasOptions(pengawas.data ?? []);
+        setDepartemenOptions((departemen.data ?? []).map((item: { nama_departemen: string }) => item.nama_departemen));
+      })
+      .catch(() => {
+        setPengawasOptions([]);
+        setDepartemenOptions([]);
+      });
   }, []);
 
-  const set = <K extends keyof FormState>(key: K, val: FormState[K]) => setForm((prev) => ({ ...prev, [key]: val }));
+  const set = <K extends keyof FormState>(key: K, val: FormState[K]) => {
+    if (key === "namaPengawasPicSubkont" || key === "pengawasPekerjaanUser") {
+      setForm((prev) => ({
+        ...prev,
+        namaPengawasPicSubkont: val as string,
+        pengawasPekerjaanUser: val as string,
+      }));
+    } else {
+      setForm((prev) => ({ ...prev, [key]: val }));
+    }
+  };
   const setGroup = <K extends keyof FormState>(key: K, patch: Partial<FormState[K]>) =>
     setForm((prev) => ({ ...prev, [key]: { ...(prev[key] as any), ...patch } }));
 
-  const buildBody = (isSubmit: boolean) => ({
-    isSubmit, ...form,
-    waktuKerja: normalizeTo24h(form.waktuKerja),
-    // Bagian 4: JSA terstruktur
-    perluJsa,
-    jsaData: perluJsa ? jsa : null,
-    safetyInduction,
-    // Bagian 9: Upload Lisensi — array file (wajib, bisa lebih dari satu)
-    licenseFiles: licenseFiles
-      .filter((f) => f.status === "success" && f.url)
-      .map((f) => ({ url: f.url, name: f.name })),
-    // Bagian 11: SPV Terkait — dikirim terpisah (nama + NIK) seperti di hot-work,
-    // supaya notifikasi email approval tertuju ke SPV yang tepat.
-    spvPemberiIzin,
-  });
+  const buildBody = (isSubmit: boolean) => {
+    const validAlatLainnya = alatLainnyaList.filter((a) => a.nama.trim());
+    let computedAlatLainnya = "";
+    let computedAlatLainnyaKondisi = "";
+    if (validAlatLainnya.length > 0) {
+      computedAlatLainnya = JSON.stringify(
+        validAlatLainnya.map((a) => ({ nama: a.nama.trim(), kondisi: a.kondisi }))
+      );
+      const allSame = validAlatLainnya.every((a) => a.kondisi === validAlatLainnya[0].kondisi);
+      computedAlatLainnyaKondisi = allSame ? (validAlatLainnya[0].kondisi || "ok") : "ok/ng";
+    }
+
+    const syncedPengawas = form.pengawasPekerjaanUser || form.namaPengawasPicSubkont || "";
+    const finalPengawasBagian = isPengawasOther ? pengawasOtherManual.trim() : form.pengawasBagian;
+
+    return {
+      isSubmit,
+      status: isSubmit ? "submitted" : "draft",
+      ...form,
+      pengawasBagian: finalPengawasBagian,
+      namaPengawasPicSubkont: syncedPengawas,
+      pengawasPekerjaanUser: syncedPengawas,
+      alatLainnya: computedAlatLainnya,
+      alatLainnyaKondisi: computedAlatLainnyaKondisi,
+      waktuKerja: normalizeTo24h(form.waktuKerja),
+      perluJsa,
+      jsaFileUrl: perluJsa && jsaMode === "upload" ? jsaFile?.url || null : null,
+      jsaData: perluJsa && jsaMode === "build" ? jsa : null,
+      safetyInduction,
+      licenseFiles: licenseFiles
+        .filter((f) => f.status === "success" && f.url)
+        .map((f) => ({ url: f.url, name: f.name })),
+      spvPemberiIzin,
+    };
+  };
 
   const handleSaveDraft = async () => {
-    setSaving(true); setError("");
+    setSaving(true);
+    setError("");
     try {
-      const res = await fetch("/form-permit/api/forms/general-permit", {
-        method: "POST", headers: { "Content-Type": "application/json" },
+      const endpoint = createdFormId
+        ? `/form-permit/api/forms/general-permit/${createdFormId}`
+        : `/form-permit/api/forms/general-permit`;
+      const method = createdFormId ? "PUT" : "POST";
+
+      const res = await fetch(endpoint, {
+        method,
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(buildBody(false)),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Gagal menyimpan draft");
+      setCreatedFormId(data.id_form || createdFormId);
       router.push("/my-forms");
     } catch (err: any) {
       setError(err.message);
@@ -296,15 +540,31 @@ export default function IjinKerjaEksternalPage() {
       document.getElementById("bagian-15")?.scrollIntoView({ behavior: "smooth", block: "center" });
       return;
     }
-    if (!form.pengawasPekerjaanUser.trim()) {
-      setError("Nama Pengawas Pekerjaan/User (Bagian 15) wajib diisi.");
-      document.getElementById("bagian-15")?.scrollIntoView({ behavior: "smooth", block: "center" });
+    const syncedPengawas = (form.pengawasPekerjaanUser || form.namaPengawasPicSubkont).trim();
+    if (!syncedPengawas) {
+      setError("Nama Pengawas / PIC Subkontraktor (Bagian 1 & 15) wajib diisi.");
+      document.getElementById("bagian-1")?.scrollIntoView({ behavior: "smooth", block: "center" });
       return;
     }
-    if (perluJsa && (!jsa.area.trim() || !jsa.jenisPekerjaan.trim() || !jsa.pic.trim() || !jsa.petugas.some((petugas) => petugas.trim()))) {
-      setError("Area, Jenis Pekerjaan, PIC, dan minimal satu Petugas pada JSA wajib diisi.");
-      document.getElementById("bagian-jsa")?.scrollIntoView({ behavior: "smooth", block: "center" });
-      return;
+    if (perluJsa) {
+      if (jsaMode === "upload") {
+        if (!jsaFile?.url) {
+          setError("Silakan upload file dokumen JSA terlebih dahulu.");
+          document.getElementById("bagian-jsa")?.scrollIntoView({ behavior: "smooth", block: "center" });
+          return;
+        }
+      } else {
+        if (
+          !jsa.area.trim() ||
+          !jsa.jenisPekerjaan.trim() ||
+          !jsa.pic.trim() ||
+          !jsa.petugas.some((petugas) => petugas.trim())
+        ) {
+          setError("Area, Jenis Pekerjaan, PIC, dan minimal satu Petugas pada JSA wajib diisi.");
+          document.getElementById("bagian-jsa")?.scrollIntoView({ behavior: "smooth", block: "center" });
+          return;
+        }
+      }
     }
     const workerCountValue = form.jumlahTenagaKerja.trim();
     const workerCount = Number(workerCountValue);
@@ -314,8 +574,9 @@ export default function IjinKerjaEksternalPage() {
       return;
     }
     const successLicenseCount = licenseFiles.filter((f) => f.status === "success" && f.url).length;
-    if (!form.departemenPengawas || !form.pengawasBagian) {
-      setError("Departemen dan Pengawas (Bagian) wajib dipilih.");
+    const finalPengawasBagian = (isPengawasOther ? pengawasOtherManual : form.pengawasBagian).trim();
+    if (!form.departemenPengawas || !finalPengawasBagian) {
+      setError("Departemen dan Pengawas (Bagian) wajib dipilih/diisi.");
       document.getElementById("bagian-5")?.scrollIntoView({ behavior: "smooth", block: "center" });
       return;
     }
@@ -324,26 +585,37 @@ export default function IjinKerjaEksternalPage() {
       document.getElementById("bagian-11")?.scrollIntoView({ behavior: "smooth", block: "center" });
       return;
     }
-    if ((workerCount > 0 && successLicenseCount < 1) || successLicenseCount > workerCount) {
-      setError(`Jumlah file Lisensi/Sertifikasi harus minimal 1 dan maksimal ${workerCount}, saat ini ${successLicenseCount} file berhasil diupload.`);
+    // Upload lisensi dibuat OPSIONAL — hanya jika diisi tidak boleh melebihi jumlah tenaga kerja
+    if (workerCount > 0 && successLicenseCount > workerCount) {
+      setError(
+        `Jumlah file Lisensi/Sertifikasi maksimal ${workerCount}, saat ini ${successLicenseCount} file berhasil diupload.`
+      );
       document.getElementById("bagian-lisensi")?.scrollIntoView({ behavior: "smooth", block: "center" });
       return;
     }
     if (licenseFiles.some((f) => f.status === "uploading")) {
-      setError("Masih ada file Lisensi/Sertifikasi yang sedang diupload, tunggu sebentar.");
+      setError("Masih ada file Lisensi/Sertifikasi yang sedang diupload, harap tunggu.");
       document.getElementById("bagian-lisensi")?.scrollIntoView({ behavior: "smooth", block: "center" });
       return;
     }
 
     setSubmitting(true);
     try {
-      const res = await fetch("/form-permit/api/forms/general-permit", {
-        method: "POST", headers: { "Content-Type": "application/json" },
+      const endpoint = createdFormId
+        ? `/form-permit/api/forms/general-permit/${createdFormId}`
+        : `/form-permit/api/forms/general-permit`;
+      const method = createdFormId ? "PUT" : "POST";
+
+      const res = await fetch(endpoint, {
+        method,
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(buildBody(true)),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Gagal mengajukan form");
-      setSuccessId(data.id_form);
+      const savedId = data.id_form || createdFormId;
+      setCreatedFormId(savedId);
+      setSuccessId(savedId);
       setSuccess(true);
     } catch (err: any) {
       setError(err.message);
@@ -355,41 +627,75 @@ export default function IjinKerjaEksternalPage() {
   if (success) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
-        <div className="bg-white rounded-2xl shadow-xl p-10 max-w-lg w-full text-center">
-          <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <CheckCircle className="w-8 h-8 text-green-600" />
+        <div className="bg-white rounded-3xl shadow-xl border border-slate-200 p-8 sm:p-10 max-w-lg w-full text-center">
+          <div className="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-2xl flex items-center justify-center mx-auto mb-5 shadow-sm">
+            <CheckCircle className="w-9 h-9" />
           </div>
           <h2 className="text-2xl font-bold text-slate-900 mb-2">Ijin Kerja Eksternal Berhasil Dikirim!</h2>
-          <p className="text-slate-500 text-sm mb-2">Sedang menunggu persetujuan SPV → Security → SFO → MGR.</p>
+          <p className="text-slate-500 text-sm mb-4">
+            Permohonan sedang menunggu alur persetujuan: <strong className="text-slate-700">SPV → Security → SFO → MGR</strong>.
+          </p>
           {successId && (
-            <p className="text-xs text-slate-400 mb-6">ID Form: <span className="font-mono font-bold text-slate-700">{successId}</span></p>
+            <p className="text-xs text-slate-400 mb-6 bg-slate-50 py-2 rounded-lg border border-slate-100">
+              ID Permohonan: <span className="font-mono font-bold text-slate-800">{successId}</span>
+            </p>
           )}
 
-          <div className="text-left bg-orange-50 border border-orange-200 rounded-xl p-4 mb-6">
-            <p className="text-sm font-semibold text-orange-800 mb-3">Lanjutkan dengan jenis pekerjaan spesifik (jika dibutuhkan):</p>
-            <div className="space-y-2">
-              <Link href={`/form/hot-work?id_ijin_kerja=${successId}`}
-                className="flex items-center gap-3 p-3 bg-white rounded-lg border border-orange-200 hover:border-orange-400 transition-colors">
-                <Flame className="w-5 h-5 text-red-500 shrink-0" />
-                <span className="text-sm font-medium text-slate-800">Tambah Ijin Kerja Panas (Hot Work)</span>
+          <div className="text-left bg-orange-50/80 border border-orange-200 rounded-2xl p-5 mb-6">
+            <p className="text-xs sm:text-sm font-bold text-orange-950 mb-3">
+              Lanjutkan dengan formulir jenis pekerjaan khusus (jika diperlukan):
+            </p>
+            <div className="space-y-2.5">
+              <Link
+                href={`/form/hot-work?id_ijin_kerja=${successId}`}
+                className="flex items-center gap-3 p-3.5 bg-white rounded-xl border border-orange-200 hover:border-orange-400 hover:shadow-xs transition-all group"
+              >
+                <div className="p-2 rounded-lg bg-rose-50 text-rose-600 group-hover:bg-rose-100 transition-colors">
+                  <Flame className="w-5 h-5" />
+                </div>
+                <span className="text-xs sm:text-sm font-bold text-slate-800">Tambah Izin Kerja Panas (Hot Work)</span>
               </Link>
-              <Link href={`/form/height-work?id_ijin_kerja=${successId}`}
-                className="flex items-center gap-3 p-3 bg-white rounded-lg border border-orange-200 hover:border-orange-400 transition-colors">
-                <AlertTriangle className="w-5 h-5 text-blue-500 shrink-0" />
-                <span className="text-sm font-medium text-slate-800">Tambah Ijin Kerja Ketinggian (Height Work)</span>
+              <Link
+                href={`/form/height-work?id_ijin_kerja=${successId}`}
+                className="flex items-center gap-3 p-3.5 bg-white rounded-xl border border-orange-200 hover:border-orange-400 hover:shadow-xs transition-all group"
+              >
+                <div className="p-2 rounded-lg bg-blue-50 text-blue-600 group-hover:bg-blue-100 transition-colors">
+                  <HardHat className="w-5 h-5" />
+                </div>
+                <span className="text-xs sm:text-sm font-bold text-slate-800">Tambah Izin Kerja Ketinggian (Height Work)</span>
               </Link>
-              <Link href={`/form/workshop?id_ijin_kerja=${successId}`}
-                className="flex items-center gap-3 p-3 bg-white rounded-lg border border-orange-200 hover:border-orange-400 transition-colors">
-                <Wrench className="w-5 h-5 text-green-500 shrink-0" />
-                <span className="text-sm font-medium text-slate-800">Tambah Ijin Kerja Workshop</span>
+              <Link
+                href={`/form/workshop?id_ijin_kerja=${successId}`}
+                className="flex items-center gap-3 p-3.5 bg-white rounded-xl border border-orange-200 hover:border-orange-400 hover:shadow-xs transition-all group"
+              >
+                <div className="p-2 rounded-lg bg-emerald-50 text-emerald-600 group-hover:bg-emerald-100 transition-colors">
+                  <Wrench className="w-5 h-5" />
+                </div>
+                <span className="text-xs sm:text-sm font-bold text-slate-800">Tambah Izin Kerja Workshop</span>
               </Link>
             </div>
-            <p className="text-xs text-orange-600 mt-3">Anda juga bisa menambahkan ini nanti lewat menu "Lihat Detail" di Riwayat Form.</p>
+            <p className="text-[11px] text-orange-700 mt-3 leading-relaxed">
+              Anda juga dapat menghubungkan izin kerja khusus ini kapan saja melalui menu &quot;Lihat Detail&quot; di Riwayat Form.
+            </p>
           </div>
 
           <div className="flex gap-3">
-            <Link href="/my-forms" className="flex-1 py-2.5 bg-orange-600 hover:bg-orange-700 text-white font-semibold rounded-lg text-sm transition-colors">Lihat Riwayat</Link>
-            <Link href="/home" className="flex-1 py-2.5 border border-slate-200 hover:bg-slate-50 text-slate-700 font-semibold rounded-lg text-sm transition-colors">Kembali</Link>
+            <Link
+              href="/my-forms"
+              className="flex-1 py-3 bg-orange-600 hover:bg-orange-700 text-white font-semibold rounded-xl text-sm transition-all shadow-md shadow-orange-600/20 text-center"
+            >
+              Lihat Riwayat
+            </Link>
+            <button
+              type="button"
+              onClick={() => {
+                setSuccess(false);
+                window.scrollTo({ top: 0, behavior: "smooth" });
+              }}
+              className="flex-1 py-3 border border-slate-200 hover:bg-slate-50 text-slate-700 font-semibold rounded-xl text-sm transition-colors text-center cursor-pointer"
+            >
+              Kembali ke Formulir
+            </button>
           </div>
         </div>
       </div>
@@ -397,376 +703,993 @@ export default function IjinKerjaEksternalPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <header className="bg-white border-b border-slate-200 sticky top-0 z-40">
-        <div className="max-w-3xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between">
+    <div className="min-h-screen bg-slate-50/60 pb-28">
+      {/* ── HEADER ── */}
+      <header className="bg-white border-b border-slate-200 sticky top-0 z-40 backdrop-blur-md bg-white/90">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 py-3.5 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 bg-gradient-to-br from-orange-500 to-orange-600 rounded-lg flex items-center justify-center shadow">
-              <Shield className="w-5 h-5 text-white" />
+            <div className="w-10 h-10 bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl flex items-center justify-center shadow-md shadow-orange-500/20 text-white">
+              <ClipboardList className="w-5 h-5" />
             </div>
             <div>
-              <h1 className="font-bold text-slate-900 text-sm leading-tight">Ijin Kerja Eksternal</h1>
-              <div className="flex items-center gap-1 text-xs text-slate-500">
-                <Link href="/my-forms" className="hover:text-orange-600 transition-colors">Beranda</Link>
-                <ChevronRight className="w-3 h-3" />
-                <span>Vendor / Kontraktor</span>
+              <h1 className="font-bold text-slate-900 text-sm sm:text-base leading-tight">Formulir Izin Kerja Eksternal</h1>
+              <div className="flex items-center gap-1.5 text-xs text-slate-500 mt-0.5">
+                <Link href="/home" className="hover:text-orange-600 transition-colors">Beranda</Link>
+                <ChevronRight className="w-3 h-3 text-slate-400" />
+                <span className="text-orange-600 font-medium">Vendor / Kontraktor</span>
               </div>
             </div>
           </div>
-          <span className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 bg-orange-50 border border-orange-200 rounded-full text-xs font-semibold text-orange-700">
-            <ClipboardList className="w-3.5 h-3.5" /> JAI/F-01/P.SHE-19
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-orange-50 border border-orange-200 rounded-full text-xs font-bold text-orange-700">
+            <Shield className="w-3.5 h-3.5" /> JAI/F-01/P.SHE-19
           </span>
         </div>
       </header>
 
-      <main className="max-w-3xl mx-auto px-4 sm:px-6 py-8">
+      {/* ── MAIN CONTENT ── */}
+      <main className="max-w-4xl mx-auto px-4 sm:px-6 pt-6 sm:pt-8">
         <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 flex items-start gap-3">
+          {createdFormId && (
+            <div className="bg-amber-50 border border-amber-300 rounded-2xl p-4 flex items-center justify-between gap-3 text-amber-900 text-xs sm:text-sm">
+              <div className="flex items-center gap-2.5">
+                <AlertCircle className="w-5 h-5 text-amber-600 shrink-0" />
+                <span>
+                  Anda sedang meninjau formulir <strong>{createdFormId}</strong>. Silakan ubah data yang perlu diperbaiki lalu klik <strong>Kirim Permohonan</strong> kembali untuk menyimpan perbaikan.
+                </span>
+              </div>
+            </div>
+          )}
+          <div className="bg-blue-50/70 border border-blue-200 rounded-2xl p-4 sm:p-5 flex items-start gap-3.5 shadow-xs">
             <AlertCircle className="w-5 h-5 text-blue-600 shrink-0 mt-0.5" />
-            <p className="text-sm text-blue-700">
-              Untuk vendor/kontraktor eksternal, isi Form Ijin Kerja ini terlebih dahulu, lalu pilih jenis pekerjaan spesifik
-              yang dibutuhkan (Workshop / Ketinggian / Panas) setelah form ini diajukan. Semua form akan diajukan sekaligus,
-              masing-masing dengan alur approval-nya sendiri.
-            </p>
+            <div className="text-xs sm:text-sm text-blue-900 leading-relaxed">
+              <p className="font-bold mb-1">Panduan Pengajuan Kontraktor Eksternal</p>
+              <p>
+                Lengkapi formulir izin kerja umum ini terlebih dahulu. Setelah diajukan, Anda dapat menambahkan izin pekerjaan khusus (Hot Work, Height Work, atau Workshop) yang otomatis terhubung ke dokumen izin ini.
+              </p>
+            </div>
           </div>
 
           {error && (
-            <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex items-start gap-3">
-              <AlertCircle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
-              <p className="text-red-700 text-sm">{error}</p>
+            <div className="bg-rose-50 border border-rose-200 rounded-2xl p-4 flex items-start gap-3 text-rose-700 animate-in fade-in duration-200">
+              <AlertCircle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
+              <p className="text-xs sm:text-sm font-medium">{error}</p>
             </div>
           )}
 
-          {/* ═══ BAGIAN 1 ═══ */}
-          <section id="bagian-1"><SectionCard nomor={1} title="Informasi Kontraktor/Pekerja">
-            <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-2">Nama Kontraktor/Pekerja <span className="text-red-500">*</span></label>
-              <input type="text" value={form.namaKontraktorPekerja} onChange={(e) => set("namaKontraktorPekerja", e.target.value)} required className={inputCls} />
-            </div>
-            <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-2">Nama Pengawas/PIC Subkont</label>
-              <input type="text" value={form.namaPengawasPicSubkont} onChange={(e) => set("namaPengawasPicSubkont", e.target.value)} className={inputCls} />
-            </div>
-            <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-2">Jumlah Tenaga Kerja</label>
-              <input type="number" min="0" step="1" value={form.jumlahTenagaKerja} onChange={(e) => set("jumlahTenagaKerja", e.target.value)} className={`${inputCls} max-w-[160px]`} />
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2">Tanggal Mulai Kerja <span className="text-red-500">*</span></label>
-                <input type="date" value={form.tglMulaiKerja} onChange={(e) => set("tglMulaiKerja", e.target.value)} required className={inputCls} />
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2">Tanggal Akhir Kerja (Rencana)</label>
-                <input type="date" value={form.tglAkhirKerjaRencana} onChange={(e) => set("tglAkhirKerjaRencana", e.target.value)} className={inputCls} />
-              </div>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2">Waktu</label>
-                <TimeInput24 value={form.waktuKerja} onChange={(v) => set("waktuKerja", v)} />
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2">Actual Tanggal Kerja</label>
-                <input type="date" value={form.actualTanggalKerja} onChange={(e) => set("actualTanggalKerja", e.target.value)} className={inputCls} />
-              </div>
-            </div>
-          </SectionCard></section>
+          {/* ═══ BAGIAN 1: INFORMASI KONTRAKTOR ═══ */}
+          <section id="bagian-1">
+            <SectionCard
+              nomor={1}
+              title="Informasi Kontraktor & Jadwal Kerja"
+              description="Data identitas subkontraktor, jumlah pekerja, dan durasi pelaksanaan"
+              badge="Wajib Diisi"
+            >
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs sm:text-sm font-bold text-slate-800 mb-1.5">
+                      Nama Perusahaan Kontraktor / Pekerja <span className="text-rose-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={form.namaKontraktorPekerja}
+                      onChange={(e) => set("namaKontraktorPekerja", e.target.value)}
+                      placeholder="Contoh: PT Bangun Prima Mandiri"
+                      required
+                      className={inputCls}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs sm:text-sm font-bold text-slate-800 mb-1.5">
+                      Nama Pengawas / PIC Subkontraktor <span className="text-rose-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={form.namaPengawasPicSubkont}
+                      onChange={(e) => set("namaPengawasPicSubkont", e.target.value)}
+                      placeholder="Nama PIC kontraktor di lapangan"
+                      required
+                      className={inputCls}
+                    />
+                    <p className="text-[11px] text-slate-400 mt-1">
+                      Terhubung otomatis dengan Pengawas Pekerjaan / User di Bagian 15.
+                    </p>
+                  </div>
+                  <div>
+                    <label className="block text-xs sm:text-sm font-bold text-slate-800 mb-1.5">
+                      Kontraktor Penanggung Jawab Lapangan
+                    </label>
+                    <input
+                      type="text"
+                      value={form.kontraktorPj}
+                      onChange={(e) => set("kontraktorPj", e.target.value)}
+                      placeholder="Nama penanggung jawab operasional dari kontraktor"
+                      className={inputCls}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs sm:text-sm font-bold text-slate-800 mb-1.5">
+                      Jumlah Tenaga Kerja (Orang) <span className="text-rose-500">*</span>
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="1"
+                      value={form.jumlahTenagaKerja}
+                      onChange={(e) => set("jumlahTenagaKerja", e.target.value)}
+                      placeholder="0"
+                      className={`${inputCls} font-bold`}
+                    />
+                    <p className="text-[11px] text-slate-400 mt-1">Harus sesuai dengan jumlah sertifikat lisensi yang dilampirkan di Bagian 9.</p>
+                  </div>
+                </div>
 
-          {/* ═══ BAGIAN 2 ═══ */}
-          <SectionCard nomor={2} title="Spesifikasi Pekerjaan">
-            <div className="space-y-1">
-              <CheckboxRow checked={form.spesifikasiPekerjaan.areaWorkshop} onChange={(v) => setGroup("spesifikasiPekerjaan", { areaWorkshop: v })} label="Bekerja area Workshop (las, gerinding, cutt off, pengecatan)" />
-              <CheckboxRow checked={form.spesifikasiPekerjaan.ruangTertutup} onChange={(v) => setGroup("spesifikasiPekerjaan", { ruangTertutup: v })} label="Bekerja di ruang tertutup" />
-              <CheckboxRow checked={form.spesifikasiPekerjaan.ketinggian} onChange={(v) => setGroup("spesifikasiPekerjaan", { ketinggian: v })} label="Bekerja di ketinggian" />
-              <CheckboxRow checked={form.spesifikasiPekerjaan.teganganTinggi} onChange={(v) => setGroup("spesifikasiPekerjaan", { teganganTinggi: v })} label="Bekerja di tegangan tinggi" />
-              <CheckboxRow checked={form.spesifikasiPekerjaan.pemakaianLoto} onChange={(v) => setGroup("spesifikasiPekerjaan", { pemakaianLoto: v })} label="Pemakaian LOTO" />
-              <CheckboxRow checked={form.spesifikasiPekerjaan.forklift} onChange={(v) => setGroup("spesifikasiPekerjaan", { forklift: v })} label="Bekerja mengoperasikan forklift" />
-              <CheckboxRow checked={form.spesifikasiPekerjaan.temperaturTinggi} onChange={(v) => setGroup("spesifikasiPekerjaan", { temperaturTinggi: v })} label="Bekerja di temperatur tinggi" />
-            </div>
-            <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-2">Deskripsi Pekerjaan</label>
-              <textarea rows={3} value={form.deskripsiPekerjaan} onChange={(e) => set("deskripsiPekerjaan", e.target.value)} className={`${inputCls} resize-none`} />
-            </div>
-            <input type="text" value={form.spesifikasiLainnya} onChange={(e) => set("spesifikasiLainnya", e.target.value)} className={inputCls} placeholder="Lainnya, sebutkan" />
-          </SectionCard>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+                  <div>
+                    <label className="block text-xs sm:text-sm font-bold text-slate-800 mb-1.5">
+                      Tanggal Mulai Kerja <span className="text-rose-500">*</span>
+                    </label>
+                    <input
+                      type="date"
+                      value={form.tglMulaiKerja}
+                      onChange={(e) => set("tglMulaiKerja", e.target.value)}
+                      required
+                      className={inputCls}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs sm:text-sm font-bold text-slate-800 mb-1.5">
+                      Tanggal Akhir Kerja (Rencana)
+                    </label>
+                    <input
+                      type="date"
+                      value={form.tglAkhirKerjaRencana}
+                      onChange={(e) => set("tglAkhirKerjaRencana", e.target.value)}
+                      className={inputCls}
+                    />
+                  </div>
+                </div>
 
-          {/* ═══ BAGIAN 3 ═══ */}
-          <SectionCard nomor={3} title="Alat yang Dipakai">
-            <div className="space-y-1">
-              <AlatRow label="Mesin potong / cut off" item={form.alat.mesinPotong} onChange={(v) => setGroup("alat", { mesinPotong: v })} />
-              <AlatRow label="Mesin las / Gerinda" item={form.alat.mesinLasGerinda} onChange={(v) => setGroup("alat", { mesinLasGerinda: v })} />
-              <AlatRow label="Genset" item={form.alat.genset} onChange={(v) => setGroup("alat", { genset: v })} />
-              <AlatRow label="Tabung gas" item={form.alat.tabungGas} onChange={(v) => setGroup("alat", { tabungGas: v })} />
-              <AlatRow label="Tangga Listrik / AWP" item={form.alat.tanggaListrikAwp} onChange={(v) => setGroup("alat", { tanggaListrikAwp: v })} />
-              <AlatRow label="Forklift" item={form.alat.forklift} onChange={(v) => setGroup("alat", { forklift: v })} />
-              <AlatRow label="Lift Barang" item={form.alat.liftBarang} onChange={(v) => setGroup("alat", { liftBarang: v })} />
-            </div>
-            <input type="text" value={form.alatLainnya} onChange={(e) => set("alatLainnya", e.target.value)} className={inputCls} placeholder="Alat lainnya" />
-          </SectionCard>
-
-          {/* ═══ BAGIAN 4 (BARU): UPLOAD JSA ═══ */}
-          <section id="bagian-jsa">
-            <JsaBuilderSection enabled={perluJsa} setEnabled={setPerluJsa} value={jsa} setValue={setJsa} />
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs sm:text-sm font-bold text-slate-800 mb-1.5">
+                      Waktu Mulai Kerja (Format 24 Jam)
+                    </label>
+                    <TimeInput24 value={form.waktuKerja} onChange={(v) => set("waktuKerja", v)} />
+                  </div>
+                  <div>
+                    <label className="block text-xs sm:text-sm font-bold text-slate-800 mb-1.5">
+                      Aktual Tanggal Kerja Selesai
+                    </label>
+                    <input
+                      type="date"
+                      value={form.actualTanggalKerja}
+                      onChange={(e) => set("actualTanggalKerja", e.target.value)}
+                      className={inputCls}
+                    />
+                  </div>
+                </div>
+              </div>
+            </SectionCard>
           </section>
 
-          {/* ═══ BAGIAN 5 (dulu 4) ═══ */}
-          <section id="bagian-5"><SectionCard nomor={5} title="Informasi Lokasi Proyek & Pengawas">
+          {/* ═══ BAGIAN 2: SPESIFIKASI PEKERJAAN ═══ */}
+          <SectionCard
+            nomor={2}
+            title="Spesifikasi & Deskripsi Pekerjaan"
+            description="Klasifikasi jenis pekerjaan berisiko yang akan dilakukan"
+          >
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <CheckboxRow
+                checked={form.spesifikasiPekerjaan.areaWorkshop}
+                onChange={(v) => setGroup("spesifikasiPekerjaan", { areaWorkshop: v })}
+                label="Bekerja di area Workshop (las, gerinda, cutting, pengecatan)"
+              />
+              <CheckboxRow
+                checked={form.spesifikasiPekerjaan.ruangTertutup}
+                onChange={(v) => setGroup("spesifikasiPekerjaan", { ruangTertutup: v })}
+                label="Bekerja di ruang tertutup (confined space)"
+              />
+              <CheckboxRow
+                checked={form.spesifikasiPekerjaan.ketinggian}
+                onChange={(v) => setGroup("spesifikasiPekerjaan", { ketinggian: v })}
+                label="Bekerja di ketinggian (> 1.8 meter)"
+              />
+              <CheckboxRow
+                checked={form.spesifikasiPekerjaan.teganganTinggi}
+                onChange={(v) => setGroup("spesifikasiPekerjaan", { teganganTinggi: v })}
+                label="Bekerja di area tegangan tinggi (high voltage)"
+              />
+              <CheckboxRow
+                checked={form.spesifikasiPekerjaan.pemakaianLoto}
+                onChange={(v) => setGroup("spesifikasiPekerjaan", { pemakaianLoto: v })}
+                label="Penerapan prosedur LOTO (Lockout / Tagout)"
+              />
+              <CheckboxRow
+                checked={form.spesifikasiPekerjaan.forklift}
+                onChange={(v) => setGroup("spesifikasiPekerjaan", { forklift: v })}
+                label="Mengoperasikan unit Forklift"
+              />
+              <CheckboxRow
+                checked={form.spesifikasiPekerjaan.temperaturTinggi}
+                onChange={(v) => setGroup("spesifikasiPekerjaan", { temperaturTinggi: v })}
+                label="Bekerja di lingkungan temperatur tinggi"
+              />
+            </div>
+
             <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-2">Lokasi Pekerjaan <span className="text-red-500">*</span></label>
-              <textarea rows={2} value={form.lokasiPekerjaan} onChange={(e) => set("lokasiPekerjaan", e.target.value)} required className={`${inputCls} resize-none`} />
+              <label className="block text-xs sm:text-sm font-bold text-slate-800 mb-1.5">
+                Rincian Deskripsi Pekerjaan
+              </label>
+              <textarea
+                rows={3}
+                value={form.deskripsiPekerjaan}
+                onChange={(e) => set("deskripsiPekerjaan", e.target.value)}
+                placeholder="Tuliskan uraian detail pekerjaan yang akan dilaksanakan di area PT. JAI..."
+                className={`${inputCls} resize-none`}
+              />
             </div>
-            <div className="space-y-1">
-              <CheckboxRow checked={form.lokasiTipe.dalamGedung} onChange={(v) => setGroup("lokasiTipe", { dalamGedung: v })} label="Dalam gedung" />
-              <CheckboxRow checked={form.lokasiTipe.luarGedung} onChange={(v) => setGroup("lokasiTipe", { luarGedung: v })} label="Luar gedung" />
-              <CheckboxRow checked={form.lokasiTipe.luarPagarGedung} onChange={(v) => setGroup("lokasiTipe", { luarPagarGedung: v })} label="Luar pagar gedung" />
-              <CheckboxRow checked={form.lokasiTipe.diAtasGedung} onChange={(v) => setGroup("lokasiTipe", { diAtasGedung: v })} label="Di atas gedung" />
+
+            <div>
+              <label className="block text-xs sm:text-sm font-bold text-slate-800 mb-1.5">
+                Spesifikasi Lainnya
+              </label>
+              <input
+                type="text"
+                value={form.spesifikasiLainnya}
+                onChange={(e) => set("spesifikasiLainnya", e.target.value)}
+                className={inputCls}
+                placeholder="Sebutkan jika ada spesifikasi khusus lainnya..."
+              />
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2">Departemen Pengawas <span className="text-red-500">*</span></label>
-                <select
-                  value={form.departemenPengawas}
-                  onChange={(e) => setForm((prev) => ({ ...prev, departemenPengawas: e.target.value, pengawasBagian: "" }))}
-                  required
-                  className={inputCls}
+          </SectionCard>
+
+          {/* ═══ BAGIAN 3: ALAT YANG DIPAKAI ═══ */}
+          <SectionCard
+            nomor={3}
+            title="Peralatan & Kondisi Mesin Kerja"
+            description="Daftar mesin/alat kerja yang dibawa serta pemeriksaan kelayakan fisiknya"
+          >
+            <div className="space-y-2.5">
+              <AlatRow
+                label="Mesin Potong / Cut Off"
+                item={form.alat.mesinPotong}
+                onChange={(v) => setGroup("alat", { mesinPotong: v })}
+              />
+              <AlatRow
+                label="Mesin Las / Gerinda"
+                item={form.alat.mesinLasGerinda}
+                onChange={(v) => setGroup("alat", { mesinLasGerinda: v })}
+              />
+              <AlatRow
+                label="Genset / Generator Listrik"
+                item={form.alat.genset}
+                onChange={(v) => setGroup("alat", { genset: v })}
+              />
+              <AlatRow
+                label="Tabung Gas (Oksigen / Acetylene / LPG)"
+                item={form.alat.tabungGas}
+                onChange={(v) => setGroup("alat", { tabungGas: v })}
+              />
+              <AlatRow
+                label="Tangga Listrik / AWP (Aerial Work Platform)"
+                item={form.alat.tanggaListrikAwp}
+                onChange={(v) => setGroup("alat", { tanggaListrikAwp: v })}
+              />
+              <AlatRow
+                label="Unit Forklift"
+                item={form.alat.forklift}
+                onChange={(v) => setGroup("alat", { forklift: v })}
+              />
+              <AlatRow
+                label="Lift Barang / Hoist Crane"
+                item={form.alat.liftBarang}
+                onChange={(v) => setGroup("alat", { liftBarang: v })}
+              />
+            </div>
+
+            {/* Peralatan Lainnya dengan Kondisi & Tambah Dinamis */}
+            <div className="pt-4 border-t border-slate-200">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
+                <div>
+                  <label className="block text-xs sm:text-sm font-bold text-slate-800">
+                    Peralatan Lainnya
+                  </label>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Tambahkan mesin atau peralatan kerja tambahan serta periksa kelayakan fisiknya (OK / NG).
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleAddAlatLainnya}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-orange-50 text-orange-700 hover:bg-orange-100 border border-orange-200 transition-colors cursor-pointer self-start sm:self-auto shadow-xs"
                 >
-                  <option value="">-- Pilih Departemen --</option>
-                  {departemenOptions.map((departemen) => <option key={departemen} value={departemen}>{departemen}</option>)}
-                </select>
+                  <Plus className="w-3.5 h-3.5" />
+                  Tambah Peralatan
+                </button>
               </div>
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2">Pengawas (Bagian) <span className="text-red-500">*</span></label>
-                <select
-                  value={form.pengawasBagian}
-                  onChange={(e) => set("pengawasBagian", e.target.value)}
-                  required
-                  disabled={!form.departemenPengawas}
-                  className={`${inputCls} ${!form.departemenPengawas ? "bg-slate-100 text-slate-400 cursor-not-allowed" : ""}`}
-                >
-                  <option value="">{form.departemenPengawas ? "-- Pilih Pengawas --" : "Pilih departemen terlebih dahulu"}</option>
-                  {pengawasOptions.filter((item) => item.departemen === form.departemenPengawas).map((item) => (
-                    <option key={item.id} value={item.nama}>{item.nama} / {item.nik}</option>
+
+              {alatLainnyaList.length === 0 ? (
+                <div className="p-4 rounded-xl border border-dashed border-slate-200 bg-slate-50/50 text-center">
+                  <p className="text-xs text-slate-400 italic">
+                    Belum ada peralatan tambahan. Klik tombol &quot;+ Tambah Peralatan&quot; jika membawa alat lain di luar daftar di atas.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-2.5">
+                  {alatLainnyaList.map((item, index) => (
+                    <div
+                      key={item.id}
+                      className="p-3.5 rounded-xl border border-slate-200 bg-white shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                    >
+                      <div className="flex items-center gap-2.5 flex-1 min-w-[200px]">
+                        <span className="text-xs font-bold text-slate-400 w-5 shrink-0 text-center">
+                          {index + 1}.
+                        </span>
+                        <input
+                          type="text"
+                          value={item.nama}
+                          onChange={(e) => handleUpdateAlatLainnya(item.id, { nama: e.target.value })}
+                          placeholder="Masukkan nama peralatan tambahan (contoh: Mesin Bor Duduk, Hand Grinder)..."
+                          className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs sm:text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-orange-500 placeholder-slate-400 bg-white"
+                        />
+                      </div>
+
+                      <div className="flex items-center justify-end gap-2 pl-7 sm:pl-0 shrink-0">
+                        <span className="text-xs text-slate-400 font-medium mr-1">Kondisi:</span>
+                        {(["ok", "ng"] as const).map((k) => (
+                          <button
+                            type="button"
+                            key={k}
+                            onClick={() => handleUpdateAlatLainnya(item.id, { kondisi: k })}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                              item.kondisi === k
+                                ? k === "ok"
+                                  ? "bg-emerald-600 text-white shadow-xs ring-1 ring-emerald-500"
+                                  : "bg-rose-600 text-white shadow-xs ring-1 ring-rose-500"
+                                : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                            }`}
+                          >
+                            {k.toUpperCase()}
+                          </button>
+                        ))}
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveAlatLainnya(item.id)}
+                          className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors ml-1 cursor-pointer"
+                          title="Hapus peralatan ini"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
                   ))}
-                </select>
-              </div>
+                </div>
+              )}
+            </div>
+          </SectionCard>
+
+          {/* ═══ BAGIAN 4: JSA METHOD (BUAT / UPLOAD JSA) ═══ */}
+          <section id="bagian-jsa">
+            <JsaMethodSection
+              mode={jsaMode}
+              setMode={setJsaMode}
+              perluJsa={perluJsa}
+              setPerluJsa={setPerluJsa}
+              jsaFile={jsaFile}
+              setJsaFile={setJsaFile}
+              jsaUploadStatus={jsaUploadStatus}
+              setJsaUploadStatus={setJsaUploadStatus}
+              jsaUploadError={jsaUploadError}
+              setJsaUploadError={setJsaUploadError}
+              jsaData={jsa}
+              setJsaData={setJsa}
+              sectionTitle="Bagian 4: Job Safety Analysis (JSA)"
+              sectionStyle="workshop"
+            />
+          </section>
+
+          {/* ═══ BAGIAN 5: LOKASI & PENGAWAS DEPARTEMEN ═══ */}
+          <section id="bagian-5">
+            <SectionCard
+              nomor={5}
+              title="Informasi Lokasi Proyek & Pengawas Departemen"
+              description="Zona kerja, departemen pengawas internal PT. JAI, dan PIC LOTO"
+              badge="Wajib Diisi"
+            >
               <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2">PIC LOTO / Station LOTO</label>
-                <input type="text" value={form.picLotoStationLoto} onChange={(e) => set("picLotoStationLoto", e.target.value)} className={inputCls} />
+                <label className="block text-xs sm:text-sm font-bold text-slate-800 mb-1.5">
+                  Lokasi Detail Pekerjaan <span className="text-rose-500">*</span>
+                </label>
+                <textarea
+                  rows={2}
+                  value={form.lokasiPekerjaan}
+                  onChange={(e) => set("lokasiPekerjaan", e.target.value)}
+                  placeholder="Contoh: Gedung Produksi 2 Area Line A, Rooftop Gedung Utama"
+                  required
+                  className={`${inputCls} resize-none`}
+                />
               </div>
-            </div>
-          </SectionCard></section>
 
-          {/* ═══ BAGIAN 6 (dulu 5) ═══ */}
-          <SectionCard nomor={6} title="Karakter Bahan yang Dipakai">
-            <div className="space-y-1">
-              <CheckboxRow checked={form.bahan.mudahTerbakar} onChange={(v) => setGroup("bahan", { mudahTerbakar: v })} label="Bahan mudah terbakar" />
-              <CheckboxRow checked={form.bahan.mudahMeledak} onChange={(v) => setGroup("bahan", { mudahMeledak: v })} label="Bahan mudah meledak" />
-              <CheckboxRow checked={form.bahan.kimiaBeracunIritan} onChange={(v) => setGroup("bahan", { kimiaBeracunIritan: v })} label="Bahan Kimia Beracun / Iritan" />
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                <CheckboxRow
+                  checked={form.lokasiTipe.dalamGedung}
+                  onChange={(v) => setGroup("lokasiTipe", { dalamGedung: v })}
+                  label="Dalam Gedung"
+                />
+                <CheckboxRow
+                  checked={form.lokasiTipe.luarGedung}
+                  onChange={(v) => setGroup("lokasiTipe", { luarGedung: v })}
+                  label="Luar Gedung"
+                />
+                <CheckboxRow
+                  checked={form.lokasiTipe.luarPagarGedung}
+                  onChange={(v) => setGroup("lokasiTipe", { luarPagarGedung: v })}
+                  label="Luar Pagar"
+                />
+                <CheckboxRow
+                  checked={form.lokasiTipe.diAtasGedung}
+                  onChange={(v) => setGroup("lokasiTipe", { diAtasGedung: v })}
+                  label="Di Atas Gedung"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+                <div>
+                  <label className="block text-xs sm:text-sm font-bold text-slate-800 mb-1.5">
+                    Departemen Pengawas <span className="text-rose-500">*</span>
+                  </label>
+                  <select
+                    value={form.departemenPengawas}
+                    onChange={(e) => {
+                      setForm((prev) => ({ ...prev, departemenPengawas: e.target.value, pengawasBagian: "" }));
+                      setIsPengawasOther(false);
+                      setPengawasOtherManual("");
+                    }}
+                    required
+                    className={inputCls}
+                  >
+                    <option value="">-- Pilih Departemen --</option>
+                    {departemenOptions.map((dept) => (
+                      <option key={dept} value={dept}>{dept}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="block text-xs sm:text-sm font-bold text-slate-800">
+                      Pengawas (Bagian) <span className="text-rose-500">*</span>
+                    </label>
+                    {isPengawasOther && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsPengawasOther(false);
+                          setPengawasOtherManual("");
+                          set("pengawasBagian", "");
+                        }}
+                        className="text-[11px] font-semibold text-orange-600 hover:text-orange-700 hover:underline inline-flex items-center gap-1 transition-colors"
+                        title="Batal manual & pilih dari daftar"
+                      >
+                        ← Pilih dari daftar
+                      </button>
+                    )}
+                  </div>
+
+                  {isPengawasOther ? (
+                    <div className="relative animate-in fade-in duration-200">
+                      <input
+                        type="text"
+                        value={pengawasOtherManual}
+                        onChange={(e) => {
+                          setPengawasOtherManual(e.target.value);
+                          set("pengawasBagian", e.target.value);
+                        }}
+                        placeholder="Ketik nama pengawas bagian..."
+                        required
+                        autoFocus
+                        className={inputCls}
+                      />
+                    </div>
+                  ) : (
+                    <select
+                      value={form.pengawasBagian}
+                      onChange={(e) => {
+                        if (e.target.value === "__other__") {
+                          setIsPengawasOther(true);
+                          setPengawasOtherManual("");
+                          set("pengawasBagian", "");
+                        } else {
+                          setIsPengawasOther(false);
+                          set("pengawasBagian", e.target.value);
+                        }
+                      }}
+                      required
+                      disabled={!form.departemenPengawas}
+                      className={`${inputCls} ${
+                        !form.departemenPengawas ? "bg-slate-100 text-slate-400 cursor-not-allowed" : ""
+                      }`}
+                    >
+                      <option value="">
+                        {form.departemenPengawas ? "-- Pilih Pengawas --" : "Pilih departemen terlebih dahulu"}
+                      </option>
+                      {pengawasOptions
+                        .filter((item) => item.departemen === form.departemenPengawas)
+                        .map((item) => (
+                          <option key={item.id} value={item.nama}>
+                            {item.nama} / {item.nik}
+                          </option>
+                        ))}
+                      {form.departemenPengawas && (
+                        <option value="__other__">Other (Ketik Manual)</option>
+                      )}
+                    </select>
+                  )}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs sm:text-sm font-bold text-slate-800 mb-1.5">
+                  PIC LOTO / Station LOTO
+                </label>
+                <input
+                  type="text"
+                  value={form.picLotoStationLoto}
+                  onChange={(e) => set("picLotoStationLoto", e.target.value)}
+                  className={inputCls}
+                  placeholder="Nama PIC LOTO terkait jika menggunakan prosedur LOTO"
+                />
+              </div>
+            </SectionCard>
+          </section>
+
+          {/* ═══ BAGIAN 6: KARAKTER BAHAN ═══ */}
+          <SectionCard
+            nomor={6}
+            title="Karakter Bahan yang Dipakai"
+            description="Karakteristik bahan kimia atau material berbahaya yang digunakan"
+          >
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <CheckboxRow
+                checked={form.bahan.mudahTerbakar}
+                onChange={(v) => setGroup("bahan", { mudahTerbakar: v })}
+                label="Bahan Mudah Terbakar"
+              />
+              <CheckboxRow
+                checked={form.bahan.mudahMeledak}
+                onChange={(v) => setGroup("bahan", { mudahMeledak: v })}
+                label="Bahan Mudah Meledak"
+              />
+              <CheckboxRow
+                checked={form.bahan.kimiaBeracunIritan}
+                onChange={(v) => setGroup("bahan", { kimiaBeracunIritan: v })}
+                label="Kimia Beracun / Iritan"
+              />
             </div>
-            <input type="text" value={form.bahanLainnya} onChange={(e) => set("bahanLainnya", e.target.value)} className={inputCls} placeholder="Lainnya, sebutkan" />
+            <input
+              type="text"
+              value={form.bahanLainnya}
+              onChange={(e) => set("bahanLainnya", e.target.value)}
+              className={inputCls}
+              placeholder="Bahan berbahaya lainnya..."
+            />
           </SectionCard>
 
-          {/* ═══ BAGIAN 7 (dulu 6) ═══ */}
-          <SectionCard nomor={7} title="Potensi Dampak LK3 yang Ditimbulkan">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4">
-              <div className="space-y-1">
-                <CheckboxRow checked={form.dampak.ledakanKebakaran} onChange={(v) => setGroup("dampak", { ledakanKebakaran: v })} label="Bahaya ledakan / kebakaran" />
-                <CheckboxRow checked={form.dampak.jatuhKetinggian} onChange={(v) => setGroup("dampak", { jatuhKetinggian: v })} label="Jatuh dari ketinggian" />
-                <CheckboxRow checked={form.dampak.kepalaTertimpa} onChange={(v) => setGroup("dampak", { kepalaTertimpa: v })} label="Kepala tertimpa benda keras" />
-                <CheckboxRow checked={form.dampak.kakiTertimpa} onChange={(v) => setGroup("dampak", { kakiTertimpa: v })} label="Kaki tertimpa benda keras" />
-                <CheckboxRow checked={form.dampak.tumpahanOliBbmB3} onChange={(v) => setGroup("dampak", { tumpahanOliBbmB3: v })} label="Tumpahan Oli & BBM, B3" />
-                <CheckboxRow checked={form.dampak.tersengatListrik} onChange={(v) => setGroup("dampak", { tersengatListrik: v })} label="Tersengat Listrik" />
-                <CheckboxRow checked={form.dampak.terjepitMesin} onChange={(v) => setGroup("dampak", { terjepitMesin: v })} label="Terjepit Mesin" />
-              </div>
-              <div className="space-y-1">
-                <CheckboxRow checked={form.dampak.tersayatTertusuk} onChange={(v) => setGroup("dampak", { tersayatTertusuk: v })} label="Tersayat / tertusuk" />
-                <CheckboxRow checked={form.dampak.infeksiPernafasan} onChange={(v) => setGroup("dampak", { infeksiPernafasan: v })} label="Infeksi pernafasan" />
-                <CheckboxRow checked={form.dampak.iritasiMata} onChange={(v) => setGroup("dampak", { iritasiMata: v })} label="Iritasi mata" />
-                <CheckboxRow checked={form.dampak.radiasiSinarLas} onChange={(v) => setGroup("dampak", { radiasiSinarLas: v })} label="Radiasi sinar las" />
-                <CheckboxRow checked={form.dampak.iritasiKulit} onChange={(v) => setGroup("dampak", { iritasiKulit: v })} label="Iritasi Kulit" />
-                <CheckboxRow checked={form.dampak.kebisingan} onChange={(v) => setGroup("dampak", { kebisingan: v })} label="Kebisingan diatas 85 dB" />
-                <CheckboxRow checked={form.dampak.keracunanZatKimia} onChange={(v) => setGroup("dampak", { keracunanZatKimia: v })} label="Keracunan Zat Kimia" />
-              </div>
+          {/* ═══ BAGIAN 7: POTENSI DAMPAK LK3 ═══ */}
+          <SectionCard
+            nomor={7}
+            title="Potensi Bahaya & Dampak LK3"
+            description="Identifikasi kemungkinan bahaya keselamatan dan lingkungan kerja"
+          >
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <CheckboxRow
+                checked={form.dampak.ledakanKebakaran}
+                onChange={(v) => setGroup("dampak", { ledakanKebakaran: v })}
+                label="Bahaya Ledakan / Kebakaran"
+              />
+              <CheckboxRow
+                checked={form.dampak.jatuhKetinggian}
+                onChange={(v) => setGroup("dampak", { jatuhKetinggian: v })}
+                label="Jatuh dari Ketinggian"
+              />
+              <CheckboxRow
+                checked={form.dampak.kepalaTertimpa}
+                onChange={(v) => setGroup("dampak", { kepalaTertimpa: v })}
+                label="Kepala Tertimpa Benda Keras"
+              />
+              <CheckboxRow
+                checked={form.dampak.kakiTertimpa}
+                onChange={(v) => setGroup("dampak", { kakiTertimpa: v })}
+                label="Kaki Tertimpa Benda Keras"
+              />
+              <CheckboxRow
+                checked={form.dampak.tumpahanOliBbmB3}
+                onChange={(v) => setGroup("dampak", { tumpahanOliBbmB3: v })}
+                label="Tumpahan Oli, BBM, atau Limbah B3"
+              />
+              <CheckboxRow
+                checked={form.dampak.tersengatListrik}
+                onChange={(v) => setGroup("dampak", { tersengatListrik: v })}
+                label="Bahaya Tersengat Aliran Listrik"
+              />
+              <CheckboxRow
+                checked={form.dampak.terjepitMesin}
+                onChange={(v) => setGroup("dampak", { terjepitMesin: v })}
+                label="Terjepit Putaran Mesin / Komponen Bergerak"
+              />
+              <CheckboxRow
+                checked={form.dampak.tersayatTertusuk}
+                onChange={(v) => setGroup("dampak", { tersayatTertusuk: v })}
+                label="Tersayat atau Tertusuk Material Tajam"
+              />
+              <CheckboxRow
+                checked={form.dampak.infeksiPernafasan}
+                onChange={(v) => setGroup("dampak", { infeksiPernafasan: v })}
+                label="Gangguan / Infeksi Pernafasan (Debu/Uap)"
+              />
+              <CheckboxRow
+                checked={form.dampak.iritasiMata}
+                onChange={(v) => setGroup("dampak", { iritasiMata: v })}
+                label="Iritasi Mata akibat Partikel atau Cairan"
+              />
+              <CheckboxRow
+                checked={form.dampak.radiasiSinarLas}
+                onChange={(v) => setGroup("dampak", { radiasiSinarLas: v })}
+                label="Paparan Radiasi Sinar Pengelasan"
+              />
+              <CheckboxRow
+                checked={form.dampak.iritasiKulit}
+                onChange={(v) => setGroup("dampak", { iritasiKulit: v })}
+                label="Iritasi Kulit akibat Paparan Bahan Kimia"
+              />
+              <CheckboxRow
+                checked={form.dampak.kebisingan}
+                onChange={(v) => setGroup("dampak", { kebisingan: v })}
+                label="Kebisingan Melebihi Ambang Batas (> 85 dB)"
+              />
+              <CheckboxRow
+                checked={form.dampak.keracunanZatKimia}
+                onChange={(v) => setGroup("dampak", { keracunanZatKimia: v })}
+                label="Keracunan / Intoksikasi Zat Kimia"
+              />
             </div>
-            <input type="text" value={form.dampakLainnya} onChange={(e) => set("dampakLainnya", e.target.value)} className={inputCls} placeholder="Lainnya, sebutkan" />
+            <input
+              type="text"
+              value={form.dampakLainnya}
+              onChange={(e) => set("dampakLainnya", e.target.value)}
+              className={inputCls}
+              placeholder="Dampak bahaya lainnya..."
+            />
           </SectionCard>
 
-          {/* ═══ BAGIAN 8 (dulu 7) ═══ */}
-          <SectionCard nomor={8} title="Alat Pelindung Diri (APD) yang Harus Dipergunakan">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4">
-              <div className="space-y-1">
-                <CheckboxRow checked={form.apd.masker} onChange={(v) => setGroup("apd", { masker: v })} label="Masker" />
-                <CheckboxRow checked={form.apd.maskerKimia} onChange={(v) => setGroup("apd", { maskerKimia: v })} label="Masker Kimia" />
-                <CheckboxRow checked={form.apd.kacamataBiasa} onChange={(v) => setGroup("apd", { kacamataBiasa: v })} label="Kaca mata Biasa" />
-                <CheckboxRow checked={form.apd.kacamataLas} onChange={(v) => setGroup("apd", { kacamataLas: v })} label="Kaca mata Las" />
-                <CheckboxRow checked={form.apd.earPlug} onChange={(v) => setGroup("apd", { earPlug: v })} label="Ear plug" />
-                <CheckboxRow checked={form.apd.gloves} onChange={(v) => setGroup("apd", { gloves: v })} label="Gloves" />
-                <CheckboxRow checked={form.apd.fullBodyHarness} onChange={(v) => setGroup("apd", { fullBodyHarness: v })} label="Full Body Harness" />
-              </div>
-              <div className="space-y-1">
-                <CheckboxRow checked={form.apd.sarungTanganBintil} onChange={(v) => setGroup("apd", { sarungTanganBintil: v })} label="Sarung Tangan Bintil" />
-                <CheckboxRow checked={form.apd.sarungTanganListrik} onChange={(v) => setGroup("apd", { sarungTanganListrik: v })} label="Sarung Tangan Listrik" />
-                <CheckboxRow checked={form.apd.sarungTanganKulit} onChange={(v) => setGroup("apd", { sarungTanganKulit: v })} label="Sarung Tangan Kulit" />
-                <CheckboxRow checked={form.apd.helm} onChange={(v) => setGroup("apd", { helm: v })} label="Helm" />
-                <CheckboxRow checked={form.apd.safetyShoes} onChange={(v) => setGroup("apd", { safetyShoes: v })} label="Safety Shoes" />
-                <CheckboxRow checked={form.apd.sepatuKaret} onChange={(v) => setGroup("apd", { sepatuKaret: v })} label="Sepatu Karet" />
-                <CheckboxRow checked={form.apd.topiKerja} onChange={(v) => setGroup("apd", { topiKerja: v })} label="Topi Kerja" />
-              </div>
+          {/* ═══ BAGIAN 8: APD WAJIB ═══ */}
+          <SectionCard
+            nomor={8}
+            title="Alat Pelindung Diri (APD) yang Wajib Digunakan"
+            description="Perlengkapan proteksi standar dan khusus yang wajib dikenakan di area kerja"
+          >
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+              <CheckboxRow checked={form.apd.masker} onChange={(v) => setGroup("apd", { masker: v })} label="Masker Debu" />
+              <CheckboxRow checked={form.apd.maskerKimia} onChange={(v) => setGroup("apd", { maskerKimia: v })} label="Masker Kimia / Respirator" />
+              <CheckboxRow checked={form.apd.kacamataBiasa} onChange={(v) => setGroup("apd", { kacamataBiasa: v })} label="Kacamata Safety" />
+              <CheckboxRow checked={form.apd.kacamataLas} onChange={(v) => setGroup("apd", { kacamataLas: v })} label="Kedok / Kacamata Las" />
+              <CheckboxRow checked={form.apd.earPlug} onChange={(v) => setGroup("apd", { earPlug: v })} label="Ear Plug / Muff" />
+              <CheckboxRow checked={form.apd.gloves} onChange={(v) => setGroup("apd", { gloves: v })} label="Sarung Tangan Kerja" />
+              <CheckboxRow checked={form.apd.fullBodyHarness} onChange={(v) => setGroup("apd", { fullBodyHarness: v })} label="Full Body Harness" />
+              <CheckboxRow checked={form.apd.sarungTanganBintil} onChange={(v) => setGroup("apd", { sarungTanganBintil: v })} label="Sarung Tangan Bintil" />
+              <CheckboxRow checked={form.apd.sarungTanganListrik} onChange={(v) => setGroup("apd", { sarungTanganListrik: v })} label="Sarung Tangan Listrik" />
+              <CheckboxRow checked={form.apd.sarungTanganKulit} onChange={(v) => setGroup("apd", { sarungTanganKulit: v })} label="Sarung Tangan Kulit" />
+              <CheckboxRow checked={form.apd.helm} onChange={(v) => setGroup("apd", { helm: v })} label="Safety Helmet" />
+              <CheckboxRow checked={form.apd.safetyShoes} onChange={(v) => setGroup("apd", { safetyShoes: v })} label="Safety Shoes" />
+              <CheckboxRow checked={form.apd.sepatuKaret} onChange={(v) => setGroup("apd", { sepatuKaret: v })} label="Sepatu Karet Boots" />
+              <CheckboxRow checked={form.apd.topiKerja} onChange={(v) => setGroup("apd", { topiKerja: v })} label="Topi Kerja" />
             </div>
-            <input type="text" value={form.apdLainnya} onChange={(e) => set("apdLainnya", e.target.value)} className={inputCls} placeholder="Lainnya, sebutkan" />
+            <input
+              type="text"
+              value={form.apdLainnya}
+              onChange={(e) => set("apdLainnya", e.target.value)}
+              className={inputCls}
+              placeholder="APD lainnya..."
+            />
           </SectionCard>
 
-          {/* ═══ BAGIAN 9 (dulu 8 "License/Sertifikasi"): UPLOAD LISENSI ═══ */}
+          {/* ═══ BAGIAN 9: UPLOAD LISENSI ═══ */}
           <section id="bagian-lisensi">
             <LicenseUploadSection
               licenseFiles={licenseFiles}
               setLicenseFiles={setLicenseFiles}
               jumlahTenagaKerja={form.jumlahTenagaKerja}
-              sectionTitle="Bagian 9: Upload Lisensi / Sertifikasi"
+              sectionTitle="Bagian 9: Upload Lisensi & Sertifikasi Kompetensi"
               sectionStyle="workshop"
+              required={false}
             />
           </section>
 
-          {/* ═══ BAGIAN 10 (dulu 9) ═══ */}
-          <SectionCard nomor={10} title="Jenis APAR yang Harus Tersedia">
-            <div className="space-y-1">
-              <CheckboxRow checked={form.apar.dryPowder} onChange={(v) => setGroup("apar", { dryPowder: v, tidakPerlu: v ? false : form.apar.tidakPerlu })} label="Dry Powder" />
-              <CheckboxRow checked={form.apar.gasCair} onChange={(v) => setGroup("apar", { gasCair: v, tidakPerlu: v ? false : form.apar.tidakPerlu })} label="Gas Cair" />
-              <CheckboxRow checked={form.apar.tidakPerlu} onChange={(v) => setGroup("apar", v ? { tidakPerlu: true, dryPowder: false, gasCair: false } : { tidakPerlu: false })} label="Tidak Perlu" />
+          {/* ═══ BAGIAN 10: APAR ═══ */}
+          <SectionCard
+            nomor={10}
+            title="Kesiapan Alat Pemadam Api Ringan (APAR)"
+            description="Tipe APAR yang harus disiapkan di dekat lokasi pelaksanaan kerja"
+          >
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <CheckboxRow
+                checked={form.apar.dryPowder}
+                onChange={(v) =>
+                  setGroup("apar", { dryPowder: v, tidakPerlu: v ? false : form.apar.tidakPerlu })
+                }
+                label="Dry Chemical Powder"
+              />
+              <CheckboxRow
+                checked={form.apar.gasCair}
+                onChange={(v) =>
+                  setGroup("apar", { gasCair: v, tidakPerlu: v ? false : form.apar.tidakPerlu })
+                }
+                label="Gas Cair / CO2"
+              />
+              <CheckboxRow
+                checked={form.apar.tidakPerlu}
+                onChange={(v) =>
+                  setGroup("apar", v ? { tidakPerlu: true, dryPowder: false, gasCair: false } : { tidakPerlu: false })
+                }
+                label="Tidak Memerlukan APAR"
+              />
             </div>
-            <input type="text" value={form.aparLainnya} onChange={(e) => set("aparLainnya", e.target.value)} className={inputCls} placeholder="Lainnya, sebutkan" />
+            <input
+              type="text"
+              value={form.aparLainnya}
+              onChange={(e) => set("aparLainnya", e.target.value)}
+              className={inputCls}
+              placeholder="Tipe APAR lainnya..."
+            />
           </SectionCard>
 
-          {/* ═══ BAGIAN 11 (dulu 10) ═══ */}
-          <section id="bagian-11"><SectionCard nomor={11} title="Tanggung Jawab Limbah Hasil Kegiatan">
-            <div className="space-y-1">
-              <CheckboxRow checked={form.limbah.kontraktor} onChange={(v) => setGroup("limbah", { kontraktor: v })} label="Kontraktor" />
-              <CheckboxRow checked={form.limbah.ptJai} onChange={(v) => setGroup("limbah", { ptJai: v })} label="PT.JAI" />
-            </div>
-            <div className="flex flex-col sm:flex-row gap-3">
-              <input type="text" value={form.limbahLokasiPt} onChange={(e) => set("limbahLokasiPt", e.target.value)} className={inputCls} placeholder="Lokasi pembuangan limbah" />
-              <label className="flex items-center gap-2 shrink-0 px-4 py-3 border border-slate-200 rounded-xl cursor-pointer hover:bg-slate-50">
-                <input type="checkbox" checked={form.limbah.luarJai} onChange={(e) => setGroup("limbah", { luarJai: e.target.checked })} className={cb} />
-                <span className="text-sm text-slate-700 whitespace-nowrap">Luar JAI</span>
-              </label>
-            </div>
-
-            {/* ── Kontraktor & SPV Terkait Penanggung Jawab ── */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-slate-100">
+          {/* ═══ BAGIAN 11: LIMBAH & SPV PENANGGUNG JAWAB ═══ */}
+          <section id="bagian-11">
+            <SectionCard
+              nomor={11}
+              title="Pengelolaan Limbah & SPV Penanggung Jawab"
+              description="Tanggung jawab pembersihan sisa kegiatan dan penetapan SPV pemberi izin"
+              badge="Wajib Diisi"
+            >
               <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2">Kontraktor Penanggung Jawab</label>
-                <input type="text" value={form.kontraktorPj} onChange={(e) => set("kontraktorPj", e.target.value)} className={inputCls} placeholder="Nama penanggung jawab dari kontraktor" />
-              </div>
-            </div>
-
-            {/* SPV Terkait — gaya sama seperti "Pemberi Izin (SPV)" di /form/hot-work */}
-            <div className="bg-green-50 border border-green-200 rounded-xl p-4">
-              <div className="flex items-center gap-2 mb-3">
-                <Lock className="w-4 h-4 text-green-600 shrink-0" />
-                <h4 className="font-bold text-green-900 text-sm">SPV Terkait Penanggung Jawab <span className="text-red-500">*</span></h4>
-              </div>
-              <div className="flex items-start gap-2 bg-green-100 border border-green-300 rounded-lg px-3 py-2.5 mb-4">
-                <AlertCircle className="w-4 h-4 text-green-600 shrink-0 mt-0.5" />
-                <p className="text-xs text-green-700">Pilih SPV yang sesuai dari departemen Anda. NIK akan muncul otomatis dan dipakai untuk mengirim notifikasi approval ke SPV yang tepat.</p>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-2">Nama SPV Terkait <span className="text-red-500">*</span></label>
-                  <select
-                    value={spvPemberiIzin.nama}
-                    onChange={(e) => {
-                      const selected = spvOptions.find((spv) => spv.nama === e.target.value);
-                      setSpvPemberiIzin({
-                        nama: selected?.nama ?? "",
-                        nik: selected?.nik ?? "",
-                        jabatan: selected?.jabatan ?? "",
-                      });
-                    }}
-                    className={`w-full px-4 py-2.5 border ${spvPemberiIzin.nama ? "border-slate-300" : "border-red-300 bg-red-50"} rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent text-black text-sm`}
-                  >
-                    <option value="">-- Pilih SPV --</option>
-                    {spvOptions.map((spv) => (
-                      <option key={spv.id} value={spv.nama}>{spv.nama}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-2">NIK SPV</label>
-                  <input
-                    type="text"
-                    value={spvPemberiIzin.nik}
-                    readOnly
-                    className="w-full px-4 py-2.5 border border-slate-300 rounded-lg bg-slate-100 text-slate-600 text-sm"
+                <label className="block text-xs sm:text-sm font-bold text-slate-800 mb-2">Tanggung Jawab Pembuangan Limbah</label>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <CheckboxRow
+                    checked={form.limbah.kontraktor}
+                    onChange={(v) => setGroup("limbah", { kontraktor: v })}
+                    label="Pihak Kontraktor"
+                  />
+                  <CheckboxRow
+                    checked={form.limbah.ptJai}
+                    onChange={(v) => setGroup("limbah", { ptJai: v })}
+                    label="Pihak PT. JAI"
+                  />
+                  <CheckboxRow
+                    checked={form.limbah.luarJai}
+                    onChange={(v) => setGroup("limbah", { luarJai: v })}
+                    label="Dibuang Keluar Area JAI"
                   />
                 </div>
               </div>
-            </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-slate-100">
               <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2">Izin Mulai Kerja</label>
-                <p className="w-full px-4 py-3 border border-slate-200 rounded-xl bg-slate-50 text-sm text-slate-700">
-                  {form.tglMulaiKerja ? new Date(`${form.tglMulaiKerja}T00:00:00`).toLocaleDateString("id-ID", { day: "2-digit", month: "long", year: "numeric" }) : "Belum diisi"}
-                </p>
+                <label className="block text-xs sm:text-sm font-bold text-slate-800 mb-1.5">Lokasi Pembuangan Limbah di Area JAI</label>
+                <input
+                  type="text"
+                  value={form.limbahLokasiPt}
+                  onChange={(e) => set("limbahLokasiPt", e.target.value)}
+                  className={inputCls}
+                  placeholder="Lokasi penampungan limbah yang disepakati..."
+                />
               </div>
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2">Sampai Dengan</label>
-                <p className="w-full px-4 py-3 border border-slate-200 rounded-xl bg-slate-50 text-sm text-slate-700">
-                  {form.tglAkhirKerjaRencana ? new Date(`${form.tglAkhirKerjaRencana}T00:00:00`).toLocaleDateString("id-ID", { day: "2-digit", month: "long", year: "numeric" }) : "Belum diisi"}
-                </p>
-              </div>
-            </div>
-          </SectionCard></section>
 
-          <div className="px-4 py-3 rounded-xl text-xs bg-blue-50 text-blue-700 border border-blue-200">
-            <strong>Alur approval Ijin Kerja (Bagian 12) yang akan diterapkan:</strong>
-            <span className="ml-1">SPV → Security → SFO → MGR</span>
-          </div>
-
-          {/* ═══ BAGIAN 15 (dulu 14) ═══ */}
-          <section id="bagian-15" className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-            <div className={sectionHead}>
-              <h2 className="font-bold text-slate-800">Bagian 15: Pernyataan Tentang Ijin Kerja</h2>
-            </div>
-            <div className="p-6 space-y-4">
-              <label className="flex items-start gap-3 cursor-pointer p-3 rounded-xl border-2 border-slate-200 hover:border-orange-300 transition-all">
-                <input type="checkbox" checked={form.pernyataanDiperiksa} onChange={(e) => set("pernyataanDiperiksa", e.target.checked)} className={`${cb} mt-0.5`} />
-                <span className="text-sm text-slate-700">
-                  Saya telah memeriksa area kerja dan pencegahan yang diperlukan, dan telah dibahas oleh pihak-pihak terkait.
-                  <span className="text-red-500"> *</span>
-                </span>
-              </label>
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2">Nama Pengawas Pekerjaan / User <span className="text-red-500">*</span></label>
-                <input type="text" value={form.pengawasPekerjaanUser} onChange={(e) => set("pengawasPekerjaanUser", e.target.value)} className={inputCls} />
+              {/* SPV Terkait Penanggung Jawab */}
+              <div className="p-4 sm:p-5 bg-emerald-50/70 border border-emerald-200/80 rounded-2xl">
+                <div className="flex items-center gap-2 mb-3">
+                  <UserCheck className="w-4 h-4 text-emerald-700" />
+                  <span className="text-xs sm:text-sm font-bold text-emerald-900">
+                    Pemberi Izin (SPV Terkait Penanggung Jawab) <span className="text-rose-500">*</span>
+                  </span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1.5">Pilih Nama SPV</label>
+                    <select
+                      value={spvPemberiIzin.nama}
+                      onChange={(e) => {
+                        const selected = spvOptions.find((spv) => spv.nama === e.target.value);
+                        setSpvPemberiIzin({
+                          nama: selected?.nama ?? "",
+                          nik: selected?.nik ?? "",
+                          jabatan: selected?.jabatan ?? "",
+                        });
+                      }}
+                      required
+                      className={`${inputCls} ${!spvPemberiIzin.nama ? "border-amber-300 bg-amber-50/50" : ""}`}
+                    >
+                      <option value="">-- Pilih SPV --</option>
+                      {spvOptions.map((spv) => (
+                        <option key={spv.id} value={spv.nama}>{spv.nama}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1.5">NIK SPV</label>
+                    <input
+                      type="text"
+                      value={spvPemberiIzin.nik}
+                      readOnly
+                      placeholder="Terisi otomatis"
+                      className="w-full px-4 py-2.5 sm:py-3 border border-slate-200 rounded-xl bg-slate-100 text-slate-600 text-xs sm:text-sm cursor-not-allowed"
+                    />
+                  </div>
+                </div>
               </div>
-            </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-slate-100">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Mulai Berlaku Izin</label>
+                  <p className="w-full px-4 py-2.5 sm:py-3 border border-slate-200 rounded-xl bg-slate-50 text-xs sm:text-sm text-slate-800 font-semibold">
+                    {form.tglMulaiKerja
+                      ? new Date(`${form.tglMulaiKerja}T00:00:00`).toLocaleDateString("id-ID", {
+                          day: "2-digit",
+                          month: "long",
+                          year: "numeric",
+                        })
+                      : "Belum diatur"}
+                  </p>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Sampai Dengan</label>
+                  <p className="w-full px-4 py-2.5 sm:py-3 border border-slate-200 rounded-xl bg-slate-50 text-xs sm:text-sm text-slate-800 font-semibold">
+                    {form.tglAkhirKerjaRencana
+                      ? new Date(`${form.tglAkhirKerjaRencana}T00:00:00`).toLocaleDateString("id-ID", {
+                          day: "2-digit",
+                          month: "long",
+                          year: "numeric",
+                        })
+                      : "Belum diatur"}
+                  </p>
+                </div>
+              </div>
+            </SectionCard>
+          </section>
+
+          {/* ═══ BAGIAN 15: PERNYATAAN ═══ */}
+          <section id="bagian-15">
+            <SectionCard
+              nomor={15}
+              title="Pernyataan & Konfirmasi Izin Kerja"
+              description="Pernyataan kepatuhan keselamatan kerja dan penanggung jawab user"
+              badge="Wajib Konfirmasi"
+            >
+              <div className="space-y-4">
+                <label
+                  className={`flex items-start gap-3.5 p-4 rounded-xl border-2 transition-all cursor-pointer ${
+                    form.pernyataanDiperiksa
+                      ? "bg-orange-50/80 border-orange-500 shadow-xs"
+                      : "bg-white border-slate-200 hover:border-slate-300"
+                  }`}
+                >
+                  <div
+                    className={`w-6 h-6 rounded-lg border-2 flex items-center justify-center mt-0.5 shrink-0 transition-colors ${
+                      form.pernyataanDiperiksa
+                        ? "bg-orange-600 border-orange-600 text-white"
+                        : "border-slate-300 bg-white"
+                    }`}
+                  >
+                    {form.pernyataanDiperiksa && <Check className="w-4 h-4 stroke-[3]" />}
+                  </div>
+                  <span className="text-xs sm:text-sm font-semibold text-slate-800 leading-relaxed select-none">
+                    Saya menyatakan telah memeriksa seluruh area kerja, memastikan upaya pencegahan bahaya telah diterapkan, dan telah dibahas bersama pihak-pihak terkait. <span className="text-rose-500">*</span>
+                  </span>
+                  <input
+                    type="checkbox"
+                    checked={form.pernyataanDiperiksa}
+                    onChange={(e) => set("pernyataanDiperiksa", e.target.checked)}
+                    className="sr-only"
+                  />
+                </label>
+
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="block text-xs sm:text-sm font-bold text-slate-800">
+                      Nama Pengawas Pekerjaan / User PT. JAI <span className="text-rose-500">*</span>
+                    </label>
+                    <span className="text-[10px] font-semibold text-slate-500 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded-md">
+                      Terkunci &amp; Otomatis
+                    </span>
+                  </div>
+                  <input
+                    type="text"
+                    value={form.namaPengawasPicSubkont || form.pengawasPekerjaanUser}
+                    disabled
+                    placeholder="Otomatis mengikuti Nama Pengawas / PIC Subkontraktor di Bagian 1"
+                    className={`${inputCls} bg-slate-100 text-slate-600 cursor-not-allowed border-slate-200 select-none shadow-none`}
+                  />
+                  <p className="text-[11px] text-slate-500 mt-1">
+                    Kolom ini dinonaktifkan (disable) dan otomatis terhubung dari <strong>Nama Pengawas / PIC Subkontraktor</strong> pada Bagian 1.
+                  </p>
+                </div>
+
+                <div className="px-4 py-3 rounded-xl text-xs bg-blue-50/80 text-blue-800 border border-blue-200 flex items-center gap-2">
+                  <Lock className="w-4 h-4 text-blue-600 shrink-0" />
+                  <span>
+                    <strong>Alur Persetujuan Digital:</strong> SPV → Security → SFO → MGR.
+                  </span>
+                </div>
+              </div>
+            </SectionCard>
           </section>
 
           {error && (
-            <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex items-start gap-3">
-              <AlertCircle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
-              <p className="text-red-700 text-sm">{error}</p>
+            <div className="bg-rose-50 border border-rose-200 rounded-2xl p-4 flex items-start gap-3 text-rose-700">
+              <AlertCircle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
+              <p className="text-xs sm:text-sm font-medium">{error}</p>
             </div>
           )}
 
-          <div className="flex flex-col sm:flex-row gap-3 pb-8">
-            <button type="button" onClick={handleSaveDraft} disabled={saving || submitting || licenseFiles.some((f) => f.status === "uploading")}
-              className="flex-1 py-3.5 border-2 border-slate-200 hover:border-slate-300 hover:bg-slate-50 text-slate-700 font-semibold rounded-xl text-sm transition-all disabled:opacity-50 flex items-center justify-center gap-2">
-              {saving ? <><Loader2 className="w-4 h-4 animate-spin" />Menyimpan Draft...</> : "Simpan sebagai Draft"}
-            </button>
-            <button type="submit" disabled={submitting || saving || licenseFiles.some((f) => f.status === "uploading")}
-              className="flex-1 py-3.5 bg-orange-600 hover:bg-orange-700 disabled:bg-orange-300 text-white font-semibold rounded-xl text-sm transition-all shadow-lg shadow-orange-600/20 flex items-center justify-center gap-2">
-              {submitting
-                ? <><Loader2 className="w-4 h-4 animate-spin" />Mengirim...</>
-                : licenseFiles.some((f) => f.status === "uploading")
-                  ? <><Loader2 className="w-4 h-4 animate-spin" />Upload file...</>
-                  : <><AlertTriangle className="w-4 h-4" />Kirim Ijin Kerja</>}
-            </button>
+          {/* ── STICKY BOTTOM ACTION BAR ── */}
+          <div className="fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-slate-200 shadow-2xl py-3 px-4">
+            <div className="max-w-4xl mx-auto flex items-center justify-between gap-4">
+              <div className="hidden sm:block">
+                <span className="text-xs font-semibold text-slate-500">Izin Kerja Eksternal</span>
+                <p className="text-sm font-bold text-slate-900 truncate max-w-xs">{form.namaKontraktorPekerja || "Kontraktor belum diisi"}</p>
+              </div>
+
+              <div className="flex items-center gap-3 w-full sm:w-auto">
+                <button
+                  type="button"
+                  onClick={handleSaveDraft}
+                  disabled={saving || submitting || licenseFiles.some((f) => f.status === "uploading")}
+                  className="flex-1 sm:flex-none px-5 py-2.5 border-2 border-slate-200 hover:border-slate-300 hover:bg-slate-50 text-slate-700 font-bold rounded-xl text-xs sm:text-sm transition-all disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  {saving ? <Loader2 className="w-4 h-4 animate-spin text-slate-600" /> : <Save className="w-4 h-4 text-slate-600" />}
+                  <span>Simpan Draft</span>
+                </button>
+
+                <button
+                  type="submit"
+                  disabled={submitting || saving || licenseFiles.some((f) => f.status === "uploading")}
+                  className="flex-1 sm:flex-none px-7 py-2.5 bg-orange-600 hover:bg-orange-700 disabled:bg-orange-300 text-white font-bold rounded-xl text-xs sm:text-sm transition-all shadow-md shadow-orange-600/20 flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  {submitting ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>Mengirim...</span>
+                    </>
+                  ) : licenseFiles.some((f) => f.status === "uploading") ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>Upload Lisensi...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Send className="w-4 h-4" />
+                      <span>Ajukan Ijin Kerja</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
           </div>
         </form>
       </main>
     </div>
+  );
+}
+
+export default function IjinKerjaEksternalPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center text-slate-500 text-sm">
+          Memuat formulir ijin kerja eksternal...
+        </div>
+      }
+    >
+      <IjinKerjaEksternalPageInner />
+    </Suspense>
   );
 }

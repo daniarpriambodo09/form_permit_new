@@ -91,33 +91,33 @@ const jenisTheme: Record<string, {
   "hot-work": {
     icon: Flame,
     borderLeft: "border-l-orange-500",
-    iconBg: "bg-orange-100",
-    iconColor: "text-orange-600",
-    badgeBg: "bg-orange-50 text-orange-700 border-orange-200",
+    iconBg: "bg-orange-100 dark:bg-orange-950/60",
+    iconColor: "text-orange-600 dark:text-orange-400",
+    badgeBg: "bg-orange-50 dark:bg-orange-950/50 text-orange-700 dark:text-orange-300 border-orange-200 dark:border-orange-500/40",
     badgeText: "Hot Work",
   },
   "workshop": {
     icon: Wrench,
     borderLeft: "border-l-blue-500",
-    iconBg: "bg-blue-100",
-    iconColor: "text-blue-600",
-    badgeBg: "bg-blue-50 text-blue-700 border-blue-200",
+    iconBg: "bg-blue-100 dark:bg-blue-950/60",
+    iconColor: "text-blue-600 dark:text-blue-400",
+    badgeBg: "bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-500/40",
     badgeText: "Workshop",
   },
   "height-work": {
     icon: AlertCircle,
     borderLeft: "border-l-purple-500",
-    iconBg: "bg-purple-100",
-    iconColor: "text-purple-600",
-    badgeBg: "bg-purple-50 text-purple-700 border-purple-200",
+    iconBg: "bg-purple-100 dark:bg-purple-950/60",
+    iconColor: "text-purple-600 dark:text-purple-400",
+    badgeBg: "bg-purple-50 dark:bg-purple-950/50 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-500/40",
     badgeText: "Ketinggian",
   },
   "general-permit": {
     icon: Layers,
     borderLeft: "border-l-emerald-500",
-    iconBg: "bg-emerald-100",
-    iconColor: "text-emerald-600",
-    badgeBg: "bg-emerald-50 text-emerald-700 border-emerald-200",
+    iconBg: "bg-emerald-100 dark:bg-emerald-950/60",
+    iconColor: "text-emerald-600 dark:text-emerald-400",
+    badgeBg: "bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-500/40",
     badgeText: "Ijin Eksternal",
   },
 };
@@ -126,34 +126,34 @@ const statusConfig: Record<string, { label: string; icon: any; color: string; bg
   draft: {
     label: "Draft",
     icon: FileText,
-    color: "text-slate-700",
-    bg: "bg-slate-100",
-    dot: "bg-slate-400",
-    border: "border-slate-200",
+    color: "text-slate-700 dark:text-slate-200",
+    bg: "bg-slate-100 dark:bg-slate-800",
+    dot: "bg-slate-400 dark:bg-slate-400",
+    border: "border-slate-200 dark:border-slate-700",
   },
   submitted: {
     label: "Diajukan",
     icon: Clock,
-    color: "text-amber-700",
-    bg: "bg-amber-50",
-    dot: "bg-amber-500",
-    border: "border-amber-200",
+    color: "text-amber-700 dark:text-amber-300",
+    bg: "bg-amber-50 dark:bg-amber-950/50",
+    dot: "bg-amber-500 dark:bg-amber-400",
+    border: "border-amber-200 dark:border-amber-500/40",
   },
   approved: {
     label: "Disetujui",
     icon: CheckCircle2,
-    color: "text-emerald-700",
-    bg: "bg-emerald-50",
-    dot: "bg-emerald-500",
-    border: "border-emerald-200",
+    color: "text-emerald-700 dark:text-emerald-300",
+    bg: "bg-emerald-50 dark:bg-emerald-950/50",
+    dot: "bg-emerald-500 dark:bg-emerald-400",
+    border: "border-emerald-200 dark:border-emerald-500/40",
   },
   rejected: {
     label: "Ditolak",
     icon: XCircle,
-    color: "text-rose-700",
-    bg: "bg-rose-50",
-    dot: "bg-rose-500",
-    border: "border-rose-200",
+    color: "text-rose-700 dark:text-rose-300",
+    bg: "bg-rose-50 dark:bg-rose-950/50",
+    dot: "bg-rose-500 dark:bg-rose-400",
+    border: "border-rose-200 dark:border-rose-500/40",
   },
 };
 
@@ -488,12 +488,16 @@ export default function MyFormsPage() {
   };
 
   const handleLogout = async () => {
-    await fetch("/form-permit/api/auth/logout", {
-      method: "POST",
-      credentials: "include",
-    });
+    try {
+      await fetch("/form-permit/api/auth/logout", {
+        method: "POST",
+        credentials: "include",
+      });
+    } catch (e) {
+      console.error("Logout error:", e);
+    }
     sessionStorage.clear();
-    router.push("/");
+    window.location.href = "/form-permit";
   };
 
   // ── Hitung Statistik Counts ──
@@ -536,7 +540,7 @@ export default function MyFormsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-white text-slate-800">
+    <div className="min-h-screen bg-slate-50/80 text-slate-800">
       {/* Sidebar Navigasi Konsisten */}
       <Sidebar />
 

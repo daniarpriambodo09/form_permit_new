@@ -86,7 +86,7 @@ export async function PUT(
     if (!existing) {
       return NextResponse.json({ error: 'Form tidak ditemukan' }, { status: 404 });
     }
-    if (!['rejected', 'draft'].includes(existing.status)) {
+    if (!['rejected', 'draft', 'submitted'].includes(existing.status)) {
       return NextResponse.json(
         { error: `Form dengan status "${existing.status}" tidak bisa diedit` },
         { status: 403 }
@@ -106,6 +106,23 @@ export async function PUT(
     const perluJsa   = f.perluJsa === true;
     const jsaFileUrl = perluJsa ? (f.jsaFileUrl || null) : null;
 
+    if (newStatus === 'submitted' && perluJsa) {
+      if (jsaFileUrl) {
+        // Mode upload: file JSA sudah dilampirkan
+      } else if (
+        !f.jsaData ||
+        !String(f.jsaData.area || '').trim() ||
+        !String(f.jsaData.jenisPekerjaan || '').trim() ||
+        !String(f.jsaData.pic || '').trim() ||
+        !f.jsaData.petugas?.some((name: unknown) => typeof name === 'string' && name.trim())
+      ) {
+        return NextResponse.json(
+          { error: 'Silakan lampirkan file dokumen JSA atau lengkapi formulir JSA.' },
+          { status: 400 }
+        );
+      }
+    }
+
     // ── Bagian 11: SPV Terkait — nama + NIK ─────────────────────────────
     const selectedSpvName = (f.spvPemberiIzin?.nama ?? null)?.toString().trim() || null;
     const selectedSpvNik  = (f.spvPemberiIzin?.nik  ?? null)?.toString().trim() || null;
@@ -116,7 +133,7 @@ export async function PUT(
       );
     }
 
-    // ── Lisensi/Sertifikasi files (Bagian 9) — wajib, bisa banyak file ──
+    // ── Lisensi/Sertifikasi files (Bagian 9) — opsional, jika diisi maksimal sesuai jumlah tenaga kerja ──
     const licenseFiles = Array.isArray(f.licenseFiles)
       ? f.licenseFiles.filter((x: any) => x && typeof x.url === 'string')
       : [];
@@ -129,9 +146,9 @@ export async function PUT(
         { status: 400 }
       );
     }
-    if (newStatus === 'submitted' && (!hasWorkerCount || licenseFiles.length !== workerCount)) {
+    if (newStatus === 'submitted' && hasWorkerCount && workerCount > 0 && licenseFiles.length > workerCount) {
       return NextResponse.json(
-        { error: `Jumlah file lisensi harus tepat ${workerCount}. Saat ini ${licenseFiles.length} file.` },
+        { error: `Jumlah file lisensi maksimal ${workerCount}. Saat ini ${licenseFiles.length} file.` },
         { status: 400 }
       );
     }
@@ -242,6 +259,13 @@ export async function PUT(
                 izin_kerja_tanggal_sampai = $2
           WHERE id_form = $3`,
         [f.tglMulaiKerja || null, f.tglAkhirKerjaRencana || null, id]
+      );
+    }
+
+    if (f.jsaData) {
+      await query(
+        `UPDATE form_ijin_kerja SET jsa_data = $1 WHERE id_form = $2`,
+        [JSON.stringify(f.jsaData), id]
       );
     }
 

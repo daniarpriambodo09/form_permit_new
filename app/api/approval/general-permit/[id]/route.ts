@@ -21,9 +21,10 @@ const STAGE_ROLE_MAP: Record<
     number,
     { role: UserRole; approvedCol: string; byCol: string; atCol: string; nikCol: string }
 > = {
-    2: { role: "spv", approvedCol: "spv_approved", byCol: "spv_approved_by", atCol: "spv_approved_at", nikCol: "spv_nik" },
-    4: { role: "sfo", approvedCol: "sfo_approved", byCol: "sfo_approved_by", atCol: "sfo_approved_at", nikCol: "sfo_nik" },
-    5: { role: "smr", approvedCol: "pga_approved", byCol: "pga_approved_by", atCol: "pga_approved_at", nikCol: "pga_nik" },
+    1: { role: "spv", approvedCol: "spv_approved", byCol: "spv_approved_by", atCol: "spv_approved_at", nikCol: "spv_nik" },
+    2: { role: "sfo", approvedCol: "sfo_approved", byCol: "sfo_approved_by", atCol: "sfo_approved_at", nikCol: "sfo_nik" },
+    3: { role: "smr", approvedCol: "pga_approved", byCol: "pga_approved_by", atCol: "pga_approved_at", nikCol: "pga_nik" },
+    4: { role: "security", approvedCol: "security_approved", byCol: "security_approved_by", atCol: "security_approved_at", nikCol: "security_nik" },
 };
 
 // ── GET: detail ringkas untuk keperluan approval (opsional, dipakai
@@ -127,7 +128,7 @@ export async function PATCH(
             );
         }
 
-        const isLastStage = currentStage === 5;
+        const isLastStage = currentStage === 4;
         const nextStage = currentStage + 1;
         const cols = stageInfo!;
 

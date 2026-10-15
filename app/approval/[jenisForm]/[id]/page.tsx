@@ -455,9 +455,13 @@ export default function ApprovalDetailPage({
   };
 
   const handleLogout = async () => {
-    await fetch("/form-permit/api/auth/logout", { method: "POST", credentials: "include" });
+    try {
+      await fetch("/form-permit/api/auth/logout", { method: "POST", credentials: "include" });
+    } catch (e) {
+      console.error("Logout error:", e);
+    }
     sessionStorage.clear();
-    router.push("/login/approver");
+    window.location.href = "/form-permit/login/approver";
   };
 
   // ── Auth loading — jangan render halaman sebelum auth selesai ──

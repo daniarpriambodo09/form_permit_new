@@ -36,16 +36,16 @@ const statusConfig: Record<string, { label: string; cls: string }> = {
 
 // ── Label & role per stage (form_ijin_kerja) ────────────────
 const STAGE_LABEL: Record<number, string> = {
-  1: "Kontraktor",
-  2: "SPV",
-  3: "Security",
-  4: "SFO",
-  5: "SMR / PGA Manager",
+  1: "SPV",
+  2: "SFO",
+  3: "SMR / PGA Manager",
+  4: "Security",
 };
 const STAGE_ROLE: Record<number, string> = {
-  2: "spv",
-  4: "sfo",
-  5: "smr",
+  1: "spv",
+  2: "sfo",
+  3: "smr",
+  4: "security",
 };
 
 const formatDate = (d?: string | null) => {
@@ -216,7 +216,7 @@ export default function ExternalApprovalPage({ params }: { params: Promise<{ id:
       });
       const result = await res.json();
       if (!res.ok) throw new Error(result.error || "Gagal menyimpan tanda tangan");
-      setMessage("Safety Induction berhasil ditandatangani & disetujui. Menunggu SFO.");
+      setMessage("Safety Induction berhasil ditandatangani & disetujui. Seluruh alur approval selesai dan form telah disetujui penuh.");
       loadData();
     } catch (err: any) {
       setError(err.message);
@@ -295,7 +295,7 @@ export default function ExternalApprovalPage({ params }: { params: Promise<{ id:
   const isMyStageRole = STAGE_ROLE[currentStage] === user.role || isAdmin;
   const canActOnGeneralPermit =
     general.status === "submitted" &&
-    (currentStage === 2 || currentStage === 4 || currentStage === 5) &&
+    (currentStage === 1 || currentStage === 2 || currentStage === 3 || (currentStage === 4 && isAdmin)) &&
     isMyStageRole;
 
   // ── Helper lists for Section rendering ──
@@ -309,6 +309,17 @@ export default function ExternalApprovalPage({ params }: { params: Promise<{ id:
     { label: "Temperatur Tinggi", val: general.spek_temperatur_tinggi },
   ];
 
+  const parsedAlatLainnya = (() => {
+    if (!general.alat_lainnya) return [];
+    try {
+      if (typeof general.alat_lainnya === "string" && general.alat_lainnya.trim().startsWith("[")) {
+        const parsed = JSON.parse(general.alat_lainnya);
+        if (Array.isArray(parsed)) return parsed;
+      }
+    } catch {}
+    return [];
+  })();
+
   const alatItems = [
     { label: "Mesin Potong", val: general.alat_mesin_potong, cond: general.alat_mesin_potong_kondisi },
     { label: "Mesin Las / Gerinda", val: general.alat_mesin_las_gerinda, cond: general.alat_mesin_las_gerinda_kondisi },
@@ -317,7 +328,9 @@ export default function ExternalApprovalPage({ params }: { params: Promise<{ id:
     { label: "Tangga Listrik / AWP", val: general.alat_tangga_listrik_awp, cond: general.alat_tangga_listrik_awp_kondisi },
     { label: "Forklift", val: general.alat_forklift, cond: general.alat_forklift_kondisi },
     { label: "Lift Barang", val: general.alat_lift_barang, cond: general.alat_lift_barang_kondisi },
-    { label: general.alat_lainnya || "Alat Lainnya", val: Boolean(general.alat_lainnya), cond: general.alat_lainnya_kondisi },
+    ...(parsedAlatLainnya.length > 0
+      ? parsedAlatLainnya.map((it: any) => ({ label: it.nama, val: true, cond: it.kondisi }))
+      : [{ label: general.alat_lainnya || "Alat Lainnya", val: Boolean(general.alat_lainnya), cond: general.alat_lainnya_kondisi }]),
   ];
 
   const bahanItems = [
@@ -572,19 +585,25 @@ export default function ExternalApprovalPage({ params }: { params: Promise<{ id:
             )}
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 pt-1">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1">
             {[
               {
                 num: 1,
-                title: "Kontraktor",
-                isApproved: true,
-                status: "Selesai (Diajukan)",
+                title: "SPV",
+                isApproved: Boolean(general.spv_approved || general.status === "approved" || currentStage > 1),
+                status: general.spv_approved
+                  ? "Disetujui"
+                  : general.status === "approved" || currentStage > 1
+                  ? "Selesai"
+                  : currentStage === 1 && general.status === "submitted"
+                  ? "Menunggu Approval"
+                  : "Menunggu",
               },
               {
                 num: 2,
-                title: "SPV",
-                isApproved: Boolean(general.spv_approved || general.status === "approved" || currentStage > 2),
-                status: general.spv_approved
+                title: "SFO",
+                isApproved: Boolean(general.sfo_approved || general.status === "approved" || currentStage > 2),
+                status: general.sfo_approved
                   ? "Disetujui"
                   : general.status === "approved" || currentStage > 2
                   ? "Selesai"
@@ -594,36 +613,24 @@ export default function ExternalApprovalPage({ params }: { params: Promise<{ id:
               },
               {
                 num: 3,
-                title: "Security",
-                isApproved: Boolean(general.security_approved || general.status === "approved" || currentStage > 3),
-                status: general.security_approved
+                title: "SMR / PGA",
+                isApproved: Boolean(general.pga_approved || general.mr_pga_approved || general.status === "approved" || currentStage > 3),
+                status: Boolean(general.pga_approved || general.mr_pga_approved || general.status === "approved" || currentStage > 3)
                   ? "Disetujui"
-                  : general.status === "approved" || currentStage > 3
-                  ? "Selesai"
                   : currentStage === 3 && general.status === "submitted"
-                  ? "Menunggu Safety Induction"
+                  ? "Menunggu Approval"
                   : "Menunggu",
               },
               {
                 num: 4,
-                title: "SFO",
-                isApproved: Boolean(general.sfo_approved || general.status === "approved" || currentStage > 4),
-                status: general.sfo_approved
+                title: "Security",
+                isApproved: Boolean(general.security_approved || general.status === "approved"),
+                status: general.security_approved
                   ? "Disetujui"
-                  : general.status === "approved" || currentStage > 4
+                  : general.status === "approved"
                   ? "Selesai"
                   : currentStage === 4 && general.status === "submitted"
-                  ? "Menunggu Approval"
-                  : "Menunggu",
-              },
-              {
-                num: 5,
-                title: "SMR / PGA",
-                isApproved: Boolean(general.pga_approved || general.mr_pga_approved || general.status === "approved"),
-                status: Boolean(general.pga_approved || general.mr_pga_approved || general.status === "approved")
-                  ? "Disetujui"
-                  : currentStage === 5 && general.status === "submitted"
-                  ? "Menunggu Approval"
+                  ? "Menunggu Safety Induction"
                   : "Menunggu",
               },
             ].map((step) => {
@@ -1180,15 +1187,19 @@ export default function ExternalApprovalPage({ params }: { params: Promise<{ id:
                   </p>
                 </div>
 
-                {general.kontraktor_signature_url && (
-                  <div className="sm:col-span-3 pt-3 border-t border-slate-100">
-                    <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider block mb-2">Tanda Tangan Pemohon (Kontraktor)</span>
+                <div className="sm:col-span-3 pt-3 border-t border-slate-100">
+                  <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider block mb-2">Tanda Tangan Pemohon (Kontraktor)</span>
+                  {general.kontraktor_signature_url ? (
                     <div className="inline-block p-2 bg-slate-50 border border-slate-200 rounded-xl">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img src={general.kontraktor_signature_url} alt="TTD Kontraktor" className="h-20 rounded bg-white" />
                     </div>
-                  </div>
-                )}
+                  ) : (
+                    <span className="inline-flex items-center gap-1.5 text-xs text-amber-700 bg-amber-50 border border-amber-200 px-3 py-1.5 rounded-lg">
+                      <Clock className="w-3.5 h-3.5" /> Belum ditandatangani kontraktor (dapat ditandatangani kapan saja)
+                    </span>
+                  )}
+                </div>
               </div>
             </section>
           </div>
@@ -1250,12 +1261,12 @@ export default function ExternalApprovalPage({ params }: { params: Promise<{ id:
                     kontraktorSignatureUrl={general.kontraktor_signature_url}
                   />
 
-                  {(isSecurity || isAdmin) && currentStage === 3 && !siApproved && (
+                  {(isSecurity || isAdmin) && currentStage === 4 && !siApproved && (
                     <div className="border-t border-teal-200 pt-5">
                       <div className="flex items-start gap-2.5 bg-blue-50 border border-blue-200 rounded-xl p-3.5 mb-4">
                         <User className="w-5 h-5 text-blue-600 shrink-0 mt-0.5" />
                         <p className="text-xs text-blue-800 leading-relaxed">
-                          Pastikan poin evaluasi Safety Induction sudah diisi dengan benar. Konfirmasi tanda tangan digital di bawah akan secara otomatis menyetujui Safety Induction dan memajukan perizinan ke tahap <strong>SFO</strong>.
+                          Pastikan poin evaluasi Safety Induction sudah diisi dengan benar. Konfirmasi tanda tangan digital di bawah adalah tahap persetujuan terakhir yang akan secara resmi menyelesaikan seluruh proses perizinan form ijin kerja eksternal.
                         </p>
                       </div>
                       <SignaturePad
@@ -1266,7 +1277,7 @@ export default function ExternalApprovalPage({ params }: { params: Promise<{ id:
                     </div>
                   )}
 
-                  {(isSecurity || isAdmin) && currentStage !== 3 && !siApproved && (
+                  {(isSecurity || isAdmin) && currentStage !== 4 && !siApproved && (
                     <div className="flex items-center gap-2.5 bg-amber-50 border border-amber-200 rounded-xl p-4">
                       <AlertCircle className="w-5 h-5 text-amber-600 shrink-0" />
                       <p className="text-xs text-amber-800">

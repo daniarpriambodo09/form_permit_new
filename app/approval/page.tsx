@@ -81,7 +81,7 @@ function getStageLabelForForm(form: FormItem): string {
 
   if (form.jenis_form === "general-permit") {
     const map: Record<number, string> = {
-      2: "SPV", 3: "Security", 4: "SFO", 5: "MGR",
+      1: "SPV", 2: "SFO", 3: "MGR", 4: "Security",
     };
     return map[stage] ?? `Tahap ${stage}`;
   }
@@ -104,9 +104,9 @@ function getApprovalStages(form: FormItem): { key: keyof FormItem; label: string
   if (form.jenis_form === "general-permit") {
     return [
       { key: "spv_approved", label: "SPV" },
-      { key: "security_approved", label: "Security" },
       { key: "sfo_approved", label: "SFO" },
       { key: "mr_pga_approved", label: "MGR" },
+      { key: "security_approved", label: "Security" },
     ];
   }
 
@@ -218,9 +218,13 @@ export default function ApprovalPage() {
   };
 
   const handleLogout = async () => {
-    await fetch("/form-permit/api/auth/logout", { method: "POST", credentials: "include" });
+    try {
+      await fetch("/form-permit/api/auth/logout", { method: "POST", credentials: "include" });
+    } catch (e) {
+      console.error("Logout error:", e);
+    }
     sessionStorage.clear();
-    router.push("/login/approver");    // ← redirect ke approver login, bukan /
+    window.location.href = "/form-permit/login/approver";
   };
 
   // ── ADDED: Download rekap Excel khusus Workshop (sesuai tab aktif) ──
@@ -504,7 +508,7 @@ export default function ApprovalPage() {
                         )}
                         {form.jenis_form === "general-permit" && (
                           <p className="text-[10px] text-slate-400 mt-1">
-                            Alur: SPV → Security → SFO → MGR
+                            Alur: SPV → SFO → MGR → Security
                           </p>
                         )}
 

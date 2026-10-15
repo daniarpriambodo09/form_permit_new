@@ -2,9 +2,14 @@
 
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #f8fafc;
+  --foreground: #0f172a;
+  --surface-card: #ffffff;
+  --surface-tile: #f1f5f9;
+  --border-subtle: #e2e8f0;
 }
 
 @theme inline {
@@ -14,22 +19,255 @@
   --font-mono: var(--font-geist-mono);
 }
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+.dark {
+  --background: #090e17;
+  --foreground: #f8fafc;
+  --surface-card: #131c2e;
+  --surface-tile: #1a263d;
+  --border-subtle: #233149;
+  color-scheme: dark;
 }
 
 body {
-  background: var(--background);
-  color: black;
+  background-color: var(--background);
+  color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+  transition: background-color 0.2s ease, color 0.2s ease;
 }
 
+/* ═════════════════════════════════════════════════════════════════
+   PREMIUM HIGH-CONTRAST DARK THEME (ELEVATED MULTI-SURFACE)
+   Mencegah tampilan datar/monoton di mode gelap dengan hierarki:
+   Level 0 (Halaman) : #090e17 (Deep Navy Slate)
+   Level 1 (Kartu)   : #131c2e (Elevated Card dengan border #233149)
+   Level 2 (Kotak/Tile): #1a263d (Info Box dengan border #2a3a58)
+   Level 3 (Kontrol/Input): #1e2c45 (Input & Dropdown aktif)
+   ═════════════════════════════════════════════════════════════════ */
 
-.scrollbar-hide {
+/* ── 1. Latar Belakang & Hirarki Permukaan ── */
+.dark body {
+  background-color: #090e17 !important;
+  color: #f1f5f9 !important;
+}
+
+/* Level 1: Kartu Utama (Kontras & Timbul dari background halaman) */
+.dark .bg-white,
+.dark .bg-white\/90,
+.dark .bg-white\/95 {
+  background-color: #131c2e !important;
+  border-color: #233149 !important;
+}
+
+/* Level 2: Kotak Informasi Bersarang (Tile tanggal, lokasi, stepper, dll.) */
+.dark .bg-slate-50,
+.dark .bg-slate-50\/50,
+.dark .bg-slate-50\/60,
+.dark .bg-slate-50\/70,
+.dark .bg-slate-50\/80 {
+  background-color: #1a263d !important;
+  border-color: #2a3a58 !important;
+}
+
+/* Level 3: Surface interaktif / hover */
+.dark .bg-slate-100,
+.dark .bg-slate-100\/80 {
+  background-color: #22324f !important;
+  border-color: #2d4268 !important;
+}
+
+.dark .bg-slate-200 {
+  background-color: #33466a !important;
+}
+
+/* ── 2. Garis Border yang Rapi & Jelas ── */
+.dark .border-slate-100,
+.dark .border-slate-200,
+.dark .border-slate-200\/60,
+.dark .border-slate-200\/70,
+.dark .border-slate-200\/80,
+.dark .border-slate-200\/90,
+.dark .border-slate-300 {
+  border-color: #233149 !important;
+}
+
+/* ── 3. Tipografi & Kontras Teks yang Jelas (Tidak Buram/Mati) ── */
+.dark .text-slate-900,
+.dark .text-black {
+  color: #ffffff !important;
+  font-weight: 700;
+}
+
+.dark .text-slate-800 {
+  color: #f1f5f9 !important;
+}
+
+.dark .text-slate-700 {
+  color: #e2e8f0 !important;
+}
+
+.dark .text-slate-600 {
+  color: #cbd5e1 !important;
+}
+
+.dark .text-slate-500,
+.dark .text-slate-400 {
+  color: #94a3b8 !important;
+}
+
+/* ── 4. Input Form, Dropdown, Textarea ── */
+.dark input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="color"]),
+.dark select,
+.dark textarea {
+  background-color: #1a263d !important;
+  color: #ffffff !important;
+  border-color: #2a3a58 !important;
+}
+
+.dark select option {
+  background-color: #131c2e !important;
+  color: #ffffff !important;
+}
+
+.dark input::placeholder,
+.dark textarea::placeholder {
+  color: #64748b !important;
+}
+
+.dark input[readonly],
+.dark textarea[readonly] {
+  background-color: #111827 !important;
+  color: #94a3b8 !important;
+  border-color: #1f2937 !important;
+}
+
+/* ── 5. Badges & Chips Berwarna yang Hidup (Vibrant & High-Contrast) ── */
+/* Hijau / Emerald / Success */
+.dark .bg-emerald-50,
+.dark .bg-emerald-100,
+.dark .bg-green-50 {
+  background-color: rgba(16, 185, 129, 0.16) !important;
+  border-color: rgba(52, 211, 153, 0.45) !important;
+}
+.dark .text-emerald-700,
+.dark .text-emerald-800,
+.dark .text-green-700,
+.dark .text-green-800 {
+  color: #34d399 !important;
+}
+
+/* Oranye / Hot Work / Warning */
+.dark .bg-orange-50,
+.dark .bg-orange-50\/50,
+.dark .bg-orange-50\/60,
+.dark .bg-orange-50\/70,
+.dark .bg-orange-50\/80,
+.dark .bg-orange-100 {
+  background-color: rgba(249, 115, 22, 0.18) !important;
+  border-color: rgba(251, 146, 60, 0.45) !important;
+}
+.dark .text-orange-700,
+.dark .text-orange-800,
+.dark .text-orange-900,
+.dark .text-orange-950 {
+  color: #fb923c !important;
+}
+
+/* Biru / Workshop / Info */
+.dark .bg-blue-50,
+.dark .bg-blue-50\/60,
+.dark .bg-blue-50\/70,
+.dark .bg-blue-50\/80,
+.dark .bg-blue-100 {
+  background-color: rgba(59, 130, 246, 0.16) !important;
+  border-color: rgba(96, 165, 250, 0.45) !important;
+}
+.dark .text-blue-700,
+.dark .text-blue-800,
+.dark .text-blue-900 {
+  color: #60a5fa !important;
+}
+
+/* Ungu / Eksternal / Height Work */
+.dark .bg-purple-50,
+.dark .bg-purple-100 {
+  background-color: rgba(168, 85, 247, 0.16) !important;
+  border-color: rgba(192, 132, 252, 0.45) !important;
+}
+.dark .text-purple-700,
+.dark .text-purple-800,
+.dark .text-purple-900 {
+  color: #c084fc !important;
+}
+
+/* Kuning / Amber / Diajukan */
+.dark .bg-amber-50,
+.dark .bg-amber-50\/60,
+.dark .bg-amber-50\/70,
+.dark .bg-amber-100 {
+  background-color: rgba(245, 158, 11, 0.18) !important;
+  border-color: rgba(251, 191, 36, 0.45) !important;
+}
+.dark .text-amber-700,
+.dark .text-amber-800,
+.dark .text-amber-900,
+.dark .text-amber-950 {
+  color: #fbbf24 !important;
+}
+
+/* Merah / Rose / Ditolak */
+.dark .bg-red-50,
+.dark .bg-rose-50,
+.dark .bg-rose-50\/60,
+.dark .bg-rose-100 {
+  background-color: rgba(244, 63, 94, 0.16) !important;
+  border-color: rgba(251, 113, 133, 0.45) !important;
+}
+.dark .text-rose-700,
+.dark .text-rose-800,
+.dark .text-rose-900,
+.dark .text-rose-950,
+.dark .text-red-700,
+.dark .text-red-800,
+.dark .text-red-900 {
+  color: #fb7185 !important;
+}
+
+/* Teal / Safety Induction */
+.dark .bg-teal-50,
+.dark .bg-teal-100 {
+  background-color: rgba(20, 184, 166, 0.16) !important;
+  border-color: rgba(45, 212, 191, 0.45) !important;
+}
+.dark .text-teal-700,
+.dark .text-teal-800 {
+  color: #2dd4bf !important;
+}
+
+/* ── 6. Header Bar & Sticky Action Bar ── */
+.dark header {
+  background-color: rgba(19, 28, 46, 0.94) !important;
+  border-color: #233149 !important;
+}
+
+.dark .hover\:bg-slate-50:hover,
+.dark .hover\:bg-slate-100:hover {
+  background-color: #22324f !important;
+}
+
+/* ── 7. Efek Bayangan & Glow ── */
+.dark .shadow-xs,
+.dark .shadow-sm,
+.dark .shadow-md,
+.dark .shadow-lg,
+.dark .shadow-xl {
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(255, 255, 255, 0.05) !important;
+}
+
+.dark .scrollbar-hide {
   -ms-overflow-style: none;
   scrollbar-width: none;
 }
-.scrollbar-hide::-webkit-scrollbar {
+
+.dark .scrollbar-hide::-webkit-scrollbar {
   display: none;
 }

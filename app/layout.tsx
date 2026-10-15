@@ -5,14 +5,15 @@ import type { Metadata } from "next"
 import { Geist, Geist_Mono } from "next/font/google"
 import { Analytics } from "@vercel/analytics/next"
 import "./globals.css"
+import { ThemeProvider } from "@/components/ThemeProvider"
 
 const _geist = Geist({ subsets: ["latin"] })
 const _geistMono = Geist_Mono({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: "Sistem Izin Kerja Digital - Hot Work Permit",
+  title: "Sistem Izin Kerja Digital - PT. Jatim Autocomp Indonesia",
   description:
-    "Platform manajemen izin kerja panas (hot work permit) yang aman dan terintegrasi untuk keselamatan kerja",
+    "Platform manajemen izin kerja digital (Work Permit System) yang aman dan terintegrasi untuk keselamatan kerja",
   generator: "v0.app",
   icons: {
     icon: [
@@ -39,9 +40,30 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="id">
-      <body className={`font-sans antialiased`}>
-        {children}
+    <html lang="id" suppressHydrationWarning>
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              try {
+                const saved = localStorage.getItem('theme');
+                const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+                if (saved === 'dark' || (!saved && prefersDark)) {
+                  document.documentElement.classList.add('dark');
+                  document.documentElement.setAttribute('data-theme', 'dark');
+                } else {
+                  document.documentElement.classList.remove('dark');
+                  document.documentElement.setAttribute('data-theme', 'light');
+                }
+              } catch (_) {}
+            `,
+          }}
+        />
+      </head>
+      <body className={`font-sans antialiased min-h-screen`}>
+        <ThemeProvider>
+          {children}
+        </ThemeProvider>
         <Analytics />
       </body>
     </html>

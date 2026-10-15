@@ -92,9 +92,13 @@ export default function FormFilesPage() {
   };
 
   const handleLogout = async () => {
-    await fetch("/form-permit/api/auth/logout", { method: "POST", credentials: "include" });
+    try {
+      await fetch("/form-permit/api/auth/logout", { method: "POST", credentials: "include" });
+    } catch (e) {
+      console.error("Logout error:", e);
+    }
     sessionStorage.clear();
-    router.push("/");
+    window.location.href = "/form-permit";
   };
 
   // ── Generate PDF blob dan tampilkan di iframe ──────────────

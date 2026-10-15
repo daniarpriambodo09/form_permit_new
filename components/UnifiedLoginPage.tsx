@@ -45,7 +45,10 @@ export default function UnifiedLoginPage({ defaultRole = "worker" }: UnifiedLogi
   useEffect(() => {
     const checkAuth = async () => {
       try {
-        const res = await fetch("/form-permit/api/auth/me");
+        const res = await fetch("/form-permit/api/auth/me", {
+          cache: "no-store",
+          headers: { "Cache-Control": "no-cache" },
+        });
         if (res.ok) {
           const data = await res.json();
           if (data?.user) {
@@ -137,8 +140,8 @@ export default function UnifiedLoginPage({ defaultRole = "worker" }: UnifiedLogi
         const cleanFrom = rawFrom.startsWith("/form-permit")
           ? rawFrom.replace("/form-permit", "") || "/home"
           : rawFrom.startsWith("/")
-          ? rawFrom
-          : "/home";
+            ? rawFrom
+            : "/home";
         router.replace(cleanFrom);
         return;
       }
@@ -172,9 +175,8 @@ export default function UnifiedLoginPage({ defaultRole = "worker" }: UnifiedLogi
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-between relative overflow-hidden selection:bg-orange-500 selection:text-white p-4 sm:p-6 lg:p-8">
       {/* Ambient background glows */}
       <div
-        className={`pointer-events-none absolute -top-40 -left-40 w-[600px] h-[600px] blur-[130px] rounded-full transition-all duration-700 ${
-          isWorker ? "bg-orange-600/10" : "bg-emerald-600/10"
-        }`}
+        className={`pointer-events-none absolute -top-40 -left-40 w-[600px] h-[600px] blur-[130px] rounded-full transition-all duration-700 ${isWorker ? "bg-orange-600/10" : "bg-emerald-600/10"
+          }`}
       />
       <div className="pointer-events-none absolute -bottom-40 -right-40 w-[600px] h-[600px] bg-amber-600/10 blur-[130px] rounded-full" />
 
@@ -198,11 +200,13 @@ export default function UnifiedLoginPage({ defaultRole = "worker" }: UnifiedLogi
           </span>
         </div>
 
-        <div className="flex items-center gap-2 bg-slate-900/80 border border-slate-800 px-3 py-1 rounded-full text-xs text-slate-400">
-          <div className={`w-2 h-2 rounded-full ${isWorker ? "bg-orange-500" : "bg-emerald-500"} animate-pulse`} />
-          <span className="hidden sm:inline font-medium text-slate-300">Work Permit System (WPS)</span>
-          <span className="text-slate-600 hidden sm:inline">&bull;</span>
-          <span className="text-[11px] text-slate-400">Secure Access</span>
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 bg-slate-900/80 border border-slate-800 px-3 py-1 rounded-full text-xs text-slate-400">
+            <div className={`w-2 h-2 rounded-full ${isWorker ? "bg-orange-500" : "bg-emerald-500"} animate-pulse`} />
+            <span className="hidden sm:inline font-medium text-slate-300">Work Permit System (WPS)</span>
+            <span className="text-slate-600 hidden sm:inline">&bull;</span>
+            <span className="text-[11px] text-slate-400">Secure Access</span>
+          </div>
         </div>
       </div>
 
@@ -260,7 +264,7 @@ export default function UnifiedLoginPage({ defaultRole = "worker" }: UnifiedLogi
                 </p>
                 <div className="flex items-center justify-between text-[11px] text-slate-400 pt-2.5 border-t border-white/10">
                   <span>Zero Accident Goal</span>
-                  <span className="text-orange-400 font-semibold">ISO 45001 Compliance</span>
+                  <span className="text-orange-400 font-semibold">SMK3, ISO14001, IATF16949</span>
                 </div>
               </div>
             </div>
@@ -278,11 +282,10 @@ export default function UnifiedLoginPage({ defaultRole = "worker" }: UnifiedLogi
                 <button
                   type="button"
                   onClick={() => handleRoleChange("worker")}
-                  className={`py-3 px-3 rounded-xl text-xs sm:text-sm font-semibold flex items-center justify-center gap-2 transition-all duration-200 ${
-                    isWorker
-                      ? "bg-gradient-to-r from-orange-600 to-amber-600 text-white shadow-lg shadow-orange-600/30 ring-1 ring-orange-500/50"
-                      : "text-slate-400 hover:text-white hover:bg-slate-800/60"
-                  }`}
+                  className={`py-3 px-3 rounded-xl text-xs sm:text-sm font-semibold flex items-center justify-center gap-2 transition-all duration-200 ${isWorker
+                    ? "bg-gradient-to-r from-orange-600 to-amber-600 text-white shadow-lg shadow-orange-600/30 ring-1 ring-orange-500/50"
+                    : "text-slate-400 hover:text-white hover:bg-slate-800/60"
+                    }`}
                 >
                   <HardHat className={`w-4 h-4 ${isWorker ? "text-white" : "text-slate-400"}`} />
                   <span>Pekerja / Dept</span>
@@ -292,11 +295,10 @@ export default function UnifiedLoginPage({ defaultRole = "worker" }: UnifiedLogi
                 <button
                   type="button"
                   onClick={() => handleRoleChange("approver")}
-                  className={`py-3 px-3 rounded-xl text-xs sm:text-sm font-semibold flex items-center justify-center gap-2 transition-all duration-200 ${
-                    !isWorker
-                      ? "bg-gradient-to-r from-orange-600 to-amber-600 text-white shadow-lg shadow-orange-600/30 ring-1 ring-orange-500/50"
-                      : "text-slate-400 hover:text-white hover:bg-slate-800/60"
-                  }`}
+                  className={`py-3 px-3 rounded-xl text-xs sm:text-sm font-semibold flex items-center justify-center gap-2 transition-all duration-200 ${!isWorker
+                    ? "bg-gradient-to-r from-orange-600 to-amber-600 text-white shadow-lg shadow-orange-600/30 ring-1 ring-orange-500/50"
+                    : "text-slate-400 hover:text-white hover:bg-slate-800/60"
+                    }`}
                 >
                   <ShieldCheck className={`w-4 h-4 ${!isWorker ? "text-white" : "text-slate-400"}`} />
                   <span>Approver / K3</span>

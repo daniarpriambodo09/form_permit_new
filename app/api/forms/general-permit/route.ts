@@ -13,7 +13,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query, queryOne } from '@/lib/db';
 import { generateEditToken, verifyToken, COOKIE_NAME } from '@/lib/auth';
-import { notifyExternalPermit } from '@/lib/approval-email';
+import { notifyGeneralPermitNextApprover } from '@/lib/approval-email';
 
 async function generateId(): Promise<string> {
   const row = await queryOne<{ next_number: number }>(
@@ -127,11 +127,21 @@ export async function POST(req: NextRequest) {
         }
       : null;
 
-    if (isSubmit && perluJsa && (!jsaData || !String(jsaData.area || '').trim() || !String(jsaData.jenisPekerjaan || '').trim() || !String(jsaData.pic || '').trim() || !jsaData.petugas.some((name: unknown) => typeof name === 'string' && name.trim()))) {
-      return NextResponse.json(
-        { error: 'Area, Jenis Pekerjaan, PIC, dan minimal satu Petugas pada JSA wajib diisi.' },
-        { status: 400 }
-      );
+    if (isSubmit && perluJsa) {
+      if (jsaFileUrl) {
+        // Mode Upload: file JSA sudah dilampirkan
+      } else if (
+        !jsaData ||
+        !String(jsaData.area || '').trim() ||
+        !String(jsaData.jenisPekerjaan || '').trim() ||
+        !String(jsaData.pic || '').trim() ||
+        !jsaData.petugas?.some((name: unknown) => typeof name === 'string' && name.trim())
+      ) {
+        return NextResponse.json(
+          { error: 'Silakan lampirkan file dokumen JSA atau lengkapi formulir JSA.' },
+          { status: 400 }
+        );
+      }
     }
 
     // ── Bagian 11: SPV Terkait — nama + NIK, dikirim sebagai spvPemberiIzin ──
@@ -144,7 +154,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // ── Lisensi/Sertifikasi files (Bagian 9) — wajib, bisa banyak file ──
+    // ── Lisensi/Sertifikasi files (Bagian 9) — opsional, jika diisi maksimal sesuai jumlah tenaga kerja ──
     const licenseFiles = Array.isArray(f.licenseFiles)
       ? f.licenseFiles.filter((x: any) => x && typeof x.url === 'string')
       : [];
@@ -157,9 +167,9 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       );
     }
-    if (isSubmit && (!hasWorkerCount || (workerCount > 0 && licenseFiles.length < 1) || licenseFiles.length > workerCount)) {
+    if (isSubmit && hasWorkerCount && workerCount > 0 && licenseFiles.length > workerCount) {
       return NextResponse.json(
-        { error: `Jumlah file lisensi harus minimal 1 dan maksimal ${workerCount}. Saat ini ${licenseFiles.length} file.` },
+        { error: `Jumlah file lisensi maksimal ${workerCount}. Saat ini ${licenseFiles.length} file.` },
         { status: 400 }
       );
     }
@@ -328,13 +338,13 @@ export async function POST(req: NextRequest) {
     }
 
     if (status === 'submitted' && userId) {
-      notifyExternalPermit({
+      notifyGeneralPermitNextApprover({
         idForm,
+        nextStage: 1,
         userId,
         namaPemohon: f.namaKontraktorPekerja || 'Pemohon',
         tanggal: now,
-        attachmentCount: jsaData ? 1 : 0,
-      }).catch((error) => console.error(`[EMAIL] External permit notification failed for ${idForm}:`, error));
+      }).catch((error) => console.error(`[EMAIL] General permit SPV notification failed for ${idForm}:`, error));
     }
 
     return NextResponse.json({ success: true, id_form: idForm, status, edit_token: editToken }, { status: 201 });
