@@ -106,7 +106,7 @@ export default function JsaUploadSection({
     try {
       const fd = new FormData();
       fd.append("file", file);
-      const res = await fetch("/form-permit/api/upload/jsa", {
+      const res = await fetch("/api/upload/jsa", {
         method: "POST",
         body: fd,
       });

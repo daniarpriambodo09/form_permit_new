@@ -309,9 +309,9 @@ type LinkedJobForm = { id_form: string; status: string; tanggal: string; jenis: 
 interface LinkedJobForms { hotWork: LinkedJobForm; heightWork: LinkedJobForm; workshop: LinkedJobForm }
 
 const JOB_TYPE_META: Record<string, { label: string; shortLabel: string; icon: string; addHref: (id: string) => string }> = {
-  hotWork: { label: "Ijin Kerja Panas (Hot Work)", shortLabel: "Hot Work", icon: "🔥", addHref: (id) => `/form-permit/form/hot-work?id_ijin_kerja=${id}` },
-  heightWork: { label: "Ijin Kerja Ketinggian (Height Work)", shortLabel: "Height Work", icon: "⚠️", addHref: (id) => `/form-permit/form/height-work?id_ijin_kerja=${id}` },
-  workshop: { label: "Ijin Kerja Workshop", shortLabel: "Workshop", icon: "🔧", addHref: (id) => `/form-permit/form/workshop?id_ijin_kerja=${id}` },
+  hotWork: { label: "Ijin Kerja Panas (Hot Work)", shortLabel: "Hot Work", icon: "🔥", addHref: (id) => `/form/hot-work?id_ijin_kerja=${id}` },
+  heightWork: { label: "Ijin Kerja Ketinggian (Height Work)", shortLabel: "Height Work", icon: "⚠️", addHref: (id) => `/form/height-work?id_ijin_kerja=${id}` },
+  workshop: { label: "Ijin Kerja Workshop", shortLabel: "Workshop", icon: "🔧", addHref: (id) => `/form/workshop?id_ijin_kerja=${id}` },
 };
 
 const STATUS_META: Record<string, { label: string; cls: string }> = {
@@ -331,7 +331,7 @@ function LinkedJobFormsSection({ generalPermitId, onOpenDetail, onOpenEdit }: {
 
   useEffect(() => {
     setLoading(true);
-    fetch(`/form-permit/api/forms/general-permit/${generalPermitId}/job-forms`)
+    fetch(`/api/forms/general-permit/${generalPermitId}/job-forms`)
       .then((r) => (r.ok ? r.json() : null))
       .then((json) => setJobForms(json?.data ?? null))
       .catch(() => setJobForms(null))
@@ -629,7 +629,7 @@ function ContractorSignatureBlock({
       const fd = new FormData();
       fd.append("file", blob, "signature.png");
       fd.append("context", "kontraktor");
-      const uploadRes = await fetch("/form-permit/api/upload/signature", { method: "POST", body: fd });
+      const uploadRes = await fetch("/api/upload/signature", { method: "POST", body: fd });
       const uploadJson = await uploadRes.json();
       if (!uploadRes.ok) throw new Error(uploadJson.error || "Upload tanda tangan gagal");
 
@@ -678,12 +678,12 @@ export default function DetailModal({ isOpen, onClose, formId, formType, initial
     setLoading(true);
     setError("");
     try {
-      const res = await fetch(`/form-permit/api/forms/${formType}/${formId}`);
+      const res = await fetch(`/api/forms/${formType}/${formId}`);
       if (!res.ok) throw new Error("Gagal memuat data form");
       const json = await res.json();
       let detail = json.data;
       if (detail?.id_ijin_kerja) {
-        const parentRes = await fetch(`/form-permit/api/forms/general-permit/${detail.id_ijin_kerja}`);
+        const parentRes = await fetch(`/api/forms/general-permit/${detail.id_ijin_kerja}`);
         if (parentRes.ok) {
           const parent = await parentRes.json();
           const parentData = parent.data;
@@ -742,7 +742,7 @@ export default function DetailModal({ isOpen, onClose, formId, formType, initial
 
   const savePenilaianSubkontraktor = async (payload: PenilaianSubkontraktorData) => {
     const res = await fetch(
-      `/form-permit/api/forms/general-permit/${formId}/penilaian-subkontraktor`,
+      `/api/forms/general-permit/${formId}/penilaian-subkontraktor`,
       {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -890,7 +890,7 @@ export default function DetailModal({ isOpen, onClose, formId, formType, initial
         {isEksternal && !p.kontraktor_signature_url && (
           <MS title="Tanda Tangan Kontraktor">
             <ContractorSignatureBlock
-              endpoint={`/form-permit/api/approval/hot-work/${p.id_form}/sign`}
+              endpoint={`/api/approval/hot-work/${p.id_form}/sign`}
               onSigned={loadFormData}
             />
           </MS>
@@ -1025,7 +1025,7 @@ export default function DetailModal({ isOpen, onClose, formId, formType, initial
         {isEksternal && !p.kontraktor_signature_url && (
           <MS title="Tanda Tangan Kontraktor">
             <ContractorSignatureBlock
-              endpoint={`/form-permit/api/approval/height-work/${p.id_form}/sign`}
+              endpoint={`/api/approval/height-work/${p.id_form}/sign`}
               onSigned={loadFormData}
             />
           </MS>
@@ -1139,7 +1139,7 @@ export default function DetailModal({ isOpen, onClose, formId, formType, initial
         {isEksternal && !p.kontraktor_signature_url && (
           <MS title="Tanda Tangan Kontraktor">
             <ContractorSignatureBlock
-              endpoint={`/form-permit/api/approval/workshop/${p.id_form}/sign`}
+              endpoint={`/api/approval/workshop/${p.id_form}/sign`}
               onSigned={loadFormData}
             />
           </MS>
@@ -1406,7 +1406,7 @@ export default function DetailModal({ isOpen, onClose, formId, formType, initial
         {!p.kontraktor_signature_url && (
           <MS title="Tanda Tangan Kontraktor">
             <ContractorSignatureBlock
-              endpoint={`/form-permit/api/forms/general-permit/${p.id_form}/sign-kontraktor`}
+              endpoint={`/api/forms/general-permit/${p.id_form}/sign-kontraktor`}
               onSigned={loadFormData}
             />
           </MS>

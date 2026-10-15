@@ -122,7 +122,7 @@ export default function LicenseUploadSection({
     try {
       const fd = new FormData();
       fd.append("file", file);
-      const res = await fetch("/form-permit/api/upload/license", {
+      const res = await fetch("/api/upload/license", {
         method: "POST",
         body: fd,
       });

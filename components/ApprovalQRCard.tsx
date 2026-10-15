@@ -48,7 +48,7 @@ export default function ApprovalQRCard({
   useEffect(() => {
     if (!isApproved || !canvasRef.current) return;
     const origin = baseUrl ?? (typeof window !== "undefined" ? window.location.origin : "");
-    const url    = `${origin}/form-permit/approval-verification/${formType}/${formId}/${role}`;
+    const url    = `${origin}/approval-verification/${formType}/${formId}/${role}`;
 
     QRCode.toCanvas(canvasRef.current, url, {
       width:            140,

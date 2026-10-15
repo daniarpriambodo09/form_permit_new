@@ -21,8 +21,8 @@ export default function KelolaPengawasDepartemenPage() {
     setLoading(true);
     try {
       const [supervisorRes, departmentRes] = await Promise.all([
-        fetch("/form-permit/api/pengawas-departemen", { credentials: "include" }),
-        fetch("/form-permit/api/departemen?activeOnly=1", { credentials: "include" }),
+        fetch("/api/pengawas-departemen", { credentials: "include" }),
+        fetch("/api/departemen?activeOnly=1", { credentials: "include" }),
       ]);
       const supervisorData = await supervisorRes.json();
       const departmentData = await departmentRes.json();
@@ -52,7 +52,7 @@ export default function KelolaPengawasDepartemenPage() {
     setSaving(true);
     try {
       const isEdit = modal !== "add" && modal !== null;
-      const res = await fetch(isEdit ? `/form-permit/api/pengawas-departemen/${(modal as Supervisor).id}` : "/form-permit/api/pengawas-departemen", {
+      const res = await fetch(isEdit ? `/api/pengawas-departemen/${(modal as Supervisor).id}` : "/api/pengawas-departemen", {
         method: isEdit ? "PUT" : "POST", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify(form),
       });
       const data = await res.json();
@@ -65,14 +65,14 @@ export default function KelolaPengawasDepartemenPage() {
 
   const remove = async (item: Supervisor) => {
     if (!window.confirm(`Hapus pengawas ${item.nama}?`)) return;
-    const res = await fetch(`/form-permit/api/pengawas-departemen/${item.id}`, { method: "DELETE", credentials: "include" });
+    const res = await fetch(`/api/pengawas-departemen/${item.id}`, { method: "DELETE", credentials: "include" });
     const data = await res.json();
     if (!res.ok) { setMessage({ type: "error", text: data.error || "Gagal menghapus data" }); return; }
     setMessage({ type: "success", text: "Data pengawas dihapus." }); load();
   };
 
   const toggle = async (item: Supervisor) => {
-    const res = await fetch(`/form-permit/api/pengawas-departemen/${item.id}`, {
+    const res = await fetch(`/api/pengawas-departemen/${item.id}`, {
       method: "PUT", credentials: "include", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ nama: item.nama, nik: item.nik, departemen: item.departemen, isActive: !item.is_active }),
     });

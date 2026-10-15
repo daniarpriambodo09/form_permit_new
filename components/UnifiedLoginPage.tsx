@@ -45,7 +45,7 @@ export default function UnifiedLoginPage({ defaultRole = "worker" }: UnifiedLogi
   useEffect(() => {
     const checkAuth = async () => {
       try {
-        const res = await fetch("/form-permit/api/auth/me", {
+        const res = await fetch("/api/auth/me", {
           cache: "no-store",
           headers: { "Cache-Control": "no-cache" },
         });
@@ -84,7 +84,7 @@ export default function UnifiedLoginPage({ defaultRole = "worker" }: UnifiedLogi
     setLoading(true);
 
     try {
-      const res = await fetch("/form-permit/api/auth/login", {
+      const res = await fetch("/api/auth/login", {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
@@ -101,7 +101,7 @@ export default function UnifiedLoginPage({ defaultRole = "worker" }: UnifiedLogi
       // Validasi role sesuai tab yang dipilih
       if (role === "worker") {
         if (data.user.role !== "worker") {
-          await fetch("/form-permit/api/auth/logout", {
+          await fetch("/api/auth/logout", {
             method: "POST",
             credentials: "include",
           });
@@ -112,7 +112,7 @@ export default function UnifiedLoginPage({ defaultRole = "worker" }: UnifiedLogi
       } else {
         const allowedRoles = ["spv", "admin", "kontraktor", "sfo", "smr", "firewatch", "admin_k3", "security"];
         if (!allowedRoles.includes(data.user.role)) {
-          await fetch("/form-permit/api/auth/logout", {
+          await fetch("/api/auth/logout", {
             method: "POST",
             credentials: "include",
           });
@@ -193,7 +193,7 @@ export default function UnifiedLoginPage({ defaultRole = "worker" }: UnifiedLogi
       <div className="relative z-10 max-w-5xl w-full mx-auto flex items-center justify-between py-2">
         <div className="flex items-center gap-2.5">
           <div className="w-8 h-8 rounded-lg bg-slate-900 border border-slate-700/80 p-1 flex items-center justify-center shadow-inner">
-            <img src="/form-permit/logo-k3.png" alt="K3 Logo" className="w-full h-full object-contain" />
+            <img src="/logo-k3.png" alt="K3 Logo" className="w-full h-full object-contain" />
           </div>
           <span className="text-xs sm:text-sm font-bold text-white tracking-tight">
             PT Jatim Autocomp Indonesia
@@ -217,7 +217,7 @@ export default function UnifiedLoginPage({ defaultRole = "worker" }: UnifiedLogi
           <div className="lg:col-span-5 relative min-h-[380px] lg:min-h-full overflow-hidden flex flex-col justify-between p-6 sm:p-8 border-b lg:border-b-0 lg:border-r border-slate-800">
             {/* Background Photography */}
             <img
-              src="/form-permit/images/k3_login_banner.jpg?v=2"
+              src="/images/k3_login_banner.jpg?v=2"
               alt="K3 HSE Safety Inspection"
               className="absolute inset-0 w-full h-full object-cover object-center filter brightness-[0.88] contrast-[1.05] transition-transform duration-700 hover:scale-105"
             />
@@ -231,7 +231,7 @@ export default function UnifiedLoginPage({ defaultRole = "worker" }: UnifiedLogi
               <div className="inline-flex items-center gap-2.5 bg-slate-950/85 backdrop-blur-md border border-white/15 rounded-2xl p-2 pr-4 shadow-xl">
                 <div className="w-10 h-10 rounded-xl bg-slate-900 border border-slate-700/80 p-1 flex items-center justify-center shrink-0">
                   <img
-                    src="/form-permit/logo-k3.png"
+                    src="/logo-k3.png"
                     alt="Logo K3"
                     className="w-full h-full object-contain filter drop-shadow"
                   />

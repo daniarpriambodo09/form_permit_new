@@ -45,8 +45,8 @@ export async function POST(req: NextRequest) {
     await fs.mkdir(uploadDir, { recursive: true });
     await fs.writeFile(path.join(uploadDir, fileName), buffer);
 
-    // ✅ Kembalikan URL API Route (dengan basePath /form-permit)
-    const url = `/form-permit/api/upload/jsa/${fileName}`;
+    // ✅ Kembalikan URL API Route
+    const url = `/api/upload/jsa/${fileName}`;
 
     return NextResponse.json({ url, filename: file.name }, { status: 200 });
   } catch (err: any) {

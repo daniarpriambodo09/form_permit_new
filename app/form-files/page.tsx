@@ -80,7 +80,7 @@ export default function FormFilesPage() {
   const loadForms = async () => {
     setLoading(true);
     try {
-      const res = await fetch("/form-permit/api/form-files", { credentials: "include" });
+      const res = await fetch("/api/form-files", { credentials: "include" });
       if (res.status === 401) { router.replace("/"); return; }
       const data = await res.json();
       setForms(data.data ?? []);
@@ -93,12 +93,12 @@ export default function FormFilesPage() {
 
   const handleLogout = async () => {
     try {
-      await fetch("/form-permit/api/auth/logout", { method: "POST", credentials: "include" });
+      await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
     } catch (e) {
       console.error("Logout error:", e);
     }
     sessionStorage.clear();
-    window.location.href = "/form-permit";
+    window.location.href = "/";
   };
 
   // ── Generate PDF blob dan tampilkan di iframe ──────────────
@@ -111,7 +111,7 @@ export default function FormFilesPage() {
     try {
       // 1. Ambil data lengkap form dari API
       const res = await fetch(
-        `/form-permit/api/forms/${form.jenis_form}/${form.id_form}`,
+        `/api/forms/${form.jenis_form}/${form.id_form}`,
         { credentials: "include" }
       );
       if (!res.ok) throw new Error("Gagal memuat data form");
@@ -141,7 +141,7 @@ export default function FormFilesPage() {
     setDownloading(true);
     try {
       const res = await fetch(
-        `/form-permit/api/forms/${selectedForm.jenis_form}/${selectedForm.id_form}`,
+        `/api/forms/${selectedForm.jenis_form}/${selectedForm.id_form}`,
         { credentials: "include" }
       );
       const json = await res.json();

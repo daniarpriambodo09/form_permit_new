@@ -1,6 +1,6 @@
 // hooks/useApproverAuth.ts
 // Reusable hook untuk memproteksi halaman approver.
-// Memanggil GET /form-permit/api/auth/me dengan credentials: "include".
+// Memanggil GET /api/auth/me dengan credentials: "include".
 // Jika 401/403/user tidak ditemukan → redirect ke /login/approver?redirect=<currentPath>
 // Jika role bukan approver → redirect ke /home
 "use client";
@@ -36,7 +36,7 @@ export function useApproverAuth(): UseApproverAuthResult {
 
     async function checkAuth() {
       try {
-        const res = await fetch("/form-permit/api/auth/me", {
+        const res = await fetch("/api/auth/me", {
           credentials: "include",
           cache: "no-store",
         });

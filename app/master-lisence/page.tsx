@@ -276,7 +276,7 @@ function AddLisenceModal({ onClose, onItemAdded, draft, setDraft }: AddModalProp
     try {
       const fd = new FormData();
       fd.append("file", file);
-      const res = await fetch("/form-permit/api/upload/master-lisence", {
+      const res = await fetch("/api/upload/master-lisence", {
         method: "POST",
         credentials: "include",
         body: fd,
@@ -300,7 +300,7 @@ function AddLisenceModal({ onClose, onItemAdded, draft, setDraft }: AddModalProp
 
     setSaving(true);
     try {
-      const res = await fetch("/form-permit/api/master-lisence", {
+      const res = await fetch("/api/master-lisence", {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
@@ -529,7 +529,7 @@ function EditLisenceModal({ item, onClose, onSuccess }: EditModalProps) {
     try {
       const fd = new FormData();
       fd.append("file", file);
-      const res = await fetch("/form-permit/api/upload/master-lisence", {
+      const res = await fetch("/api/upload/master-lisence", {
         method: "POST",
         credentials: "include",
         body: fd,
@@ -557,7 +557,7 @@ function EditLisenceModal({ item, onClose, onSuccess }: EditModalProps) {
 
     setSaving(true);
     try {
-      const res = await fetch(`/form-permit/api/master-lisence/${item.id}`, {
+      const res = await fetch(`/api/master-lisence/${item.id}`, {
         method: "PUT",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
@@ -893,7 +893,7 @@ export default function MasterLisencePage() {
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch("/form-permit/api/master-lisence", { credentials: "include" });
+      const res = await fetch("/api/master-lisence", { credentials: "include" });
       if (res.status === 401 || res.status === 403) { router.replace("/home"); return; }
       const data = await res.json();
       setItems(data.data || []);
@@ -974,7 +974,7 @@ export default function MasterLisencePage() {
     try {
       if (confirmDelete.type === "single") {
         const { item } = confirmDelete;
-        const res = await fetch(`/form-permit/api/master-lisence/${item.id}`, {
+        const res = await fetch(`/api/master-lisence/${item.id}`, {
           method: "DELETE",
           credentials: "include",
         });
@@ -989,7 +989,7 @@ export default function MasterLisencePage() {
         const { worker } = confirmDelete;
         const results = await Promise.all(
           worker.licenses.map((lic) =>
-            fetch(`/form-permit/api/master-lisence/${lic.id}`, { method: "DELETE", credentials: "include" })
+            fetch(`/api/master-lisence/${lic.id}`, { method: "DELETE", credentials: "include" })
               .then((res) => ({ ok: res.ok, id: lic.id }))
               .catch(() => ({ ok: false, id: lic.id }))
           )

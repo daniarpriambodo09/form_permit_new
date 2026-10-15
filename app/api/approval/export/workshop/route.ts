@@ -228,7 +228,7 @@ export async function GET(req: NextRequest) {
       // ── TTD SFO: QR code jika sudah di-approve SFO ──────────
       if (r.sfo_approved) {
         try {
-          const url   = `${origin}/form-permit/approval-verification/workshop/${r.id_form}/sfo`;
+          const url   = `${origin}/approval-verification/workshop/${r.id_form}/sfo`;
           const qrImg = await makeQR(url, 150);
           const imageId = workbook.addImage({
             base64: qrImg,

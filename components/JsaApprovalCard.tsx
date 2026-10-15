@@ -18,7 +18,7 @@ export default function JsaApprovalCard({ label, role, entry, formId }: JsaAppro
 
   useEffect(() => {
     if (!entry.approved || !canvasRef.current) return;
-    const url = `${window.location.origin}/form-permit/approval-verification/jsa/${formId}/${role}`;
+    const url = `${window.location.origin}/approval-verification/jsa/${formId}/${role}`;
     QRCode.toCanvas(canvasRef.current, url, { width: 120, margin: 1, color: { dark: "#0f172a", light: "#ffffff" } })
       .then(() => setReady(true)).catch(() => setReady(false));
   }, [entry.approved, formId, role]);

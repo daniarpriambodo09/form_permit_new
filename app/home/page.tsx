@@ -67,7 +67,7 @@ export default function HomePage() {
       setLoadingRole(false);
       return;
     }
-    fetch("/form-permit/api/auth/me", { credentials: "include" })
+    fetch("/api/auth/me", { credentials: "include" })
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
         if (data?.user?.role) {

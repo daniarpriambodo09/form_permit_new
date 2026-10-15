@@ -88,7 +88,7 @@ function LisensiUploadButton({ namaPetugas, index, fotoUrl, uploadStatus, upload
       const fd = new FormData();
       fd.append("file", file);
       fd.append("index", String(index));
-      const res = await fetch("/form-permit/api/upload/lisensi", { method: "POST", body: fd });
+      const res = await fetch("/api/upload/lisensi", { method: "POST", body: fd });
       if (!res.ok) {
         const e = await res.json();
         throw new Error(e.error || "Upload gagal");
@@ -388,7 +388,7 @@ function HeightWorkFormPageInner() {
   }, [idIjinKerja]);
 
   useEffect(() => {
-    fetch("/form-permit/api/admin-users/approvers", { credentials: "include" })
+    fetch("/api/admin-users/approvers", { credentials: "include" })
       .then((r) => (r.ok ? r.json() : { users: [] }))
       .then((d) => {
         const options = (d.users ?? []).filter((user: { role: string }) => user.role === "spv");
@@ -425,7 +425,7 @@ function HeightWorkFormPageInner() {
   const [loadingDept, setLoadingDept] = useState(true);
 
   useEffect(() => {
-    fetch("/form-permit/api/departemen?activeOnly=1", { credentials: "include" })
+    fetch("/api/departemen?activeOnly=1", { credentials: "include" })
       .then((r) => (r.ok ? r.json() : { data: [] }))
       .then((d) => setDepartemenOptions((d.data || []).map((x: any) => x.nama_departemen)))
       .catch(() => setDepartemenOptions([]))
@@ -439,7 +439,7 @@ function HeightWorkFormPageInner() {
     }
     setLoadingWorkers(true);
     fetch(
-      `/form-permit/api/master-lisence/workers?jenisKerja=height_work&departemen=${encodeURIComponent(namaDepartemen)}`,
+      `/api/master-lisence/workers?jenisKerja=height_work&departemen=${encodeURIComponent(namaDepartemen)}`,
       { credentials: "include" }
     )
       .then((r) => (r.ok ? r.json() : { data: [] }))
@@ -553,7 +553,7 @@ function HeightWorkFormPageInner() {
     setSaving(true);
     setError("");
     try {
-      const res = await fetch("/form-permit/api/forms/height-work", {
+      const res = await fetch("/api/forms/height-work", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(buildBody(false))
@@ -601,7 +601,7 @@ function HeightWorkFormPageInner() {
 
     setSubmitting(true);
     try {
-      const res = await fetch("/form-permit/api/forms/height-work", {
+      const res = await fetch("/api/forms/height-work", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(buildBody(true))
@@ -1314,7 +1314,7 @@ function HeightWorkFormPageInner() {
                   title="Klik untuk memperbesar diagram"
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src="/form-permit/images/Body_Harness_Check.png" alt="Diagram Body Harness" className="w-full object-contain" />
+                  <img src="/images/Body_Harness_Check.png" alt="Diagram Body Harness" className="w-full object-contain" />
                   <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
                     <div className="opacity-0 group-hover:opacity-100 transition-opacity bg-black/70 text-white rounded-full p-2.5 shadow-lg">
                       <ZoomIn className="w-5 h-5" />
@@ -1336,7 +1336,7 @@ function HeightWorkFormPageInner() {
                   </div>
                   <div className="p-4 overflow-auto max-h-[80vh] flex items-center justify-center bg-slate-100">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src="/form-permit/images/Body_Harness_Check.png" alt="Diagram Body Harness" className="max-w-full h-auto object-contain rounded-xl bg-white shadow-sm" style={{ maxHeight: "72vh" }} />
+                    <img src="/images/Body_Harness_Check.png" alt="Diagram Body Harness" className="max-w-full h-auto object-contain rounded-xl bg-white shadow-sm" style={{ maxHeight: "72vh" }} />
                   </div>
                 </div>
               </div>

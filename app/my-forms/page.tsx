@@ -443,7 +443,7 @@ export default function MyFormsPage() {
   const loadForms = async () => {
     setLoading(true);
     try {
-      const res = await fetch("/form-permit/api/my-forms", {
+      const res = await fetch("/api/my-forms", {
         credentials: "include",
       });
 
@@ -473,7 +473,7 @@ export default function MyFormsPage() {
     setCancelling(true);
     try {
       const res = await fetch(
-        `/form-permit/api/forms/${cancelModal.formType}/${cancelModal.formId}`,
+        `/api/forms/${cancelModal.formType}/${cancelModal.formId}`,
         { method: "DELETE", credentials: "include" }
       );
       const data = await res.json();
@@ -489,7 +489,7 @@ export default function MyFormsPage() {
 
   const handleLogout = async () => {
     try {
-      await fetch("/form-permit/api/auth/logout", {
+      await fetch("/api/auth/logout", {
         method: "POST",
         credentials: "include",
       });
@@ -497,7 +497,7 @@ export default function MyFormsPage() {
       console.error("Logout error:", e);
     }
     sessionStorage.clear();
-    window.location.href = "/form-permit";
+    window.location.href = "/";
   };
 
   // ── Hitung Statistik Counts ──

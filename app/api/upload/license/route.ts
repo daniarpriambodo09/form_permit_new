@@ -38,7 +38,7 @@ export async function POST(req: NextRequest) {
     await fs.writeFile(path.join(UPLOAD_DIR, fileName), Buffer.from(await file.arrayBuffer()));
 
     return NextResponse.json({
-      url: `/form-permit/api/upload/license/${fileName}`,
+      url: `/api/upload/license/${fileName}`,
       filename: file.name,
     });
   } catch (error: unknown) {

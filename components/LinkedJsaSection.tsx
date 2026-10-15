@@ -20,7 +20,7 @@ export default function LinkedJsaSection({ idIjinKerja, enabled, setEnabled, val
       setLoading(false);
       return;
     }
-    fetch(`/form-permit/api/forms/general-permit/${idIjinKerja}/jsa`, { credentials: "include" })
+    fetch(`/api/forms/general-permit/${idIjinKerja}/jsa`, { credentials: "include" })
       .then((response) => response.ok ? response.json() : null)
       .then((data) => {
         const jsa = data?.jsaData as JsaData | null;

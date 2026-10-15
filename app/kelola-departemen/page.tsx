@@ -75,7 +75,7 @@ function DepartemenFormModal({ mode, initial, onClose, onSuccess }: FormModalPro
 
     setSaving(true);
     try {
-      const url = mode === "add" ? "/form-permit/api/departemen" : `/form-permit/api/departemen/${initial?.id}`;
+      const url = mode === "add" ? "/api/departemen" : `/api/departemen/${initial?.id}`;
       const method = mode === "add" ? "POST" : "PUT";
       const res = await fetch(url, {
         method,
@@ -253,7 +253,7 @@ export default function KelolaDepartemenPage() {
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch("/form-permit/api/departemen", { credentials: "include" });
+      const res = await fetch("/api/departemen", { credentials: "include" });
       if (res.status === 401 || res.status === 403) { router.replace("/home"); return; }
       const data = await res.json();
       setItems(data.data || []);
@@ -301,7 +301,7 @@ export default function KelolaDepartemenPage() {
     if (!deleteTarget) return;
     setDeleting(true);
     try {
-      const res = await fetch(`/form-permit/api/departemen/${deleteTarget.id}`, {
+      const res = await fetch(`/api/departemen/${deleteTarget.id}`, {
         method: "DELETE",
         credentials: "include",
       });
@@ -324,7 +324,7 @@ export default function KelolaDepartemenPage() {
   // Toggle cepat aktif/nonaktif langsung dari tabel (tanpa buka modal)
   const handleQuickToggle = async (item: DepartemenItem) => {
     try {
-      const res = await fetch(`/form-permit/api/departemen/${item.id}`, {
+      const res = await fetch(`/api/departemen/${item.id}`, {
         method: "PUT",
         credentials: "include",
         headers: { "Content-Type": "application/json" },

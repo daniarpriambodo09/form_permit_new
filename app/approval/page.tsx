@@ -181,7 +181,7 @@ export default function ApprovalPage() {
 
   const loadFormCounts = async () => {
     try {
-      const res = await fetch("/form-permit/api/approval?countOnly=1", { credentials: "include" });
+      const res = await fetch("/api/approval?countOnly=1", { credentials: "include" });
       if (res.ok) {
         const data = await res.json();
         if (data.counts) setFormCounts(data.counts);
@@ -194,7 +194,7 @@ export default function ApprovalPage() {
   const loadForms = async (status = activeTab) => {
     setLoading(true);
     try {
-      const res = await fetch(`/form-permit/api/approval?status=${status}`, { credentials: "include" });
+      const res = await fetch(`/api/approval?status=${status}`, { credentials: "include" });
       if (res.status === 401) {
         router.push("/login/approver");
         return;
@@ -219,19 +219,19 @@ export default function ApprovalPage() {
 
   const handleLogout = async () => {
     try {
-      await fetch("/form-permit/api/auth/logout", { method: "POST", credentials: "include" });
+      await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
     } catch (e) {
       console.error("Logout error:", e);
     }
     sessionStorage.clear();
-    window.location.href = "/form-permit/login/approver";
+    window.location.href = "/login/approver";
   };
 
   // ── ADDED: Download rekap Excel khusus Workshop (sesuai tab aktif) ──
   const handleExportWorkshop = async () => {
     setExportLoading(true);
     try {
-      const res = await fetch(`/form-permit/api/approval/export/workshop?status=${activeTab}`, {
+      const res = await fetch(`/api/approval/export/workshop?status=${activeTab}`, {
         credentials: "include",
       });
       if (!res.ok) {

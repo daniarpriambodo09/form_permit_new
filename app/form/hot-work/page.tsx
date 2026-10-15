@@ -403,7 +403,7 @@ function HotWorkPermitFormInner() {
   useEffect(() => {
     const fetchUser = async () => {
       try {
-        const res = await fetch("/form-permit/api/auth/me");
+        const res = await fetch("/api/auth/me");
         if (!res.ok) return;
 
         const data = await res.json();
@@ -414,7 +414,7 @@ function HotWorkPermitFormInner() {
         }
 
         if (data.user.departmen) {
-          const spvRes = await fetch("/form-permit/api/admin-users/approvers");
+          const spvRes = await fetch("/api/admin-users/approvers");
           if (spvRes.ok) {
             const spvData = await spvRes.json();
             const options = (spvData.users ?? []).filter((u: any) => {
@@ -446,7 +446,7 @@ function HotWorkPermitFormInner() {
       return;
     }
     setLoadingWorkers(true);
-    fetch("/form-permit/api/master-lisence/workers?jenisKerja=hot_work", {
+    fetch("/api/master-lisence/workers?jenisKerja=hot_work", {
       credentials: "include",
     })
       .then((r) => (r.ok ? r.json() : { data: [] }))
@@ -554,7 +554,7 @@ function HotWorkPermitFormInner() {
         },
       };
 
-      const res = await fetch("/form-permit/api/forms/hot-work", {
+      const res = await fetch("/api/forms/hot-work", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -600,7 +600,7 @@ function HotWorkPermitFormInner() {
       const r = await submit(true);
       if (!r) return;
       alert(`Izin Kerja Panas berhasil diajukan! ID: ${r.id_form}`);
-      window.location.href = "/form-permit/my-forms";
+      window.location.href = "/my-forms";
     } catch (e: any) {
       alert("Gagal mengajukan izin: " + e.message);
     }

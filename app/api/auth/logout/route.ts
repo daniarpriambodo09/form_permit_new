@@ -14,13 +14,6 @@ function handleLogout() {
     sameSite: 'lax',
   });
 
-  // Hapus juga di path '/form-permit' via append Set-Cookie header
-  // agar tidak menimpa cookie map Next.js untuk path '/'
-  res.headers.append(
-    'Set-Cookie',
-    `${COOKIE_NAME}=; Path=/form-permit; Expires=Thu, 01 Jan 1970 00:00:00 GMT; Max-Age=0; HttpOnly; SameSite=Lax`
-  );
-
   return res;
 }
 

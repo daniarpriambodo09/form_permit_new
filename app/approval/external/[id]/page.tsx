@@ -85,7 +85,7 @@ export default function ExternalApprovalPage({ params }: { params: Promise<{ id:
   const isAdmin = user?.role === "admin";
 
   const loadData = () =>
-    fetch(`/form-permit/api/approval/external/${id}`, { credentials: "include" })
+    fetch(`/api/approval/external/${id}`, { credentials: "include" })
       .then(async (response) => {
         const result = await response.json();
         if (!response.ok) throw new Error(result.error || "Gagal memuat form eksternal");
@@ -114,7 +114,7 @@ export default function ExternalApprovalPage({ params }: { params: Promise<{ id:
     setError("");
     setMessage("");
     try {
-      const res = await fetch(`/form-permit/api/approval/external/${id}/penilaian-subkontraktor`, {
+      const res = await fetch(`/api/approval/external/${id}/penilaian-subkontraktor`, {
         method: "PATCH",
         credentials: "include",
       });
@@ -144,7 +144,7 @@ export default function ExternalApprovalPage({ params }: { params: Promise<{ id:
     setActionLoading(true);
     setError("");
     const results = await Promise.all(data.attachments.map(async (attachment) => {
-      const response = await fetch(`/form-permit/api/approval/${attachment.jenis_form}/${attachment.id_form}`, {
+      const response = await fetch(`/api/approval/${attachment.jenis_form}/${attachment.id_form}`, {
         method: "PATCH",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
@@ -156,7 +156,7 @@ export default function ExternalApprovalPage({ params }: { params: Promise<{ id:
     const failed = results.filter((result) => !result.ok);
     setMessage(`${approved} lampiran berhasil diproses${failed.length ? `. ${failed.length} lampiran belum dapat diproses karena belum giliran approval atau sudah diproses.` : "."}`);
     if (approved) {
-      const refreshed = await fetch(`/form-permit/api/approval/external/${id}`, { credentials: "include" });
+      const refreshed = await fetch(`/api/approval/external/${id}`, { credentials: "include" });
       if (refreshed.ok) setData((await refreshed.json()).data);
     }
     setActionLoading(false);
@@ -166,21 +166,21 @@ export default function ExternalApprovalPage({ params }: { params: Promise<{ id:
   const approveJsa = async () => {
     setActionLoading(true);
     setError("");
-    const response = await fetch(`/form-permit/api/approval/external/${id}/jsa`, {
+    const response = await fetch(`/api/approval/external/${id}/jsa`, {
       method: "PATCH", credentials: "include", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ action: "approve" }),
     });
     const result = await response.json();
     if (!response.ok) setError(result.error || "JSA tidak dapat disetujui");
     else setMessage(`JSA berhasil diproses oleh role ${user?.role}.`);
-    const refreshed = await fetch(`/form-permit/api/approval/external/${id}`, { credentials: "include" });
+    const refreshed = await fetch(`/api/approval/external/${id}`, { credentials: "include" });
     if (refreshed.ok) setData((await refreshed.json()).data);
     setActionLoading(false);
   };
 
   // ── Simpan Safety Induction (draft, tanpa approve) ─────────────
   const saveSafetyInduction = async (submit: boolean) => {
-    const response = await fetch(`/form-permit/api/approval/external/${id}/safety-induction`, {
+    const response = await fetch(`/api/approval/external/${id}/safety-induction`, {
       method: "PATCH", credentials: "include", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ safetyInduction, submit }),
     });
@@ -188,7 +188,7 @@ export default function ExternalApprovalPage({ params }: { params: Promise<{ id:
     if (!response.ok) throw new Error(result.error || "Safety Induction gagal disimpan");
     setSafetyInduction(result.data);
     setMessage(submit ? "Safety Induction berhasil disetujui." : "Safety Induction berhasil disimpan sebagai draft.");
-    const refreshed = await fetch(`/form-permit/api/approval/external/${id}`, { credentials: "include" });
+    const refreshed = await fetch(`/api/approval/external/${id}`, { credentials: "include" });
     if (refreshed.ok) {
       const refreshedData = (await refreshed.json()).data;
       setData(refreshedData);
@@ -204,11 +204,11 @@ export default function ExternalApprovalPage({ params }: { params: Promise<{ id:
       const fd = new FormData();
       fd.append("file", blob, `signature-${id}.png`);
       fd.append("context", `security-${id}`);
-      const uploadRes = await fetch("/form-permit/api/upload/signature", { method: "POST", body: fd });
+      const uploadRes = await fetch("/api/upload/signature", { method: "POST", body: fd });
       const uploadJson = await uploadRes.json();
       if (!uploadRes.ok) throw new Error(uploadJson.error || "Upload tanda tangan gagal");
 
-      const res = await fetch(`/form-permit/api/approval/external/${id}/safety-induction/sign`, {
+      const res = await fetch(`/api/approval/external/${id}/safety-induction/sign`, {
         method: "PATCH",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
@@ -234,7 +234,7 @@ export default function ExternalApprovalPage({ params }: { params: Promise<{ id:
     setActionLoading(true);
     setError("");
     try {
-      const res = await fetch(`/form-permit/api/approval/general-permit/${id}`, {
+      const res = await fetch(`/api/approval/general-permit/${id}`, {
         method: "PATCH",
         credentials: "include",
         headers: { "Content-Type": "application/json" },

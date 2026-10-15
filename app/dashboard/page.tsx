@@ -214,10 +214,10 @@ export default function DashboardPage() {
     try {
       // Load all 4 form types including general-permit (ijin-kerja-eksternal)
       const [r1, r2, r3, r4] = await Promise.all([
-        fetch("/form-permit/api/forms/hot-work?limit=2000&full=1"),
-        fetch("/form-permit/api/forms/workshop?limit=2000&full=1"),
-        fetch("/form-permit/api/forms/height-work?limit=2000&full=1"),
-        fetch("/form-permit/api/forms/general-permit?limit=2000&full=1"),
+        fetch("/api/forms/hot-work?limit=2000&full=1"),
+        fetch("/api/forms/workshop?limit=2000&full=1"),
+        fetch("/api/forms/height-work?limit=2000&full=1"),
+        fetch("/api/forms/general-permit?limit=2000&full=1"),
       ]);
 
       if (!r1.ok || !r2.ok || !r3.ok || !r4.ok) {

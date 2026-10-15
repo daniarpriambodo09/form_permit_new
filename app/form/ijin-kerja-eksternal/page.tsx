@@ -405,7 +405,7 @@ function IjinKerjaEksternalPageInner() {
   });
 
   useEffect(() => {
-    fetch("/form-permit/api/auth/me", { credentials: "include" })
+    fetch("/api/auth/me", { credentials: "include" })
       .then((res) => (res.ok ? res.json() : null))
       .then(async (data) => {
         const departmen = data?.user?.departmen ?? "";
@@ -413,7 +413,7 @@ function IjinKerjaEksternalPageInner() {
 
         if (!departmen) return;
         try {
-          const spvRes = await fetch("/form-permit/api/admin-users/approvers", { credentials: "include" });
+          const spvRes = await fetch("/api/admin-users/approvers", { credentials: "include" });
           if (!spvRes.ok) return;
           const spvData = await spvRes.json();
           const options = (spvData.users ?? []).filter((u: any) => {
@@ -439,10 +439,10 @@ function IjinKerjaEksternalPageInner() {
 
   useEffect(() => {
     Promise.all([
-      fetch("/form-permit/api/pengawas-departemen", { credentials: "include" }).then((res) =>
+      fetch("/api/pengawas-departemen", { credentials: "include" }).then((res) =>
         res.ok ? res.json() : { data: [] }
       ),
-      fetch("/form-permit/api/departemen?activeOnly=1", { credentials: "include" }).then((res) =>
+      fetch("/api/departemen?activeOnly=1", { credentials: "include" }).then((res) =>
         res.ok ? res.json() : { data: [] }
       ),
     ])
@@ -511,8 +511,8 @@ function IjinKerjaEksternalPageInner() {
     setError("");
     try {
       const endpoint = createdFormId
-        ? `/form-permit/api/forms/general-permit/${createdFormId}`
-        : `/form-permit/api/forms/general-permit`;
+        ? `/api/forms/general-permit/${createdFormId}`
+        : `/api/forms/general-permit`;
       const method = createdFormId ? "PUT" : "POST";
 
       const res = await fetch(endpoint, {
@@ -602,8 +602,8 @@ function IjinKerjaEksternalPageInner() {
     setSubmitting(true);
     try {
       const endpoint = createdFormId
-        ? `/form-permit/api/forms/general-permit/${createdFormId}`
-        : `/form-permit/api/forms/general-permit`;
+        ? `/api/forms/general-permit/${createdFormId}`
+        : `/api/forms/general-permit`;
       const method = createdFormId ? "PUT" : "POST";
 
       const res = await fetch(endpoint, {

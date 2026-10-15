@@ -72,7 +72,7 @@ export async function POST(req: NextRequest) {
 
     // URL yang dikembalikan ke frontend → mengarah ke API file server
     // bukan ke /public/... yang tidak bekerja di production runtime
-    const publicUrl = `/form-permit/api/files/lisensi/${formId}/${fileName}`;
+    const publicUrl = `/api/files/lisensi/${formId}/${fileName}`;
 
     return NextResponse.json({ success: true, url: publicUrl, fileName });
 

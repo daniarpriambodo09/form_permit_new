@@ -64,8 +64,7 @@ export async function POST(req: NextRequest) {
     await writeFile(path.join(STORAGE_DIR, generatedFileName), bytes);
 
     // URL disajikan lewat route API, bukan static path public/.
-    // Sesuaikan basePath "/form-permit" jika basePath project Anda berbeda.
-    const url = `/form-permit/api/files/master-lisence/${generatedFileName}`;
+    const url = `/api/files/master-lisence/${generatedFileName}`;
     // ─────────────────────────────────────────────────────────────
 
     return NextResponse.json({

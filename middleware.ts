@@ -2,33 +2,37 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { COOKIE_NAME } from '@/lib/auth';
 
-const BASE = '/form-permit';
+const BASE = '';
 const JWT_SECRET = process.env.JWT_SECRET || 'jai-permit-secret-change-in-production';
 
 // 🔓 Route yang boleh diakses tanpa login
 const PUBLIC_ROUTES = [
-  `${BASE}/login`,
-  `${BASE}/login/worker`,
-  `${BASE}/login/approver`,
-  `${BASE}/api/auth/login`,
-  `${BASE}/api/auth/logout`,
+  '/login',
+  '/login/worker',
+  '/login/approver',
+  '/api/auth/login',
+  '/api/auth/logout',
+  '/approval-verification',
+  '/api/approval-verification',
+  '/form/track',
+  '/approval/external',
 ];
 
 // 🔐 Route khusus worker
 const WORKER_ROUTES = [
-  `${BASE}/my-forms`,
-  `${BASE}/form`,
+  '/my-forms',
+  '/form',
 ];
 
 // 🔐 Route khusus approver
 const APPROVER_ROUTES = [
-  `${BASE}/approval`,
+  '/approval',
 ];
 
 // 🔐 Route khusus admin
 const ADMIN_ONLY_ROUTES = [
-  `${BASE}/smtp-settings`,
-  `${BASE}/api/smtp-settings`,
+  '/smtp-settings',
+  '/api/smtp-settings',
 ];
 
 // Helper untuk membersihkan cookie secara konsisten di semua path
@@ -40,10 +44,6 @@ function clearAuthCookie(res: NextResponse) {
     httpOnly: true,
     sameSite: 'lax',
   });
-  res.headers.append(
-    'Set-Cookie',
-    `${COOKIE_NAME}=; Path=${BASE}; Expires=Thu, 01 Jan 1970 00:00:00 GMT; Max-Age=0; HttpOnly; SameSite=Lax`
-  );
 }
 
 // Verifikasi kriptografis JWT signature menggunakan Web Crypto API (cepat & kompatibel Edge/Node)
@@ -95,11 +95,9 @@ export async function middleware(req: NextRequest) {
 
   // Skip middleware untuk asset static & internal Next.js
   if (
-    pathname.startsWith(`${BASE}/_next/`) ||
     pathname.startsWith('/_next/') ||
     pathname.includes('/favicon') ||
     pathname.includes('/__nextjs') ||
-    pathname.startsWith(`${BASE}/images/`) ||
     pathname.startsWith('/images/') ||
     pathname.endsWith('.png') ||
     pathname.endsWith('.jpg') ||
@@ -109,8 +107,8 @@ export async function middleware(req: NextRequest) {
     return NextResponse.next();
   }
 
-  // 🔓 Skip public routes
-  if (PUBLIC_ROUTES.some((route) => pathname.startsWith(route))) {
+  // 🔓 Skip public routes (termasuk halaman root '/')
+  if (pathname === '/' || PUBLIC_ROUTES.some((route) => pathname.startsWith(route))) {
     return NextResponse.next();
   }
 
@@ -119,7 +117,7 @@ export async function middleware(req: NextRequest) {
 
   // ❌ Belum login
   if (!token) {
-    const loginUrl = new URL(`${BASE}/login/worker`, req.url);
+    const loginUrl = new URL('/login/worker', req.url);
     loginUrl.searchParams.set('from', pathname);
     return NextResponse.redirect(loginUrl);
   }
@@ -130,7 +128,7 @@ export async function middleware(req: NextRequest) {
     // Signature tidak valid atau token rusak
     if (!payload) {
       console.warn('[Middleware] Invalid JWT signature or corrupted token');
-      const loginUrl = new URL(`${BASE}/login/worker`, req.url);
+      const loginUrl = new URL('/login/worker', req.url);
       const res = NextResponse.redirect(loginUrl);
       clearAuthCookie(res);
       return res;
@@ -138,7 +136,7 @@ export async function middleware(req: NextRequest) {
 
     // ⛔ Token expired
     if (payload.exp && Date.now() / 1000 > payload.exp) {
-      const loginUrl = new URL(`${BASE}/login/worker`, req.url);
+      const loginUrl = new URL('/login/worker', req.url);
       loginUrl.searchParams.set('expired', '1');
       const res = NextResponse.redirect(loginUrl);
       clearAuthCookie(res);
@@ -149,24 +147,24 @@ export async function middleware(req: NextRequest) {
 
     // 🔐 Route khusus admin — tolak non-admin
     if (ADMIN_ONLY_ROUTES.some((r) => pathname.startsWith(r)) && role !== 'admin') {
-      return NextResponse.redirect(new URL(`${BASE}/home`, req.url));
+      return NextResponse.redirect(new URL('/home', req.url));
     }
 
     // 🔐 Worker mencoba akses halaman approver
     if (APPROVER_ROUTES.some((r) => pathname.startsWith(r)) && !allowedApproverRoles.includes(role)) {
-      return NextResponse.redirect(new URL(`${BASE}/my-forms`, req.url));
+      return NextResponse.redirect(new URL('/my-forms', req.url));
     }
 
     // 🔐 Approver mencoba akses halaman worker
     if (WORKER_ROUTES.some((r) => pathname.startsWith(r)) && role !== 'worker') {
-      return NextResponse.redirect(new URL(`${BASE}/approval`, req.url));
+      return NextResponse.redirect(new URL('/approval', req.url));
     }
 
     // ✅ Lolos semua check
     return NextResponse.next();
   } catch (err) {
     console.error('[Middleware] Token error:', err);
-    const loginUrl = new URL(`${BASE}/login/worker`, req.url);
+    const loginUrl = new URL('/login/worker', req.url);
     const res = NextResponse.redirect(loginUrl);
     clearAuthCookie(res);
     return res;
@@ -174,5 +172,7 @@ export async function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/form-permit/:path*'],
+  matcher: [
+    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+  ],
 };

@@ -395,7 +395,7 @@ export default function ApprovalDetailPage({
   const loadForm = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`/form-permit/api/approval/${jenisForm}/${id}`, {
+      const res = await fetch(`/api/approval/${jenisForm}/${id}`, {
         credentials: "include",
       });
       if (res.status === 401) {
@@ -438,7 +438,7 @@ export default function ApprovalDetailPage({
         };
       }
 
-      const res = await fetch(`/form-permit/api/approval/${jenisForm}/${id}`, {
+      const res = await fetch(`/api/approval/${jenisForm}/${id}`, {
         method:      "PATCH",
         credentials: "include",
         headers:     { "Content-Type": "application/json" },
@@ -456,12 +456,12 @@ export default function ApprovalDetailPage({
 
   const handleLogout = async () => {
     try {
-      await fetch("/form-permit/api/auth/logout", { method: "POST", credentials: "include" });
+      await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
     } catch (e) {
       console.error("Logout error:", e);
     }
     sessionStorage.clear();
-    window.location.href = "/form-permit/login/approver";
+    window.location.href = "/login/approver";
   };
 
   // ── Auth loading — jangan render halaman sebelum auth selesai ──

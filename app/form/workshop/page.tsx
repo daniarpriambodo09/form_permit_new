@@ -305,7 +305,7 @@ function WorkshopPermitFormInner() {
   useEffect(() => {
     const fetchUser = async () => {
       try {
-        const res = await fetch("/form-permit/api/auth/me");
+        const res = await fetch("/api/auth/me");
         if (!res.ok) return;
 
         const data = await res.json();
@@ -316,7 +316,7 @@ function WorkshopPermitFormInner() {
         }
 
         if (data.user.departmen) {
-          const spvRes = await fetch("/form-permit/api/admin-users/approvers");
+          const spvRes = await fetch("/api/admin-users/approvers");
           if (spvRes.ok) {
             const spvData = await spvRes.json();
             const options = (spvData.users ?? []).filter((u: any) => {
@@ -349,7 +349,7 @@ function WorkshopPermitFormInner() {
       return;
     }
     setLoadingWorkers(true);
-    fetch("/form-permit/api/master-lisence/workers?jenisKerja=workshop", {
+    fetch("/api/master-lisence/workers?jenisKerja=workshop", {
       credentials: "include",
     })
       .then((r) => (r.ok ? r.json() : { data: [] }))
@@ -431,7 +431,7 @@ function WorkshopPermitFormInner() {
           painting: normalizeWork(formData.jenisPekerjaan.painting),
         },
       };
-      const res = await fetch("/form-permit/api/forms/workshop", {
+      const res = await fetch("/api/forms/workshop", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -473,7 +473,7 @@ function WorkshopPermitFormInner() {
       const r = await submit(true);
       if (!r) return;
       alert(`Izin diajukan! ID: ${r.id_form}`);
-      window.location.href = "/form-permit/my-forms";
+      window.location.href = "/my-forms";
     } catch (e: any) {
       alert("Gagal: " + e.message);
     }

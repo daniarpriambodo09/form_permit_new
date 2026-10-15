@@ -33,7 +33,7 @@ export default function AdminK3RoutingPage() {
   const load = async () => {
     setLoading(true);
     try {
-      const res = await fetch("/form-permit/api/admin-k3-routing", { credentials: "include" });
+      const res = await fetch("/api/admin-k3-routing", { credentials: "include" });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
       setUsers(data.admin_k3_users ?? []);
@@ -59,7 +59,7 @@ export default function AdminK3RoutingPage() {
     setSaving(jenisForm);
     setError("");
     try {
-      const res = await fetch("/form-permit/api/admin-k3-routing", {
+      const res = await fetch("/api/admin-k3-routing", {
         method: "PUT",
         credentials: "include",
         headers: { "Content-Type": "application/json" },

@@ -131,7 +131,7 @@ export default function SmtpSettingsPage() {
   const loadConfig = useCallback(async () => {
     setLoading(true);
     try {
-      const res  = await fetch('/form-permit/api/smtp-settings', { credentials: 'include' });
+      const res  = await fetch('/api/smtp-settings', { credentials: 'include' });
       if (!res.ok) {
         // Mungkin belum login atau bukan admin
         if (res.status === 401 || res.status === 403) {
@@ -213,7 +213,7 @@ export default function SmtpSettingsPage() {
     try {
       const method  = isNew ? 'POST' : 'PUT';
       const payload = isNew ? config : { ...config, id: config.id };
-      const res     = await fetch('/form-permit/api/smtp-settings', {
+      const res     = await fetch('/api/smtp-settings', {
         method,
         credentials: 'include',
         headers:     { 'Content-Type': 'application/json' },
@@ -248,7 +248,7 @@ export default function SmtpSettingsPage() {
     setTesting(true);
     setTestResult(null);
     try {
-      const res  = await fetch('/form-permit/api/smtp-settings/test', {
+      const res  = await fetch('/api/smtp-settings/test', {
         method:      'POST',
         credentials: 'include',
         headers:     { 'Content-Type': 'application/json' },
@@ -452,7 +452,7 @@ export default function SmtpSettingsPage() {
               <Field label="App URL" htmlFor="appUrl" required hint="Digunakan di body email sebagai link approval">
                 <input id="appUrl" type="text" value={config.appUrl}
                   onChange={e => handleChange('appUrl', e.target.value)}
-                  placeholder="http://10.62.230.51:3000/form-permit" className={inputClass(!!errors.appUrl)} />
+                  placeholder="http://e-permitjai.com" className={inputClass(!!errors.appUrl)} />
                 {errors.appUrl && <p className="text-xs text-red-600 mt-1">{errors.appUrl}</p>}
               </Field>
             </div>

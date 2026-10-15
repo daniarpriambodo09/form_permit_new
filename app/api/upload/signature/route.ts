@@ -45,7 +45,7 @@ export async function POST(req: NextRequest) {
     const buffer = Buffer.from(await file.arrayBuffer());
     await fs.writeFile(path.join(UPLOAD_ROOT, fileName), buffer);
 
-    const publicUrl = `/form-permit/api/files/signatures/${fileName}`;
+    const publicUrl = `/api/files/signatures/${fileName}`;
     return NextResponse.json({ success: true, url: publicUrl, fileName });
   } catch (err: any) {
     console.error('[POST /api/upload/signature]', err);

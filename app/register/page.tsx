@@ -36,7 +36,7 @@ export default function RegisterPage() {
       }
       // Fallback: verifikasi dari API jika sessionStorage kosong
       try {
-        const res = await fetch("/form-permit/api/auth/me", { credentials: "include" });
+        const res = await fetch("/api/auth/me", { credentials: "include" });
         if (!res.ok) {
           router.replace("/login/approver");
           return;
@@ -97,7 +97,7 @@ export default function RegisterPage() {
       setCheckingUsername(true);
       try {
         const res = await fetch(
-          `/form-permit/api/auth/check-username?username=${encodeURIComponent(formData.username)}`
+          `/api/auth/check-username?username=${encodeURIComponent(formData.username)}`
         );
         if (res.ok) {
           const data = await res.json();
@@ -139,7 +139,7 @@ export default function RegisterPage() {
 
     setLoading(true);
     try {
-      const res = await fetch("/form-permit/api/auth/register", {
+      const res = await fetch("/api/auth/register", {
         method:      "POST",
         credentials: "include",
         headers:     { "Content-Type": "application/json" },

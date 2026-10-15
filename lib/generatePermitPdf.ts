@@ -166,7 +166,7 @@ let _logoCache: string | null = null;
 async function loadLogoBase64(): Promise<string | null> {
   if (_logoCache !== null) return _logoCache;
   try {
-    const url = "/form-permit/images/safety_first.png";
+    const url = "/images/safety_first.png";
     const resp = await fetch(url);
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
     const blob = await resp.blob();
@@ -813,7 +813,7 @@ async function approvalGrid(
     // ── QR Code ───────────────────────────────────────────
     try {
       const origin = typeof window !== "undefined" ? window.location.origin : "";
-      const url    = `${origin}/form-permit/approval-verification/${formType}/${formId}/${ap.role}`;
+      const url    = `${origin}/approval-verification/${formType}/${formId}/${ap.role}`;
       const qrImg  = await makeQR(url, 200);
       const qrX    = cx + cW - QR - 3;
       const qrY    = cy + 6.5;

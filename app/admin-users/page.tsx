@@ -198,7 +198,7 @@ export default function AdminUsersPage() {
   useEffect(() => {
     const checkAuth = async () => {
       try {
-        const res = await fetch("/form-permit/api/auth/me", { credentials: "include" });
+        const res = await fetch("/api/auth/me", { credentials: "include" });
         if (!res.ok) { router.replace("/login/approver"); return; }
         const data = await res.json();
         const role = data.user?.role;
@@ -244,7 +244,7 @@ export default function AdminUsersPage() {
     setAdminLoading(true);
     setAdminError("");
     try {
-      const res = await fetch("/form-permit/api/admin-users", { credentials: "include" });
+      const res = await fetch("/api/admin-users", { credentials: "include" });
       if (!res.ok) { setAdminError("Gagal memuat data."); return; }
       const data = await res.json();
       setAdminUsers(data.users ?? []);
@@ -266,7 +266,7 @@ export default function AdminUsersPage() {
     setApproverLoading(true);
     setApproverError("");
     try {
-      const res = await fetch("/form-permit/api/admin-users/approvers", { credentials: "include" });
+      const res = await fetch("/api/admin-users/approvers", { credentials: "include" });
       if (!res.ok) { setApproverError("Gagal memuat data."); return; }
       const data = await res.json();
       setApproverUsers(data.users ?? []);
@@ -346,7 +346,7 @@ export default function AdminUsersPage() {
     setPassState(userId, { loading: true, error: null, visible: false });
     try {
       const res = await fetch(
-        `/form-permit/api/admin-users/${userId}/password`,
+        `/api/admin-users/${userId}/password`,
         { credentials: "include" }
       );
       const data = await res.json();
@@ -368,7 +368,7 @@ export default function AdminUsersPage() {
     if (!deleteTarget) return;
     setDeleting(true);
     try {
-      const res = await fetch(`/form-permit/api/admin-users/${deleteTarget.id}`, {
+      const res = await fetch(`/api/admin-users/${deleteTarget.id}`, {
         method: "DELETE", credentials: "include",
       });
       const data = await res.json();
@@ -466,7 +466,7 @@ export default function AdminUsersPage() {
       setCheckingUsername(true);
       try {
         const res = await fetch(
-          `/form-permit/api/auth/check-username?username=${encodeURIComponent(currentUsername)}`
+          `/api/auth/check-username?username=${encodeURIComponent(currentUsername)}`
         );
         if (res.ok) {
           const data = await res.json();
@@ -513,7 +513,7 @@ export default function AdminUsersPage() {
       // Hanya admin yang boleh mengirim departemen
       if (pageMode === "admin") payload.departmen = adminForm.departmen;
 
-      const res = await fetch("/form-permit/api/auth/register", {
+      const res = await fetch("/api/auth/register", {
         method: "POST", credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -555,7 +555,7 @@ export default function AdminUsersPage() {
 
     setSubmitting(true);
     try {
-      const res = await fetch("/form-permit/api/auth/register-approver", {
+      const res = await fetch("/api/auth/register-approver", {
         method: "POST", credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(approverForm),

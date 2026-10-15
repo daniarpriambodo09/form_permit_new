@@ -233,8 +233,8 @@ export default function GeneralPermitFormPage() {
     setError("");
     try {
       const endpoint = createdFormId
-        ? `/form-permit/api/forms/general-permit/${createdFormId}`
-        : `/form-permit/api/forms/general-permit`;
+        ? `/api/forms/general-permit/${createdFormId}`
+        : `/api/forms/general-permit`;
       const method = createdFormId ? "PUT" : "POST";
       const res = await fetch(endpoint, {
         method,
@@ -271,8 +271,8 @@ export default function GeneralPermitFormPage() {
     setSubmitting(true);
     try {
       const endpoint = createdFormId
-        ? `/form-permit/api/forms/general-permit/${createdFormId}`
-        : `/form-permit/api/forms/general-permit`;
+        ? `/api/forms/general-permit/${createdFormId}`
+        : `/api/forms/general-permit`;
       const method = createdFormId ? "PUT" : "POST";
       const res = await fetch(endpoint, {
         method,

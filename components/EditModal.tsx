@@ -35,7 +35,7 @@ export default function EditModal({ isOpen, onClose, formId, formType, onSuccess
     setFetchingData(true);
     setError("");
     try {
-      const res = await fetch(`/form-permit/api/forms/${formType}/${formId}`);
+      const res = await fetch(`/api/forms/${formType}/${formId}`);
       if (!res.ok) {
         throw new Error("Gagal memuat data form");
       }
@@ -56,7 +56,7 @@ export default function EditModal({ isOpen, onClose, formId, formType, onSuccess
     
     try {
       // ✅ PENTING: Tambahkan status: 'submitted' secara eksplisit
-      const res = await fetch(`/form-permit/api/forms/${formType}/${formId}`, {
+      const res = await fetch(`/api/forms/${formType}/${formId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

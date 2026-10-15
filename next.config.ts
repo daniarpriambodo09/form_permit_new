@@ -1,8 +1,5 @@
 import type { NextConfig } from "next";
 
-const nextConfig: NextConfig = {
-  basePath: "/form-permit",
-  assetPrefix: "/form-permit",
-};
+const nextConfig: NextConfig = {};
 
 export default nextConfig;

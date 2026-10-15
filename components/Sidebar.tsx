@@ -61,7 +61,7 @@ export default function Sidebar() {
       setReady(true);
     }
 
-    fetch("/form-permit/api/auth/me", { credentials: "include" })
+    fetch("/api/auth/me", { credentials: "include" })
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
         if (data?.user?.role) {
@@ -111,7 +111,7 @@ export default function Sidebar() {
 
   const handleLogout = async () => {
     try {
-      await fetch("/form-permit/api/auth/logout", {
+      await fetch("/api/auth/logout", {
         method: "POST",
         credentials: "include",
       });
@@ -119,7 +119,7 @@ export default function Sidebar() {
       console.error("Logout error:", e);
     }
     sessionStorage.clear();
-    window.location.href = "/form-permit";
+    window.location.href = "/";
   };
 
   const sections = role ? getNavSections(role) : [];

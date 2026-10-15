@@ -103,7 +103,7 @@ export default function ProfilePage() {
   const [showConfirm, setShowConfirm] = useState(false);
 
   useEffect(() => {
-    fetch("/form-permit/api/auth/me", { credentials: "include" })
+    fetch("/api/auth/me", { credentials: "include" })
       .then(r => r.ok ? r.json() : null)
       .then(data => {
         if (!data?.user) { router.push("/"); return; }
@@ -128,7 +128,7 @@ export default function ProfilePage() {
 
     setSavingUser(true);
     try {
-      const res = await fetch("/form-permit/api/profile/username", {
+      const res = await fetch("/api/profile/username", {
         method: "PATCH",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
@@ -160,7 +160,7 @@ export default function ProfilePage() {
 
     setSavingEmail(true);
     try {
-      const res = await fetch("/form-permit/api/profile/email", {
+      const res = await fetch("/api/profile/email", {
         method: "PATCH",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
@@ -186,7 +186,7 @@ export default function ProfilePage() {
 
     setSavingPw(true);
     try {
-      const res = await fetch("/form-permit/api/profile/password", {
+      const res = await fetch("/api/profile/password", {
         method: "PATCH",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
