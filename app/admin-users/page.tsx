@@ -28,7 +28,7 @@ import {
   Shield, UserPlus, Eye, EyeOff, AlertCircle,
   CheckCircle, X, Users, ChevronLeft, Search,
   Building2, Mail, Phone, Calendar, BadgeCheck, BadgeX,
-  Trash2,
+  Trash2, Pencil,
 } from "lucide-react";
 import Sidebar from "@/components/Sidebar";
 
@@ -416,6 +416,148 @@ export default function AdminUsersPage() {
     password: "", password2: "",
   };
   const [approverForm, setApproverForm] = useState(emptyApproverForm);
+
+  // ── Edit modal state ──────────────────────────────────────────
+  interface EditUserData {
+    id: number;
+    type: "admin" | "approver";
+    nama: string;
+    username: string;
+    nik: string;
+    departmen: string;
+    perusahaan: string;
+    email: string;
+    no_telp: string;
+    role: string;
+    is_active: boolean;
+    password: string;
+  }
+
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [editUser, setEditUser] = useState<EditUserData | null>(null);
+  const [editSubmitting, setEditSubmitting] = useState(false);
+  const [editFormError, setEditFormError] = useState("");
+  const [editShowPass, setEditShowPass] = useState(false);
+
+  const handleOpenEditAdmin = (u: AdminUser) => {
+    setEditUser({
+      id: u.id,
+      type: "admin",
+      nama: u.nama,
+      username: u.username,
+      nik: u.nik ?? "",
+      departmen: u.departmen ?? "",
+      perusahaan: u.perusahaan ?? "",
+      email: u.email ?? "",
+      no_telp: u.no_telp ?? "",
+      role: "worker",
+      is_active: u.is_active,
+      password: "",
+    });
+    setEditFormError("");
+    setEditShowPass(false);
+    setEditModalOpen(true);
+  };
+
+  const handleOpenEditApprover = (u: ApproverUser) => {
+    setEditUser({
+      id: u.id,
+      type: "approver",
+      nama: u.nama,
+      username: u.username,
+      nik: u.nik ?? "",
+      departmen: u.departmen ?? "",
+      perusahaan: "",
+      email: u.email ?? "",
+      no_telp: u.no_telp ?? "",
+      role: u.role,
+      is_active: u.is_active,
+      password: "",
+    });
+    setEditFormError("");
+    setEditShowPass(false);
+    setEditModalOpen(true);
+  };
+
+  const handleEditSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editUser) return;
+    setEditFormError("");
+
+    if (!editUser.nama.trim()) {
+      setEditFormError("Nama lengkap wajib diisi");
+      return;
+    }
+    if (!editUser.username.trim()) {
+      setEditFormError("Username wajib diisi");
+      return;
+    }
+    if (!editUser.email.trim()) {
+      setEditFormError("Email wajib diisi");
+      return;
+    }
+    const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRe.test(editUser.email)) {
+      setEditFormError("Format email tidak valid");
+      return;
+    }
+    if (editUser.nik.trim()) {
+      const nikRe = /^[0-9]{4,20}$/;
+      if (!nikRe.test(editUser.nik.trim())) {
+        setEditFormError("Format NIK tidak valid (4-20 digit angka)");
+        return;
+      }
+    }
+    if (editUser.type === "approver" && editUser.role === "spv" && !editUser.departmen) {
+      setEditFormError("Departemen wajib dipilih untuk SPV");
+      return;
+    }
+    if (editUser.password && editUser.password.length < 6) {
+      setEditFormError("Password baru minimal 6 karakter");
+      return;
+    }
+
+    setEditSubmitting(true);
+    try {
+      const res = await fetch(`/api/admin-users/${editUser.id}`, {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          nama: editUser.nama,
+          username: editUser.username,
+          nik: editUser.nik || null,
+          departmen: editUser.departmen || null,
+          perusahaan: editUser.perusahaan || null,
+          email: editUser.email,
+          no_telp: editUser.no_telp || null,
+          role: editUser.role,
+          is_active: editUser.is_active,
+          ...(editUser.password ? { password: editUser.password } : {}),
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        setEditFormError(data.error || "Gagal memperbarui data user");
+        return;
+      }
+
+      setEditModalOpen(false);
+      setSuccessMsg(data.message || `Akun "${editUser.nama}" berhasil diperbarui.`);
+      setTimeout(() => setSuccessMsg(""), 4000);
+
+      if (editUser.type === "admin") {
+        await fetchAdminUsers();
+      } else {
+        await fetchApproverUsers();
+      }
+    } catch {
+      setEditFormError("Terjadi kesalahan koneksi saat memperbarui user.");
+    } finally {
+      setEditSubmitting(false);
+    }
+  };
 
   // ── Username check ────────────────────────────────────────────
   const [checkingUsername, setCheckingUsername] = useState(false);
@@ -899,16 +1041,29 @@ export default function AdminUsersPage() {
                               })()}
                             </td>
                             <td className="px-4 py-4 text-center">
-                              <button
-                                onClick={() => setDeleteTarget({
-                                  id: user.id, nama: user.nama,
-                                  username: user.username, role: "worker",
-                                })}
-                                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold
-                                          text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors
-                                          border border-red-200">
-                                <Trash2 className="w-3.5 h-3.5" /> Hapus
-                              </button>
+                              <div className="flex items-center justify-center gap-1.5">
+                                <button
+                                  onClick={() => handleOpenEditAdmin(user)}
+                                  className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold
+                                            text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors
+                                            border border-blue-200"
+                                  title="Edit akun"
+                                >
+                                  <Pencil className="w-3.5 h-3.5" /> Edit
+                                </button>
+                                <button
+                                  onClick={() => setDeleteTarget({
+                                    id: user.id, nama: user.nama,
+                                    username: user.username, role: "worker",
+                                  })}
+                                  className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold
+                                            text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors
+                                            border border-red-200"
+                                  title="Hapus akun"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" /> Hapus
+                                </button>
+                              </div>
                             </td>
                           </tr>
                         ))}
@@ -1084,16 +1239,29 @@ export default function AdminUsersPage() {
                               })()}
                             </td>
                             <td className="px-4 py-4 text-center">
-                              <button
-                                onClick={() => setDeleteTarget({
-                                  id: user.id, nama: user.nama,
-                                  username: user.username, role: user.role,
-                                })}
-                                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold
-                                          text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors
-                                          border border-red-200">
-                                <Trash2 className="w-3.5 h-3.5" /> Hapus
-                              </button>
+                              <div className="flex items-center justify-center gap-1.5">
+                                <button
+                                  onClick={() => handleOpenEditApprover(user)}
+                                  className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold
+                                            text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors
+                                            border border-blue-200"
+                                  title="Edit akun"
+                                >
+                                  <Pencil className="w-3.5 h-3.5" /> Edit
+                                </button>
+                                <button
+                                  onClick={() => setDeleteTarget({
+                                    id: user.id, nama: user.nama,
+                                    username: user.username, role: user.role,
+                                  })}
+                                  className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold
+                                            text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors
+                                            border border-red-200"
+                                  title="Hapus akun"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" /> Hapus
+                                </button>
+                              </div>
                             </td>
                           </tr>
                         ))}
@@ -1447,6 +1615,286 @@ export default function AdminUsersPage() {
                   )}
                 </>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Edit User Modal ── */}
+      {editModalOpen && editUser && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+          <div className="relative w-full max-w-lg bg-slate-800 rounded-2xl border border-slate-700 shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            {/* Modal header */}
+            <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b border-slate-700">
+              <div className="flex items-center gap-2">
+                <div className="p-1.5 bg-blue-500/20 rounded-lg">
+                  <Pencil className="w-4 h-4 text-blue-400" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-white">
+                    {editUser.type === "admin"
+                      ? "Edit Administrator Departemen"
+                      : `Edit Approver (${ROLE_LABEL[editUser.role] || editUser.role})`}
+                  </h3>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    Perbarui profil, informasi kontak, status, atau password akun.
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => !editSubmitting && setEditModalOpen(false)}
+                className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Modal body */}
+            <div className="px-6 py-5 max-h-[80vh] overflow-y-auto">
+              {editFormError && (
+                <div className="flex items-start gap-2 bg-red-500/10 border border-red-500/30 rounded-lg px-3 py-3 mb-5">
+                  <AlertCircle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
+                  <p className="text-red-400 text-sm">{editFormError}</p>
+                </div>
+              )}
+
+              <form onSubmit={handleEditSubmit} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-1.5">
+                    Nama Lengkap <span className="text-red-400">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={editUser.nama}
+                    onChange={(e) => setEditUser((p) => (p ? { ...p, nama: e.target.value } : null))}
+                    placeholder="Nama sesuai KTP"
+                    required
+                    className={inputCls}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-1.5">
+                    Username <span className="text-red-400">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={editUser.username}
+                    onChange={(e) => setEditUser((p) => (p ? { ...p, username: e.target.value } : null))}
+                    placeholder="Username"
+                    required
+                    className={inputCls}
+                  />
+                </div>
+
+                {editUser.type === "admin" && (
+                  <div>
+                    <label className="block text-sm font-medium text-slate-300 mb-1.5">
+                      Perusahaan / Kontraktor <span className="text-red-400">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={editUser.perusahaan}
+                      onChange={(e) => setEditUser((p) => (p ? { ...p, perusahaan: e.target.value } : null))}
+                      placeholder="PT JAI / PT Kontraktor ABC"
+                      required
+                      className={inputCls}
+                    />
+                  </div>
+                )}
+
+                {editUser.type === "approver" && pageMode === "admin" && (
+                  <div>
+                    <label className="block text-sm font-medium text-slate-300 mb-1.5">
+                      Role Approver <span className="text-red-400">*</span>
+                    </label>
+                    <div className="relative">
+                      <select
+                        value={editUser.role}
+                        onChange={(e) => setEditUser((p) => (p ? { ...p, role: e.target.value } : null))}
+                        required
+                        className={`${selectCls} text-white`}
+                      >
+                        {APPROVER_ROLE_OPTIONS.map((r) => (
+                          <option key={r.value} value={r.value} className="text-white bg-slate-700">
+                            {r.label}
+                          </option>
+                        ))}
+                      </select>
+                      <div className="pointer-events-none absolute inset-y-0 right-3 flex items-center">
+                        <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                        </svg>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Departemen */}
+                {pageMode === "admin" && (
+                  <div>
+                    <label className="block text-sm font-medium text-slate-300 mb-1.5">
+                      Departemen{" "}
+                      {editUser.type === "approver" && editUser.role === "spv" ? (
+                        <span className="text-red-400">*</span>
+                      ) : (
+                        <span className="text-xs text-slate-400 font-normal">(opsional)</span>
+                      )}
+                    </label>
+                    <div className="relative">
+                      <select
+                        value={editUser.departmen}
+                        onChange={(e) => setEditUser((p) => (p ? { ...p, departmen: e.target.value } : null))}
+                        required={editUser.type === "approver" && editUser.role === "spv"}
+                        className={`${selectCls} ${editUser.departmen ? "text-white" : "text-slate-400"}`}
+                      >
+                        <option value="">- Tanpa Departemen / Umum -</option>
+                        {DEPARTMENT_OPTIONS.map((d) => (
+                          <option key={d} value={d} className="text-white bg-slate-700">
+                            {d}
+                          </option>
+                        ))}
+                      </select>
+                      <div className="pointer-events-none absolute inset-y-0 right-3 flex items-center">
+                        <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                        </svg>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {pageMode === "spv" && editUser.departmen && (
+                  <div className="flex items-center gap-2 bg-blue-500/10 border border-blue-500/30 rounded-lg px-3 py-2.5">
+                    <Building2 className="w-4 h-4 text-blue-400 shrink-0" />
+                    <p className="text-blue-300 text-xs">
+                      Departemen: <span className="font-bold">{editUser.departmen}</span>
+                    </p>
+                  </div>
+                )}
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-1.5">
+                    Email <span className="text-red-400">*</span>
+                  </label>
+                  <input
+                    type="email"
+                    value={editUser.email}
+                    onChange={(e) => setEditUser((p) => (p ? { ...p, email: e.target.value } : null))}
+                    placeholder="user@company.com"
+                    required
+                    className={inputCls}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-1.5">
+                    NIK <span className="text-xs text-slate-400 font-normal">(4-20 digit angka)</span>
+                  </label>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    value={editUser.nik}
+                    onChange={(e) => setEditUser((p) => (p ? { ...p, nik: e.target.value.replace(/[^0-9]/g, "") } : null))}
+                    placeholder="4-20 digit angka"
+                    maxLength={20}
+                    className={inputCls}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-1.5">No. Telepon</label>
+                  <input
+                    type="text"
+                    value={editUser.no_telp}
+                    onChange={(e) => setEditUser((p) => (p ? { ...p, no_telp: e.target.value } : null))}
+                    placeholder="08xx-xxxx-xxxx (opsional)"
+                    className={inputCls}
+                  />
+                </div>
+
+                {/* Status Akun */}
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-1.5">Status Akun</label>
+                  <div className="flex gap-4">
+                    <label className="flex items-center gap-2 cursor-pointer text-sm text-slate-200">
+                      <input
+                        type="radio"
+                        name="edit_is_active"
+                        checked={editUser.is_active}
+                        onChange={() => setEditUser((p) => (p ? { ...p, is_active: true } : null))}
+                        className="text-orange-500 focus:ring-orange-400"
+                      />
+                      <span className="flex items-center gap-1 text-green-400 font-medium">
+                        <BadgeCheck className="w-3.5 h-3.5" /> Aktif
+                      </span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer text-sm text-slate-200">
+                      <input
+                        type="radio"
+                        name="edit_is_active"
+                        checked={!editUser.is_active}
+                        onChange={() => setEditUser((p) => (p ? { ...p, is_active: false } : null))}
+                        className="text-orange-500 focus:ring-orange-400"
+                      />
+                      <span className="flex items-center gap-1 text-slate-400 font-medium">
+                        <BadgeX className="w-3.5 h-3.5" /> Nonaktif
+                      </span>
+                    </label>
+                  </div>
+                </div>
+
+                {/* Ubah Password (Opsional) */}
+                <div className="pt-3 border-t border-slate-700/60">
+                  <label className="block text-sm font-medium text-slate-300 mb-1">
+                    Password Baru <span className="text-xs text-slate-400 font-normal">(kosongkan jika tidak ingin mengubah)</span>
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={editShowPass ? "text" : "password"}
+                      value={editUser.password}
+                      onChange={(e) => setEditUser((p) => (p ? { ...p, password: e.target.value } : null))}
+                      placeholder="Minimal 6 karakter"
+                      className={`${inputCls} pr-11`}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setEditShowPass((v) => !v)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200 transition-colors"
+                    >
+                      {editShowPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex gap-3 pt-4 border-t border-slate-700/60">
+                  <button
+                    type="button"
+                    onClick={() => setEditModalOpen(false)}
+                    disabled={editSubmitting}
+                    className="flex-1 py-2.5 bg-slate-700 hover:bg-slate-600 disabled:opacity-50 text-slate-300 font-semibold rounded-lg text-sm transition-colors"
+                  >
+                    Batal
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={editSubmitting}
+                    className="flex-1 py-2.5 bg-blue-600 hover:bg-blue-500 disabled:bg-blue-600/50 text-white font-semibold rounded-lg text-sm transition-colors flex items-center justify-center gap-2"
+                  >
+                    {editSubmitting ? (
+                      <>
+                        <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                        Menyimpan…
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle className="w-4 h-4" />
+                        Simpan Perubahan
+                      </>
+                    )}
+                  </button>
+                </div>
+              </form>
             </div>
           </div>
         </div>
