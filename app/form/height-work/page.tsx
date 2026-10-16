@@ -325,7 +325,7 @@ function HeightWorkFormPageInner() {
   const [namaPengawasKontraktor, setNamaPengawasKontraktor] = useState("");
   const [namaPengawasDepartemen, setNamaPengawasDepartemen] = useState("");
   const [namaDepartemen, setNamaDepartemen] = useState("");
-  const [spvOptions, setSpvOptions] = useState<Array<{ id: number; nama: string; nik: string | null; jabatan: string | null }>>([]);
+  const [spvOptions, setSpvOptions] = useState<Array<{ id: number; nama: string; nik: string | null; jabatan: string | null; departmen?: string | null }>>([]);
   const [spvPemberiIzin, setSpvPemberiIzin] = useState({ nama: "", nik: "", jabatan: "" });
   const [namaPetugas, setNamaPetugas] = useState<string[]>(Array(10).fill(""));
   const [berbadanSehat, setBerbadanSehat] = useState<boolean[]>(Array(10).fill(false));
@@ -397,8 +397,8 @@ function HeightWorkFormPageInner() {
           const defaultSpv = options[0];
           setSpvPemberiIzin({
             nama: defaultSpv.nama ?? "",
-            nik: defaultSpv.nik ?? "",
-            jabatan: defaultSpv.jabatan ?? "",
+            nik: (defaultSpv.nik && defaultSpv.nik.trim()) ? defaultSpv.nik.trim() : (defaultSpv.username ?? ""),
+            jabatan: defaultSpv.jabatan ?? "Supervisor",
           });
         }
       })
@@ -546,7 +546,7 @@ function HeightWorkFormPageInner() {
   });
 
   const handleSaveDraft = async () => {
-    if (!spvPemberiIzin.nama || !spvPemberiIzin.nik) {
+    if (!spvPemberiIzin.nama.trim()) {
       setError("SPV / Pemberi Izin wajib dipilih.");
       return;
     }
@@ -572,7 +572,7 @@ function HeightWorkFormPageInner() {
     e.preventDefault();
     setError("");
 
-    if (!spvPemberiIzin.nama || !spvPemberiIzin.nik) {
+    if (!spvPemberiIzin.nama.trim()) {
       setError("SPV / Pemberi Izin wajib dipilih.");
       return;
     }
@@ -775,18 +775,22 @@ function HeightWorkFormPageInner() {
                       value={spvPemberiIzin.nama}
                       onChange={(e) => {
                         const selected = spvOptions.find((spv) => spv.nama === e.target.value);
+                        const nikVal = selected?.nik?.trim() || (selected as any)?.username || "";
                         setSpvPemberiIzin({
-                          nama: selected?.nama ?? "",
-                          nik: selected?.nik ?? "",
-                          jabatan: selected?.jabatan ?? "",
+                          nama: selected?.nama ?? e.target.value,
+                          nik: nikVal,
+                          jabatan: selected?.jabatan ?? "Supervisor",
                         });
+                        setError("");
                       }}
                       required
                       className={`${inputCls} ${!spvPemberiIzin.nama ? "border-amber-300 bg-amber-50/50" : ""}`}
                     >
                       <option value="">-- Pilih SPV --</option>
                       {spvOptions.map((spv) => (
-                        <option key={spv.id} value={spv.nama}>{spv.nama}</option>
+                        <option key={spv.id} value={spv.nama}>
+                          {spv.nama} {spv.departmen ? `(${spv.departmen})` : ""}
+                        </option>
                       ))}
                     </select>
                   </div>
@@ -795,9 +799,9 @@ function HeightWorkFormPageInner() {
                     <input
                       type="text"
                       value={spvPemberiIzin.nik}
-                      readOnly
-                      placeholder="Terisi otomatis"
-                      className="w-full px-4 py-2.5 sm:py-3 border border-slate-200 rounded-xl bg-slate-100 text-slate-600 text-xs sm:text-sm cursor-not-allowed"
+                      onChange={(e) => setSpvPemberiIzin((prev) => ({ ...prev, nik: e.target.value }))}
+                      placeholder="Terisi otomatis / ketik manual"
+                      className="w-full px-4 py-2.5 sm:py-3 border border-slate-200 rounded-xl bg-white text-slate-800 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
                     />
                   </div>
                 </div>

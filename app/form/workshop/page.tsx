@@ -315,24 +315,20 @@ function WorkshopPermitFormInner() {
           setJsaData((prev) => ({ ...prev, sectDept: data.user.departmen }));
         }
 
-        if (data.user.departmen) {
-          const spvRes = await fetch("/api/admin-users/approvers");
-          if (spvRes.ok) {
-            const spvData = await spvRes.json();
-            const options = (spvData.users ?? []).filter((u: any) => {
-              if (u.role !== "spv") return false;
-              if (!u.departmen) return true;
-              return u.departmen === data.user.departmen;
+        const spvRes = await fetch("/api/admin-users/approvers");
+        if (spvRes.ok) {
+          const spvData = await spvRes.json();
+          const allSpvs = (spvData.users ?? []).filter((u: any) => u.role === "spv" && u.is_active !== false);
+          setSpvOptions(allSpvs);
+          if (allSpvs.length > 0 && !spvPemberiIzin.nama) {
+            const matchingSpv = data.user?.departmen
+              ? allSpvs.find((s: any) => s.departmen === data.user.departmen) || allSpvs[0]
+              : allSpvs[0];
+            setSpvPemberiIzin({
+              nama: matchingSpv.nama ?? "",
+              nik: (matchingSpv.nik && matchingSpv.nik.trim()) ? matchingSpv.nik.trim() : (matchingSpv.username ?? ""),
+              jabatan: matchingSpv.jabatan ?? "Supervisor",
             });
-            setSpvOptions(options);
-            if (options.length > 0) {
-              const defaultSpv = options[0];
-              setSpvPemberiIzin({
-                nama: defaultSpv.nama ?? "",
-                nik: defaultSpv.nik ?? "",
-                jabatan: defaultSpv.jabatan ?? "",
-              });
-            }
           }
         }
       } catch (err) {
@@ -385,12 +381,16 @@ function WorkshopPermitFormInner() {
       setValidationError("Fire Watch wajib diisi nama dan NIK-nya");
       return;
     }
-    if (!spvPemberiIzin.nama || !spvPemberiIzin.nik) {
+    if (!spvPemberiIzin.nama || !spvPemberiIzin.nama.trim()) {
       setValidationError("SPV / Pemberi Izin wajib dipilih");
       return;
     }
-    if (!formData.namaPekerja.trim() || !formData.nikPekerja.trim()) {
+    if (isInternal && (!formData.namaPekerja.trim() || !formData.nikPekerja.trim())) {
       setValidationError("Nama Pekerja dan NIK wajib diisi");
+      return;
+    }
+    if (!isInternal && !formData.namaKontraktor.trim()) {
+      setValidationError("Nama Kontraktor wajib diisi");
       return;
     }
 
@@ -439,7 +439,10 @@ function WorkshopPermitFormInner() {
           isSubmit,
           perluJsa,
           jsaFileUrl: jsaFile?.url ?? null,
-          spvPemberiIzin,
+          spvPemberiIzin: {
+            ...spvPemberiIzin,
+            nik: spvPemberiIzin.nik.trim() || "-",
+          },
           ...(idIjinKerja || jsaMode === "build" ? { jsaData } : {}),
           idIjinKerja,
         }),
@@ -579,22 +582,26 @@ function WorkshopPermitFormInner() {
                 </div>
               </div>
 
-              {/* Kontraktor (Eksternal) */}
-              {!isInternal && (
-                <div>
-                  <label className="block text-xs sm:text-sm font-bold text-slate-800 mb-1.5">
-                    Nama Kontraktor <span className="text-rose-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.namaKontraktor}
-                    onChange={(e) => setFormData((p) => ({ ...p, namaKontraktor: e.target.value }))}
-                    placeholder="Contoh: PT ABC Teknik Mandiri"
-                    required
-                    className={inputCls}
-                  />
-                </div>
-              )}
+              {/* Kontraktor */}
+              <div>
+                <label className="block text-xs sm:text-sm font-bold text-slate-800 mb-1.5">
+                  Nama Kontraktor{" "}
+                  {isInternal ? (
+                    <span className="text-slate-400 font-normal text-xs">(tidak diperlukan untuk Internal)</span>
+                  ) : (
+                    <span className="text-rose-500">*</span>
+                  )}
+                </label>
+                <input
+                  type="text"
+                  value={isInternal ? "" : formData.namaKontraktor}
+                  onChange={(e) => setFormData((p) => ({ ...p, namaKontraktor: e.target.value }))}
+                  disabled={isInternal}
+                  required={!isInternal}
+                  placeholder={isInternal ? "Tidak diperlukan untuk Karyawan Internal PT.JAI" : "Contoh: PT ABC Teknik Mandiri"}
+                  className={`${inputCls} ${isInternal ? "bg-slate-100 text-slate-400 cursor-not-allowed" : ""}`}
+                />
+              </div>
 
               {/* Pekerja & NIK */}
               {isInternal ? (
@@ -674,33 +681,22 @@ function WorkshopPermitFormInner() {
                   </div>
                 </div>
               ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs sm:text-sm font-bold text-slate-800 mb-1.5">
-                      Nama Pekerja <span className="text-rose-500">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.namaPekerja}
-                      onChange={(e) => setFormData((p) => ({ ...p, namaPekerja: e.target.value }))}
-                      className={inputCls}
-                      placeholder="Nama pekerja"
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs sm:text-sm font-bold text-slate-800 mb-1.5">
-                      NIK Pekerja <span className="text-rose-500">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.nikPekerja}
-                      onChange={(e) => setFormData((p) => ({ ...p, nikPekerja: e.target.value }))}
-                      className={inputCls}
-                      placeholder="Nomor identitas/NIK"
-                      required
-                    />
-                  </div>
+                <div>
+                  <label className="block text-xs sm:text-sm font-bold text-slate-800 mb-1.5">
+                    Nama Pekerja &amp; NIK{" "}
+                    <span className="text-slate-400 font-normal text-xs">(tidak diperlukan untuk Eksternal / Subkontraktor)</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={
+                      formData.namaPekerja
+                        ? `${formData.namaPekerja}${formData.nikPekerja ? ` / ${formData.nikPekerja}` : ""}`
+                        : ""
+                    }
+                    disabled
+                    placeholder="Tidak perlu diisi untuk Eksternal / Subkontraktor"
+                    className={`${inputCls} bg-slate-100 text-slate-400 cursor-not-allowed`}
+                  />
                 </div>
               )}
 
@@ -813,18 +809,22 @@ function WorkshopPermitFormInner() {
                       value={spvPemberiIzin.nama}
                       onChange={(e) => {
                         const selected = spvOptions.find((spv) => spv.nama === e.target.value);
+                        const nikVal = selected?.nik?.trim() || (selected as any)?.username || "";
                         setSpvPemberiIzin({
-                          nama: selected?.nama ?? "",
-                          nik: selected?.nik ?? "",
-                          jabatan: selected?.jabatan ?? "",
+                          nama: selected?.nama ?? e.target.value,
+                          nik: nikVal,
+                          jabatan: selected?.jabatan ?? "Supervisor",
                         });
+                        setValidationError("");
                       }}
                       required
                       className={`${inputCls} ${!spvPemberiIzin.nama ? "border-amber-300 bg-amber-50/50" : ""}`}
                     >
                       <option value="">-- Pilih SPV --</option>
                       {spvOptions.map((spv) => (
-                        <option key={spv.id} value={spv.nama}>{spv.nama}</option>
+                        <option key={spv.id} value={spv.nama}>
+                          {spv.nama} {spv.departmen ? `(${spv.departmen})` : ""}
+                        </option>
                       ))}
                     </select>
                   </div>
@@ -833,9 +833,9 @@ function WorkshopPermitFormInner() {
                     <input
                       type="text"
                       value={spvPemberiIzin.nik}
-                      readOnly
-                      placeholder="Terisi otomatis"
-                      className="w-full px-4 py-2.5 sm:py-3 border border-slate-200 rounded-xl bg-slate-100 text-slate-600 text-xs sm:text-sm cursor-not-allowed"
+                      onChange={(e) => setSpvPemberiIzin((prev) => ({ ...prev, nik: e.target.value }))}
+                      placeholder="Terisi otomatis / ketik manual"
+                      className={inputCls}
                     />
                   </div>
                 </div>

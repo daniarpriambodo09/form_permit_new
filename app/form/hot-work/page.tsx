@@ -413,24 +413,20 @@ function HotWorkPermitFormInner() {
           setJsaData((prev) => ({ ...prev, sectDept: data.user.departmen }));
         }
 
-        if (data.user.departmen) {
-          const spvRes = await fetch("/api/admin-users/approvers");
-          if (spvRes.ok) {
-            const spvData = await spvRes.json();
-            const options = (spvData.users ?? []).filter((u: any) => {
-              if (u.role !== "spv") return false;
-              if (!u.departmen) return true;
-              return u.departmen === data.user.departmen;
+        const spvRes = await fetch("/api/admin-users/approvers");
+        if (spvRes.ok) {
+          const spvData = await spvRes.json();
+          const allSpvs = (spvData.users ?? []).filter((u: any) => u.role === "spv" && u.is_active !== false);
+          setSpvOptions(allSpvs);
+          if (allSpvs.length > 0 && !spvPemberiIzin.nama) {
+            const matchingSpv = data.user?.departmen
+              ? allSpvs.find((s: any) => s.departmen === data.user.departmen) || allSpvs[0]
+              : allSpvs[0];
+            setSpvPemberiIzin({
+              nama: matchingSpv.nama ?? "",
+              nik: (matchingSpv.nik && matchingSpv.nik.trim()) ? matchingSpv.nik.trim() : (matchingSpv.username ?? ""),
+              jabatan: matchingSpv.jabatan ?? "Supervisor",
             });
-            setSpvOptions(options);
-            if (options.length > 0) {
-              const defaultSpv = options[0];
-              setSpvPemberiIzin({
-                nama: defaultSpv.nama ?? "",
-                nik: defaultSpv.nik ?? "",
-                jabatan: defaultSpv.jabatan ?? "",
-              });
-            }
           }
         }
       } catch (err) {
@@ -508,15 +504,19 @@ function HotWorkPermitFormInner() {
 
   const submit = async (isSubmit: boolean) => {
     setValidationError("");
-    if (!formData.namaPekerjaNIK.trim()) {
+    if (isInternal && !formData.namaPekerjaNIK.trim()) {
       setValidationError("Nama Pekerja / NIK wajib diisi");
+      return;
+    }
+    if (!isInternal && !formData.namaKontraktor.trim()) {
+      setValidationError("Nama Perusahaan / Kontraktor wajib diisi");
       return;
     }
     if (!formData.namaFireWatch || !formData.nikFireWatch) {
       setValidationError("Fire Watch wajib dipilih dan diisi");
       return;
     }
-    if (!spvPemberiIzin.nama || !spvPemberiIzin.nik) {
+    if (!spvPemberiIzin.nama || !spvPemberiIzin.nama.trim()) {
       setValidationError("SPV / Pemberi Izin wajib dipilih");
       return;
     }
@@ -562,7 +562,10 @@ function HotWorkPermitFormInner() {
           isSubmit,
           perluJsa,
           jsaFileUrl: jsaFile?.url ?? null,
-          spvPemberiIzin,
+          spvPemberiIzin: {
+            ...spvPemberiIzin,
+            nik: spvPemberiIzin.nik.trim() || "-",
+          },
           ...(idIjinKerja || jsaMode === "build" ? { jsaData } : {}),
           idIjinKerja,
         }),
@@ -872,21 +875,15 @@ function HotWorkPermitFormInner() {
             ) : (
               <div>
                 <label className="block text-xs sm:text-sm font-bold text-slate-800 mb-1.5">
-                  Nama Pekerja & NIK <span className="text-red-500">*</span>
+                  Nama Pekerja &amp; NIK{" "}
+                  <span className="text-slate-400 font-normal text-xs">(tidak diperlukan untuk Eksternal / Subkontraktor)</span>
                 </label>
                 <input
                   type="text"
-                  value={formData.namaPekerjaNIK}
-                  onChange={(e) =>
-                    setFormData((p) => {
-                      const next = { ...p, namaPekerjaNIK: e.target.value };
-                      saveLocalDraft(next);
-                      return next;
-                    })
-                  }
-                  className={inputCls}
-                  placeholder="Contoh: Budi Santoso / 102938"
-                  required
+                  value={formData.namaPekerjaNIK || ""}
+                  disabled
+                  placeholder="Tidak perlu diisi untuk Eksternal / Subkontraktor"
+                  className={`${inputCls} bg-slate-100 text-slate-400 cursor-not-allowed`}
                 />
               </div>
             )}
@@ -1045,11 +1042,13 @@ function HotWorkPermitFormInner() {
                     value={spvPemberiIzin.nama}
                     onChange={(e) => {
                       const selected = spvOptions.find((spv) => spv.nama === e.target.value);
+                      const nikVal = selected?.nik?.trim() || (selected as any)?.username || "";
                       setSpvPemberiIzin({
-                        nama: selected?.nama ?? "",
-                        nik: selected?.nik ?? "",
-                        jabatan: selected?.jabatan ?? "",
+                        nama: selected?.nama ?? e.target.value,
+                        nik: nikVal,
+                        jabatan: selected?.jabatan ?? "Supervisor",
                       });
+                      setValidationError("");
                     }}
                     className="w-full px-3.5 py-2.5 bg-white border border-emerald-200 rounded-xl text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                     required
@@ -1067,9 +1066,9 @@ function HotWorkPermitFormInner() {
                   <input
                     type="text"
                     value={spvPemberiIzin.nik}
-                    readOnly
-                    placeholder="Otomatis terisi"
-                    className="w-full px-3.5 py-2.5 bg-slate-100 border border-slate-200 rounded-xl text-sm text-slate-600 cursor-not-allowed"
+                    onChange={(e) => setSpvPemberiIzin((prev) => ({ ...prev, nik: e.target.value }))}
+                    placeholder="Otomatis terisi / ketik manual"
+                    className="w-full px-3.5 py-2.5 bg-white border border-emerald-200 rounded-xl text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                   />
                 </div>
               </div>

@@ -22,31 +22,18 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const isAdmin = payload.role === 'admin';
-    const departmen = isAdmin
-      ? null
-      : (await query<{ departmen: string | null }>(`SELECT departmen FROM users WHERE id = $1`, [payload.userId]))[0]?.departmen ?? null;
+    const { searchParams } = new URL(req.url);
+    const roleParam = searchParams.get('role');
+    const deptParam = searchParams.get('departmen');
 
-    const rows = await query<{
-      id: number;
-      nama: string;
-      username: string;
-      role: string;
-      nik: string | null;
-      jabatan: string | null;
-      departmen: string | null;
-      email: string | null;
-      no_telp: string | null;
-      is_active: boolean;
-      created_at: string;
-    }>(
-      `SELECT
+    let sql = `
+      SELECT
          id,
          nama,
          username,
          role,
-         nik,
-         jabatan,
+         COALESCE(NULLIF(TRIM(nik), ''), '100' || id) AS nik,
+         COALESCE(jabatan, 'Supervisor') AS jabatan,
          departmen,
          email,
          no_telp,
@@ -54,11 +41,19 @@ export async function GET(req: NextRequest) {
          created_at
        FROM users
        WHERE role IN ('spv', 'kontraktor', 'admin_k3', 'sfo', 'smr', 'admin', 'security')
-         ${isAdmin ? '' : 'AND departmen = $1'}
-       ORDER BY role ASC, created_at DESC`,
-      isAdmin ? [] : [departmen]
-    );
+    `;
+    const params: any[] = [];
+    if (roleParam) {
+      params.push(roleParam);
+      sql += ` AND role = $${params.length}`;
+    }
+    if (deptParam) {
+      params.push(deptParam);
+      sql += ` AND departmen = $${params.length}`;
+    }
+    sql += ` ORDER BY role ASC, departmen ASC, nama ASC, created_at DESC`;
 
+    const rows = await query(sql, params);
     return NextResponse.json({ users: rows }, { status: 200 });
   } catch (err: unknown) {
     console.error('[GET /api/admin-users/approvers]', err);
