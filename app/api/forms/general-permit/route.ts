@@ -144,15 +144,9 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // ── Bagian 11: SPV Terkait — nama + NIK, dikirim sebagai spvPemberiIzin ──
+    // ── Bagian 11: SPV Terkait — nama + NIK (opsional jika dikirim) ──
     const selectedSpvName = (f.spvPemberiIzin?.nama ?? null)?.toString().trim() || null;
     const selectedSpvNik  = (f.spvPemberiIzin?.nik  ?? null)?.toString().trim() || null;
-    if (isSubmit && (!selectedSpvName || !selectedSpvNik)) {
-      return NextResponse.json(
-        { error: 'SPV Terkait (Bagian 11) wajib dipilih.' },
-        { status: 400 }
-      );
-    }
 
     // ── Lisensi/Sertifikasi files (Bagian 9) — opsional, jika diisi maksimal sesuai jumlah tenaga kerja ──
     const licenseFiles = Array.isArray(f.licenseFiles)

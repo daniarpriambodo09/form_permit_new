@@ -212,10 +212,13 @@ async function queryGeneralPermitByStage(
               NULL::text AS tipe_perusahaan, NULL::text AS id_ijin_kerja,
               'general-permit' AS jenis_form
          FROM form_ijin_kerja gp
-         JOIN users creator ON creator.id = gp.user_id
-        WHERE gp.status = 'submitted' AND gp.current_stage = $1 AND creator.departmen = $2
+         LEFT JOIN users creator ON creator.id = gp.user_id
+        WHERE gp.status = 'submitted' AND gp.current_stage = $1
+          AND (creator.departmen = $2 OR creator.departmen IS NULL OR creator.departmen = '')
           AND (
-            LOWER(TRIM(gp.spv_terkait_pj)) = LOWER(TRIM($3))
+            gp.spv_terkait_pj IS NULL
+            OR gp.spv_terkait_pj = ''
+            OR LOWER(TRIM(gp.spv_terkait_pj)) = LOWER(TRIM($3))
             OR ($4::text IS NOT NULL AND gp.nik_spv_terkait_pj = $4)
           )
         ORDER BY gp.tanggal ASC`,
@@ -297,10 +300,13 @@ async function countGeneralPermitByStage(
     const res = await query(
       `SELECT COUNT(*) AS count
          FROM form_ijin_kerja gp
-         JOIN users creator ON creator.id = gp.user_id
-        WHERE gp.status = 'submitted' AND gp.current_stage = $1 AND creator.departmen = $2
+         LEFT JOIN users creator ON creator.id = gp.user_id
+        WHERE gp.status = 'submitted' AND gp.current_stage = $1
+          AND (creator.departmen = $2 OR creator.departmen IS NULL OR creator.departmen = '')
           AND (
-            LOWER(TRIM(gp.spv_terkait_pj)) = LOWER(TRIM($3))
+            gp.spv_terkait_pj IS NULL
+            OR gp.spv_terkait_pj = ''
+            OR LOWER(TRIM(gp.spv_terkait_pj)) = LOWER(TRIM($3))
             OR ($4::text IS NOT NULL AND gp.nik_spv_terkait_pj = $4)
           )`,
       [stage, spvDepartmen, spvNama ?? '', spvNik ?? null]
