@@ -1384,7 +1384,7 @@ export default function ExternalApprovalPage({ params }: { params: Promise<{ id:
                       <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Persetujuan Khusus JSA</h4>
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                         {jsaApproval && (["firewatch", "spv", "sfo"] as const).map((role) => {
-                          const roleLabel: Record<string, string> = { firewatch: "Fire Watch", spv: "SPV", sfo: "SFO" };
+                          const roleLabel: Record<string, string> = { firewatch: "Pengawas Pekerjaan", spv: "SPV", sfo: "SFO" };
                           return <JsaApprovalCard key={role} label={roleLabel[role]} role={role} entry={jsaApproval[role]} formId={id} />;
                         })}
                       </div>

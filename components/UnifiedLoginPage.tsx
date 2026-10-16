@@ -288,7 +288,7 @@ export default function UnifiedLoginPage({ defaultRole = "worker" }: UnifiedLogi
                     }`}
                 >
                   <HardHat className={`w-4 h-4 ${isWorker ? "text-white" : "text-slate-400"}`} />
-                  <span>Pekerja / Dept</span>
+                  <span>Pekerja - Pengawas - Dept</span>
                 </button>
 
                 {/* Tombol 2: Approver / Admin */}
