@@ -394,9 +394,10 @@ function IjinKerjaEksternalPageInner() {
   const [isPengawasOther, setIsPengawasOther] = useState(false);
   const [pengawasOtherManual, setPengawasOtherManual] = useState("");
 
-  // ── SPV Terkait (Bagian 11) ─────────────────────────────────────────
+  // ── SPV Terkait (Pemberi Izin) ──────────────────────────────────────
+  const [userDepartment, setUserDepartment] = useState<string>("");
   const [spvOptions, setSpvOptions] = useState<
-    Array<{ id: number; nama: string; nik: string | null; jabatan: string | null; departmen: string | null }>
+    Array<{ id: number; nama: string; nik: string | null; jabatan: string | null; departmen: string | null; username?: string }>
   >([]);
   const [spvPemberiIzin, setSpvPemberiIzin] = useState<{ nama: string; nik: string; jabatan: string }>({
     nama: "",
@@ -409,25 +410,36 @@ function IjinKerjaEksternalPageInner() {
       .then((res) => (res.ok ? res.json() : null))
       .then(async (data) => {
         const departmen = data?.user?.departmen ?? "";
+        setUserDepartment(departmen);
         setJsa((prev) => ({ ...prev, sectDept: departmen }));
 
-        if (!departmen) return;
         try {
           const spvRes = await fetch("/api/admin-users/approvers", { credentials: "include" });
           if (!spvRes.ok) return;
           const spvData = await spvRes.json();
-          const options = (spvData.users ?? []).filter((u: any) => {
-            if (u.role !== "spv") return false;
-            if (!u.departmen) return true;
-            return u.departmen === departmen;
-          });
-          setSpvOptions(options);
-          if (options.length > 0) {
-            const defaultSpv = options[0];
-            setSpvPemberiIzin({
-              nama: defaultSpv.nama ?? "",
-              nik: defaultSpv.nik ?? "",
-              jabatan: defaultSpv.jabatan ?? "",
+          const allSpvs = (spvData.users ?? []).filter((u: any) => u.role === "spv");
+
+          // Opsi SPV difilter berdasarkan departemen yang mengajukan / usernya
+          let filteredSpvs = allSpvs;
+          if (departmen && departmen !== "Unknown") {
+            filteredSpvs = allSpvs.filter(
+              (u: any) => u.departmen?.toLowerCase() === departmen.toLowerCase()
+            );
+          }
+          if (filteredSpvs.length === 0) {
+            filteredSpvs = allSpvs;
+          }
+
+          setSpvOptions(filteredSpvs);
+          if (filteredSpvs.length > 0) {
+            const defaultSpv = filteredSpvs[0];
+            setSpvPemberiIzin((prev) => {
+              if (prev.nama) return prev;
+              return {
+                nama: defaultSpv.nama ?? "",
+                nik: defaultSpv.nik?.trim() || defaultSpv.username || "",
+                jabatan: defaultSpv.jabatan ?? "Supervisor",
+              };
             });
           }
         } catch {
@@ -436,6 +448,35 @@ function IjinKerjaEksternalPageInner() {
       })
       .catch(() => undefined);
   }, []);
+
+  // Jika user eksternal / tanpa departemen, filter opsi SPV mengikuti Departemen Pengawas di Bagian 5
+  useEffect(() => {
+    if ((!userDepartment || userDepartment === "Unknown") && form.departemenPengawas) {
+      fetch("/api/admin-users/approvers", { credentials: "include" })
+        .then((res) => (res.ok ? res.json() : null))
+        .then((spvData) => {
+          if (!spvData) return;
+          const allSpvs = (spvData.users ?? []).filter((u: any) => u.role === "spv");
+          const deptSpvs = allSpvs.filter(
+            (u: any) => u.departmen?.toLowerCase() === form.departemenPengawas.toLowerCase()
+          );
+          if (deptSpvs.length > 0) {
+            setSpvOptions(deptSpvs);
+            setSpvPemberiIzin((prev) => {
+              const matched = deptSpvs.find((s: any) => s.nama === prev.nama);
+              if (matched) return prev;
+              const def = deptSpvs[0];
+              return {
+                nama: def.nama ?? "",
+                nik: def.nik?.trim() || def.username || "",
+                jabatan: def.jabatan ?? "Supervisor",
+              };
+            });
+          }
+        })
+        .catch(() => undefined);
+    }
+  }, [form.departemenPengawas, userDepartment]);
 
   useEffect(() => {
     Promise.all([
@@ -578,6 +619,11 @@ function IjinKerjaEksternalPageInner() {
     if (!form.departemenPengawas || !finalPengawasBagian) {
       setError("Departemen dan Pengawas (Bagian) wajib dipilih/diisi.");
       document.getElementById("bagian-5")?.scrollIntoView({ behavior: "smooth", block: "center" });
+      return;
+    }
+    if (!spvPemberiIzin.nama || !spvPemberiIzin.nama.trim()) {
+      setError("Pemberi Izin / Supervisor Departemen (SPV) wajib dipilih.");
+      document.getElementById("bagian-1")?.scrollIntoView({ behavior: "smooth", block: "center" });
       return;
     }
 
@@ -863,6 +909,56 @@ function IjinKerjaEksternalPageInner() {
                       onChange={(e) => set("actualTanggalKerja", e.target.value)}
                       className={inputCls}
                     />
+                  </div>
+                </div>
+
+                {/* ── Pemberi Izin / Supervisor Departemen ── */}
+                <div className="mt-4 p-4 rounded-xl border border-emerald-200 bg-emerald-50/50">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Lock className="w-4 h-4 text-emerald-700 shrink-0" />
+                    <h4 className="font-bold text-emerald-950 text-sm">Pemberi Izin / Supervisor Departemen</h4>
+                  </div>
+                  <p className="text-xs text-emerald-800/80 mb-3">
+                    Pilih Supervisor (SPV) dari departemen Anda {userDepartment && userDepartment !== "Unknown" ? `(${userDepartment})` : (form.departemenPengawas ? `(${form.departemenPengawas})` : "")} yang bertindak sebagai approver tahap pertama.
+                  </p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                        Pilih Nama SPV <span className="text-rose-500">*</span>
+                      </label>
+                      <select
+                        value={spvPemberiIzin.nama}
+                        onChange={(e) => {
+                          const selected = spvOptions.find((spv) => spv.nama === e.target.value);
+                          const nikVal = selected?.nik?.trim() || (selected as any)?.username || "";
+                          setSpvPemberiIzin({
+                            nama: selected?.nama ?? e.target.value,
+                            nik: nikVal,
+                            jabatan: selected?.jabatan ?? "Supervisor",
+                          });
+                          setError("");
+                        }}
+                        className={`${inputCls} bg-white ${!spvPemberiIzin.nama ? "border-amber-300 bg-amber-50/50" : ""}`}
+                        required
+                      >
+                        <option value="">-- Pilih SPV Terkait --</option>
+                        {spvOptions.map((spv) => (
+                          <option key={spv.id} value={spv.nama}>
+                            {spv.nama} {spv.departmen ? `(${spv.departmen})` : ""}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1.5">NIK SPV</label>
+                      <input
+                        type="text"
+                        value={spvPemberiIzin.nik}
+                        onChange={(e) => setSpvPemberiIzin((prev) => ({ ...prev, nik: e.target.value }))}
+                        placeholder="Otomatis terisi / ketik manual"
+                        className={`${inputCls} bg-white`}
+                      />
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1569,7 +1665,7 @@ function IjinKerjaEksternalPageInner() {
                 <div className="px-4 py-3 rounded-xl text-xs bg-blue-50/80 text-blue-800 border border-blue-200 flex items-center gap-2">
                   <Lock className="w-4 h-4 text-blue-600 shrink-0" />
                   <span>
-                    <strong>Alur Persetujuan Digital:</strong> SPV → Security → SFO → MGR.
+                    <strong>Alur Persetujuan Digital:</strong> SPV {spvPemberiIzin.nama ? `(${spvPemberiIzin.nama})` : ""} → SFO → MGR → Security.
                   </span>
                 </div>
               </div>

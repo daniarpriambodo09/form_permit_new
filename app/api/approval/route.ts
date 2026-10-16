@@ -197,7 +197,8 @@ async function queryGeneralPermitByStage(
   stage: number,
   spvDepartmen?: string | null,
   spvNama?: string | null,
-  spvNik?: string | null
+  spvNik?: string | null,
+  spvUsername?: string | null
 ) {
   if (spvDepartmen != null) {
     return query(
@@ -214,15 +215,17 @@ async function queryGeneralPermitByStage(
          FROM form_ijin_kerja gp
          LEFT JOIN users creator ON creator.id = gp.user_id
         WHERE gp.status = 'submitted' AND gp.current_stage = $1
-          AND (creator.departmen = $2 OR creator.departmen IS NULL OR creator.departmen = '')
           AND (
-            gp.spv_terkait_pj IS NULL
-            OR gp.spv_terkait_pj = ''
-            OR LOWER(TRIM(gp.spv_terkait_pj)) = LOWER(TRIM($3))
-            OR ($4::text IS NOT NULL AND gp.nik_spv_terkait_pj = $4)
+            ($3::text IS NOT NULL AND $3 <> '' AND LOWER(TRIM(COALESCE(gp.spv_terkait_pj, ''))) = LOWER(TRIM($3)))
+            OR ($5::text IS NOT NULL AND $5 <> '' AND LOWER(TRIM(COALESCE(gp.spv_terkait_pj, ''))) = LOWER(TRIM($5)))
+            OR ($4::text IS NOT NULL AND $4 <> '' AND gp.nik_spv_terkait_pj = $4)
+            OR (
+              $2::text IS NOT NULL AND $2 <> '' AND $2 <> 'Unknown'
+              AND LOWER(TRIM(COALESCE(creator.departmen, ''))) = LOWER(TRIM($2))
+            )
           )
         ORDER BY gp.tanggal ASC`,
-      [stage, spvDepartmen, spvNama ?? '', spvNik ?? null]
+      [stage, spvDepartmen, spvNama ?? '', spvNik ?? null, spvUsername ?? '']
     );
   }
   return query(
@@ -266,8 +269,8 @@ async function queryGeneralPermitApproved(
               NULL::text AS tipe_perusahaan, NULL::text AS id_ijin_kerja,
               'general-permit' AS jenis_form
          FROM form_ijin_kerja gp
-         JOIN users creator ON creator.id = gp.user_id
-        WHERE gp.${col} = TRUE AND creator.departmen = $1
+         LEFT JOIN users creator ON creator.id = gp.user_id
+        WHERE gp.${col} = TRUE AND (creator.departmen = $1 OR creator.departmen IS NULL OR creator.departmen = '' OR creator.departmen = 'Unknown')
         ORDER BY gp.tanggal ASC`,
       [spvDepartmen]
     );
@@ -294,7 +297,8 @@ async function countGeneralPermitByStage(
   stage: number,
   spvDepartmen?: string | null,
   spvNama?: string | null,
-  spvNik?: string | null
+  spvNik?: string | null,
+  spvUsername?: string | null
 ): Promise<number> {
   if (spvDepartmen != null) {
     const res = await query(
@@ -302,14 +306,16 @@ async function countGeneralPermitByStage(
          FROM form_ijin_kerja gp
          LEFT JOIN users creator ON creator.id = gp.user_id
         WHERE gp.status = 'submitted' AND gp.current_stage = $1
-          AND (creator.departmen = $2 OR creator.departmen IS NULL OR creator.departmen = '')
           AND (
-            gp.spv_terkait_pj IS NULL
-            OR gp.spv_terkait_pj = ''
-            OR LOWER(TRIM(gp.spv_terkait_pj)) = LOWER(TRIM($3))
-            OR ($4::text IS NOT NULL AND gp.nik_spv_terkait_pj = $4)
+            ($3::text IS NOT NULL AND $3 <> '' AND LOWER(TRIM(COALESCE(gp.spv_terkait_pj, ''))) = LOWER(TRIM($3)))
+            OR ($5::text IS NOT NULL AND $5 <> '' AND LOWER(TRIM(COALESCE(gp.spv_terkait_pj, ''))) = LOWER(TRIM($5)))
+            OR ($4::text IS NOT NULL AND $4 <> '' AND gp.nik_spv_terkait_pj = $4)
+            OR (
+              $2::text IS NOT NULL AND $2 <> '' AND $2 <> 'Unknown'
+              AND LOWER(TRIM(COALESCE(creator.departmen, ''))) = LOWER(TRIM($2))
+            )
           )`,
-      [stage, spvDepartmen, spvNama ?? '', spvNik ?? null]
+      [stage, spvDepartmen, spvNama ?? '', spvNik ?? null, spvUsername ?? '']
     );
     return parseInt(res[0].count);
   }
@@ -336,8 +342,8 @@ async function countGeneralPermitApproved(
     const res = await query(
       `SELECT COUNT(*) AS count
          FROM form_ijin_kerja gp
-         JOIN users creator ON creator.id = gp.user_id
-        WHERE gp.${col} = TRUE AND creator.departmen = $1`,
+         LEFT JOIN users creator ON creator.id = gp.user_id
+        WHERE gp.${col} = TRUE AND (creator.departmen = $1 OR creator.departmen IS NULL OR creator.departmen = '' OR creator.departmen = 'Unknown')`,
       [spvDepartmen]
     );
     return parseInt(res[0].count);
@@ -442,13 +448,14 @@ export async function GET(req: NextRequest) {
 
     // ── SPV ──────────────────────────────────────────────────────
     if (userRole === 'spv') {
-      const spvRow = await queryOne<{ departmen: string | null; nama: string | null; nik: string | null }>(
-        `SELECT departmen, nama, nik FROM users WHERE id = $1`,
+      const spvRow = await queryOne<{ departmen: string | null; nama: string | null; nik: string | null; username: string | null }>(
+        `SELECT departmen, nama, nik, username FROM users WHERE id = $1`,
         [user.userId]
       );
       const spvDepartmen = spvRow?.departmen ?? null;
       const spvNama = spvRow?.nama ?? null;
       const spvNik = spvRow?.nik ?? null;
+      const spvUsername = spvRow?.username ?? null;
       const spvAssignment = spvNama
         ? ` AND LOWER(TRIM(spv_terkait)) = LOWER(TRIM($4))`
         : '';
@@ -464,7 +471,7 @@ export async function GET(req: NextRequest) {
             ...FW_FORMS.map(f => countByQuery(f, `status = $1 AND current_stage = $2 AND (${TIPE_EXPR_FW}) = $3${spvAssignment}`, withSpvAssignment(['submitted', 2, 'eksternal']), spvDepartmen)),
             countByQuery('height-work', `status = $1 AND current_stage = $2 AND (${TIPE_EXPR}) = $3${spvAssignment}`, withSpvAssignment(['submitted', 1, 'internal']), spvDepartmen),
             countByQuery('height-work', `status = $1 AND current_stage = $2 AND (${TIPE_EXPR}) = $3${spvAssignment}`, withSpvAssignment(['submitted', 2, 'eksternal']), spvDepartmen),
-            countGeneralPermitByStage(1, spvDepartmen, spvNama, spvNik),
+            countGeneralPermitByStage(1, spvDepartmen, spvNama, spvNik, spvUsername),
           ]),
           Promise.all([
             ...allFormTypes.map(f => countByQuery(f, `spv_approved = TRUE`, [], spvDepartmen)),
@@ -482,7 +489,7 @@ export async function GET(req: NextRequest) {
           ...FW_FORMS.map(f => query(...buildSelectQuery(f, `status = $1 AND current_stage = $2 AND (${TIPE_EXPR_FW}) = $3${spvAssignment}`, withSpvAssignment(['submitted', 2, 'eksternal']), spvDepartmen))),
           query(...buildSelectQuery('height-work', `status = $1 AND current_stage = $2 AND (${TIPE_EXPR}) = $3${spvAssignment}`, withSpvAssignment(['submitted', 1, 'internal']), spvDepartmen)),
           query(...buildSelectQuery('height-work', `status = $1 AND current_stage = $2 AND (${TIPE_EXPR}) = $3${spvAssignment}`, withSpvAssignment(['submitted', 2, 'eksternal']), spvDepartmen)),
-          queryGeneralPermitByStage(1, spvDepartmen, spvNama, spvNik),
+          queryGeneralPermitByStage(1, spvDepartmen, spvNama, spvNik, spvUsername),
         ]);
         return NextResponse.json({ data: results.flat(), total: results.flat().length });
       }
