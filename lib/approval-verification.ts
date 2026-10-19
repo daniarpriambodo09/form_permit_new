@@ -50,10 +50,14 @@ const ROLE_LABEL: Record<string, string> = {
   pga:        "SMR / PGA Manager",
   security:   "Security",
   firewatch:  "Pengawas Pekerjaan / Firewatch",
-  purchasing: "Purchasing",
-  picDept:    "Pengawas Dept",
+  purchasing:   "Purchasing",
+  picdept:      "Pengawas Dept",
+  pic_dept:     "Pengawas Dept",
+  picDept:      "Pengawas Dept",
+  pengawasdept: "Pengawas Dept",
+  pengawas_dept: "Pengawas Dept",
   pengawasDept: "Pengawas Dept",
-  pengawas:   "Pengawas Dept",
+  pengawas:     "Pengawas Dept",
 };
 
 function isTruthy(v: any): boolean {
@@ -151,7 +155,7 @@ export async function getApprovalVerification(
       }>(
         `SELECT id_form, status, nama_kontraktor_pekerja, lokasi_pekerjaan, tanggal, penilaian_subkontraktor
            FROM form_ijin_kerja
-          WHERE id_form = $1`,
+          WHERE UPPER(TRIM(id_form)) = UPPER(TRIM($1))`,
         [id]
       );
 
@@ -161,12 +165,35 @@ export async function getApprovalVerification(
         ? JSON.parse(row.penilaian_subkontraktor)
         : (row.penilaian_subkontraktor || {});
 
-      const mgt = penData.mengetahui?.[roleKey] || (roleKey === "pengawasDept" || roleKey === "pengawas" ? penData.mengetahui?.picDept : (roleKey === "picDept" ? (penData.mengetahui?.pengawasDept || penData.mengetahui?.pengawas) : null));
+      const mengetahui = penData.mengetahui || {};
+      const cleanRole = roleKey.replace(/[^a-z0-9]/g, "");
+
+      let mgt: any = null;
+      let displayRoleLabel = "Pengawas Dept";
+
+      if (
+        cleanRole === "pengawasdept" ||
+        cleanRole === "pengawas" ||
+        cleanRole === "picdept" ||
+        cleanRole === "pic"
+      ) {
+        mgt = mengetahui.pengawasDept || mengetahui.picDept || mengetahui.pengawas;
+        displayRoleLabel = "Pengawas Dept";
+      } else if (cleanRole === "purchasing") {
+        mgt = mengetahui.purchasing;
+        displayRoleLabel = "Purchasing";
+      } else if (cleanRole === "sfo") {
+        mgt = mengetahui.sfo;
+        displayRoleLabel = "Safety Officer (SFO)";
+      } else {
+        mgt = mengetahui[role] || mengetahui[roleKey];
+        displayRoleLabel = ROLE_LABEL[roleKey] || ROLE_LABEL[role] || role;
+      }
 
       if (!mgt || !mgt.nama || !mgt.nama.trim()) {
         return {
           success: false,
-          error: `Persetujuan / Mengetahui ${ROLE_LABEL[roleKey] || role} belum dilakukan`,
+          error: `Persetujuan / Mengetahui ${displayRoleLabel} belum dilakukan`,
           status: 404,
         };
       }
@@ -185,9 +212,9 @@ export async function getApprovalVerification(
         approver: {
           nama: mgt.nama,
           nik: mgt.nik || null,
-          jabatan: `Mengetahui — ${ROLE_LABEL[roleKey] || roleKey}`,
-          role: roleKey,
-          role_label: ROLE_LABEL[roleKey] || roleKey,
+          jabatan: `Mengetahui — ${displayRoleLabel}`,
+          role: role,
+          role_label: displayRoleLabel,
           approved_at: mgt.tanggal || null,
         },
       };

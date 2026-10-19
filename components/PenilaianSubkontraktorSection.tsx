@@ -517,27 +517,31 @@ export default function PenilaianSubkontraktorSection({
                     {item.desc && <p className="text-xs text-slate-400">{item.desc}</p>}
                   </div>
                   <div className="grid grid-cols-4 sm:contents gap-1">
-                    {RATING_OPTIONS.map((opt) => (
-                      <label
-                        key={opt.value}
-                        className={`flex items-center justify-center gap-1 py-1.5 rounded-lg border cursor-pointer text-xs font-medium transition-colors ${
-                          entry.items[item.key] === opt.value
-                            ? "bg-orange-100 border-orange-400 text-orange-700"
-                            : "bg-white border-slate-200 text-slate-500 hover:border-orange-300"
-                        } ${readOnly ? "cursor-not-allowed opacity-70" : ""}`}
-                      >
-                        <input
-                          type="radio"
-                          name={`penilaian-${idx}-${item.key}`}
-                          checked={entry.items[item.key] === opt.value}
+                    {RATING_OPTIONS.map((opt) => {
+                      const isSelected = entry.items[item.key] === opt.value;
+                      return (
+                        <button
+                          key={opt.value}
+                          type="button"
                           disabled={readOnly}
-                          onChange={() => updateItem(idx, item.key, opt.value)}
-                          className="sr-only"
-                        />
-                        <span className="sm:hidden">{opt.label}</span>
-                        <span className="hidden sm:inline">✓</span>
-                      </label>
-                    ))}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            if (!readOnly) {
+                              updateItem(idx, item.key, opt.value);
+                            }
+                          }}
+                          title={opt.label}
+                          className={`relative flex items-center justify-center gap-1 py-1.5 px-1.5 rounded-lg border text-xs font-medium transition-all ${
+                            isSelected
+                              ? "bg-orange-100 border-orange-400 text-orange-700 font-bold shadow-2xs ring-1 ring-orange-300"
+                              : "bg-white border-slate-200 text-slate-500 hover:border-orange-300 hover:bg-slate-50/80"
+                          } ${readOnly ? "cursor-not-allowed opacity-70" : "cursor-pointer active:scale-95"}`}
+                        >
+                          <span className="sm:hidden truncate">{opt.label}</span>
+                          <span className="hidden sm:inline">✓</span>
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
               ))}

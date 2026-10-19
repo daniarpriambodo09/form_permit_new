@@ -32,6 +32,9 @@ const formatDate = (ts?: string | null) => {
 
 const formatTime = (ts?: string | null) => {
   if (!ts) return "-";
+  if (typeof ts === "string" && !ts.includes("T") && !ts.includes(":")) {
+    return "-";
+  }
   return new Date(ts).toLocaleTimeString("id-ID", {
     hour: "2-digit", minute: "2-digit", second: "2-digit", timeZoneName: "short", hour12: false,
   });
