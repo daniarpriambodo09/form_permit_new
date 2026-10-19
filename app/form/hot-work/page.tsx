@@ -370,34 +370,158 @@ function HotWorkPermitFormInner() {
   const searchParams = useSearchParams();
   const idIjinKerja = searchParams.get("id_ijin_kerja");
 
+  // Draft Key terisolasi per konteks (per parent permit jika eksternal, atau internal jika berdiri sendiri)
+  const draftKey = idIjinKerja ? `draft_hot_work_ext_${idIjinKerja}` : "draft_hot_work_internal";
+
   // ── Auto-save Draft ke LocalStorage ─────────────────────────
   useEffect(() => {
     try {
-      const saved = localStorage.getItem("draft_hot_work");
+      // Hapus draft lama/legacy yang tanpa scope spesifik agar tidak memuat draft basi
+      localStorage.removeItem("draft_hot_work");
+
+      const saved = localStorage.getItem(draftKey);
       if (saved && !hasRestoredDraft) {
         const parsed = JSON.parse(saved);
         if (parsed && typeof parsed === "object") {
-          setFormData((prev) => ({ ...prev, ...parsed }));
-          setHasRestoredDraft(true);
+          // Hanya muat jika draft tersebut belum pernah diajukan / bukan dari submit sebelumnya
+          const isSubmitted = Boolean(parsed._draftMeta?.isSubmitted || parsed.isSubmitted);
+          const savedPermitId = parsed._draftMeta?.idIjinKerja ?? parsed.idIjinKerja ?? null;
+          const currentPermitId = idIjinKerja || null;
+
+          if (!isSubmitted && savedPermitId === currentPermitId) {
+            const draftForm = parsed.formData || parsed;
+            setFormData((prev) => ({ ...prev, ...draftForm }));
+            setHasRestoredDraft(true);
+          } else {
+            // Jika sudah diajukan atau beda konteks, bersihkan draft lokal ini
+            localStorage.removeItem(draftKey);
+          }
         }
       }
     } catch {
       // Abaikan jika parse gagal
     }
-  }, [hasRestoredDraft]);
+  }, [draftKey, idIjinKerja, hasRestoredDraft]);
 
   const saveLocalDraft = (data: FormData) => {
     try {
-      localStorage.setItem("draft_hot_work", JSON.stringify(data));
+      const payload = {
+        formData: data,
+        _draftMeta: {
+          idIjinKerja: idIjinKerja || null,
+          savedAt: new Date().toISOString(),
+          isSubmitted: false,
+        },
+      };
+      localStorage.setItem(draftKey, JSON.stringify(payload));
     } catch {
       // Abaikan jika storage penuh/disabled
     }
   };
 
+  const [loadingParent, setLoadingParent] = useState(false);
+  const [parentPermit, setParentPermit] = useState<any>(null);
+
   useEffect(() => {
-    if (idIjinKerja) {
-      setFormData((p) => ({ ...p, tipePerusahaan: "eksternal" }));
-    }
+    if (!idIjinKerja) return;
+
+    // Cek dulu dari sessionStorage untuk prefill instan
+    try {
+      const sess = sessionStorage.getItem("last_ijin_kerja_eksternal");
+      if (sess) {
+        const p = JSON.parse(sess);
+        if (p && (!p.id_form || p.id_form === idIjinKerja)) {
+          setFormData((prev) => ({
+            ...prev,
+            tipePerusahaan: "eksternal",
+            namaKontraktor: p.namaKontraktor || prev.namaKontraktor,
+            lokasi: p.lokasi || prev.lokasi,
+            tanggalPelaksanaan: p.tanggalPelaksanaan ? p.tanggalPelaksanaan.slice(0, 10) : prev.tanggalPelaksanaan,
+            waktuPukul: p.waktuMulai ? p.waktuMulai.slice(0, 5) : prev.waktuPukul,
+            waktuSelesai: p.waktuSelesai ? p.waktuSelesai.slice(0, 5) : prev.waktuSelesai,
+          }));
+          if (p.spvPemberiIzin?.nama) {
+            setSpvPemberiIzin({
+              nama: p.spvPemberiIzin.nama,
+              nik: p.spvPemberiIzin.nik || "",
+              jabatan: p.spvPemberiIzin.jabatan || "Supervisor",
+            });
+          }
+          if (p.perluJsa !== undefined) setPerluJsa(Boolean(p.perluJsa));
+          if (p.jsaMode === "upload" || p.jsaFileUrl || p.jsaFile?.url) {
+            setJsaMode("upload");
+            const u = p.jsaFileUrl || p.jsaFile?.url;
+            setJsaFile(p.jsaFile || { url: u, name: "Dokumen_JSA", size: 0 });
+          } else if (p.jsaData) {
+            setJsaMode("build");
+            setJsaData(p.jsaData);
+          }
+          setJsaData((prev) => ({
+            ...prev,
+            area: p.lokasi || prev.area,
+            pic: p.namaPengawasPicSubkont || prev.pic,
+            jenisPekerjaan: p.deskripsiPekerjaan ? `Hot Work - ${p.deskripsiPekerjaan}` : prev.jenisPekerjaan,
+          }));
+        }
+      }
+    } catch {}
+
+    // Fetch langsung dari database via endpoint general-permit
+    setLoadingParent(true);
+    fetch(`/api/forms/general-permit/${idIjinKerja}`, { credentials: "include" })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (!data || !data.data) return;
+        const p = data.data;
+        setParentPermit(p);
+
+        const tgl = p.tgl_mulai_kerja ? new Date(p.tgl_mulai_kerja).toISOString().split("T")[0] : "";
+        const wMulai = p.waktu_kerja ? p.waktu_kerja.slice(0, 5) : (p.izin_kerja_dari ? p.izin_kerja_dari.slice(0, 5) : "");
+        const wSelesai = p.waktu_selesai ? p.waktu_selesai.slice(0, 5) : (p.izin_kerja_sampai ? p.izin_kerja_sampai.slice(0, 5) : "");
+
+        setFormData((prev) => ({
+          ...prev,
+          tipePerusahaan: "eksternal",
+          namaKontraktor: p.nama_kontraktor_pekerja || prev.namaKontraktor,
+          lokasi: p.lokasi_pekerjaan || prev.lokasi,
+          tanggalPelaksanaan: tgl || prev.tanggalPelaksanaan,
+          waktuPukul: wMulai || prev.waktuPukul,
+          waktuSelesai: wSelesai || prev.waktuSelesai,
+        }));
+
+        const spvName = p.spv_terkait_pj || p.spvPemberiIzin?.nama || "";
+        const spvNik = p.nik_spv_terkait_pj || p.spvPemberiIzin?.nik || "";
+        if (spvName) {
+          setSpvPemberiIzin({
+            nama: spvName,
+            nik: spvNik,
+            jabatan: "Supervisor",
+          });
+          setSpvOptions((prev) => {
+            if (prev.some((s) => s.nama === spvName)) return prev;
+            return [{ id: 999999, nama: spvName, nik: spvNik, jabatan: "Supervisor", departmen: p.departemen_pengawas || null }, ...prev];
+          });
+        }
+
+        if (p.perlu_jsa !== undefined) setPerluJsa(Boolean(p.perlu_jsa));
+        const fileUrl = p.jsa_file_url || (p.jsa_data as any)?.fileUrl;
+        if (fileUrl || (p.jsa_data as any)?.mode === "upload") {
+          setJsaMode("upload");
+          setJsaFile({ url: fileUrl, name: fileUrl ? fileUrl.split("/").pop() || "Dokumen_JSA" : "Dokumen_JSA", size: 0 });
+        } else if (p.jsa_data) {
+          setJsaMode("build");
+          setJsaData(p.jsa_data);
+        }
+
+        setJsaData((prev) => ({
+          ...prev,
+          area: p.lokasi_pekerjaan || prev.area,
+          pic: p.nama_pengawas_pic_subkont || prev.pic,
+          jenisPekerjaan: p.deskripsi_pekerjaan ? `Hot Work - ${p.deskripsi_pekerjaan}` : prev.jenisPekerjaan,
+        }));
+      })
+      .catch((err) => console.error("Gagal memuat data parent permit:", err))
+      .finally(() => setLoadingParent(false));
   }, [idIjinKerja]);
 
   useEffect(() => {
@@ -417,15 +541,43 @@ function HotWorkPermitFormInner() {
         if (spvRes.ok) {
           const spvData = await spvRes.json();
           const allSpvs = (spvData.users ?? []).filter((u: any) => u.role === "spv" && u.is_active !== false);
-          setSpvOptions(allSpvs);
-          if (allSpvs.length > 0 && !spvPemberiIzin.nama) {
-            const matchingSpv = data.user?.departmen
-              ? allSpvs.find((s: any) => s.departmen === data.user.departmen) || allSpvs[0]
-              : allSpvs[0];
-            setSpvPemberiIzin({
-              nama: matchingSpv.nama ?? "",
-              nik: (matchingSpv.nik && matchingSpv.nik.trim()) ? matchingSpv.nik.trim() : (matchingSpv.username ?? ""),
-              jabatan: matchingSpv.jabatan ?? "Supervisor",
+
+          // Opsi SPV HANYA dari departemen yang sama dengan user
+          const dept = data.user?.departmen;
+          let filteredSpvs = allSpvs;
+          if (dept && dept !== "Unknown") {
+            const byDept = allSpvs.filter(
+              (s: any) => s.departmen?.toLowerCase() === dept.toLowerCase()
+            );
+            if (byDept.length > 0) filteredSpvs = byDept;
+          }
+
+          setSpvOptions((prev) => {
+            if (spvPemberiIzin.nama && !filteredSpvs.some((s: any) => s.nama === spvPemberiIzin.nama)) {
+              return [
+                {
+                  id: 999999,
+                  nama: spvPemberiIzin.nama,
+                  nik: spvPemberiIzin.nik,
+                  jabatan: spvPemberiIzin.jabatan || "Supervisor",
+                  departmen: dept || null,
+                },
+                ...filteredSpvs,
+              ];
+            }
+            return filteredSpvs;
+          });
+
+          if (!idIjinKerja) {
+            setSpvPemberiIzin((prev) => {
+              if (prev.nama) return prev;
+              const defaultSpv = filteredSpvs[0];
+              if (!defaultSpv) return prev;
+              return {
+                nama: defaultSpv.nama ?? "",
+                nik: (defaultSpv.nik && defaultSpv.nik.trim()) ? defaultSpv.nik.trim() : (defaultSpv.username ?? ""),
+                jabatan: defaultSpv.jabatan ?? "Supervisor",
+              };
             });
           }
         }
@@ -434,7 +586,7 @@ function HotWorkPermitFormInner() {
       }
     };
     fetchUser();
-  }, []);
+  }, [idIjinKerja]);
 
   useEffect(() => {
     if (formData.tipePerusahaan !== "internal") {
@@ -522,7 +674,8 @@ function HotWorkPermitFormInner() {
     }
 
     if (
-      (idIjinKerja || jsaMode === "build") &&
+      jsaMode === "build" &&
+      !jsaFile?.url &&
       perluJsa &&
       (!jsaData.area.trim() ||
         !jsaData.jenisPekerjaan.trim() ||
@@ -566,7 +719,7 @@ function HotWorkPermitFormInner() {
             ...spvPemberiIzin,
             nik: spvPemberiIzin.nik.trim() || "-",
           },
-          ...(idIjinKerja || jsaMode === "build" ? { jsaData } : {}),
+          ...(jsaMode === "build" && !jsaFile?.url ? { jsaData } : {}),
           idIjinKerja,
         }),
       });
@@ -574,10 +727,12 @@ function HotWorkPermitFormInner() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Terjadi kesalahan server");
 
-      // Hapus draft lokal setelah berhasil submit
-      if (isSubmit) {
+      // Hapus draft lokal setelah berhasil submit atau simpan ke server
+      try {
+        localStorage.removeItem(draftKey);
         localStorage.removeItem("draft_hot_work");
-      }
+      } catch {}
+      setHasRestoredDraft(false);
 
       return data;
     } finally {
@@ -616,9 +771,9 @@ function HotWorkPermitFormInner() {
         <div className="max-w-5xl mx-auto px-4 sm:px-6 py-3.5 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Link
-              href="/my-forms"
-              className="w-9 h-9 rounded-xl bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-600 transition-colors"
-              title="Kembali ke Riwayat"
+              href="/home"
+              className="w-9 h-9 rounded-xl bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-600 transition-colors cursor-pointer"
+              title="Kembali ke Beranda"
             >
               <Home className="w-4 h-4" />
             </Link>
@@ -642,7 +797,7 @@ function HotWorkPermitFormInner() {
             </div>
             <Link
               href="/my-forms"
-              className="text-xs font-semibold text-orange-600 hover:text-orange-700 bg-orange-50 hover:bg-orange-100/80 px-3 py-1.5 rounded-lg border border-orange-200 transition-colors"
+              className="text-xs font-semibold text-orange-600 hover:text-orange-700 bg-orange-50 hover:bg-orange-100/80 px-3 py-1.5 rounded-lg border border-orange-200 transition-colors cursor-pointer"
             >
               Lihat Riwayat &rarr;
             </Link>
@@ -657,14 +812,28 @@ function HotWorkPermitFormInner() {
           <div className="bg-amber-50 border border-amber-300/80 rounded-xl p-3.5 sm:p-4 mb-6 flex items-center justify-between gap-3 text-xs sm:text-sm text-amber-900 shadow-xs">
             <div className="flex items-center gap-2.5">
               <Info className="w-4 h-4 text-amber-600 shrink-0" />
-              <span>Memuat draft isian terakhir yang tersimpan di perangkat ini.</span>
+              <span>Memuat draft isian terakhir yang tersimpan di perangkat ini (belum diajukan).</span>
             </div>
             <button
               type="button"
               onClick={() => {
-                localStorage.removeItem("draft_hot_work");
-                setFormData(defaultForm());
+                try {
+                  localStorage.removeItem(draftKey);
+                  localStorage.removeItem("draft_hot_work");
+                } catch {}
                 setHasRestoredDraft(false);
+                const fresh = defaultForm();
+                if (parentPermit) {
+                  fresh.tipePerusahaan = "eksternal";
+                  fresh.namaKontraktor = parentPermit.nama_kontraktor_pekerja || "";
+                  fresh.lokasi = parentPermit.lokasi_pekerjaan || "";
+                  fresh.tanggalPelaksanaan = parentPermit.tgl_mulai_kerja
+                    ? new Date(parentPermit.tgl_mulai_kerja).toISOString().split("T")[0]
+                    : "";
+                  fresh.waktuPukul = parentPermit.waktu_kerja ? parentPermit.waktu_kerja.slice(0, 5) : "";
+                  fresh.waktuSelesai = parentPermit.waktu_selesai ? parentPermit.waktu_selesai.slice(0, 5) : "";
+                }
+                setFormData(fresh);
               }}
               className="text-xs font-bold text-amber-700 hover:text-amber-900 underline shrink-0 cursor-pointer"
             >
@@ -677,13 +846,15 @@ function HotWorkPermitFormInner() {
         {idIjinKerja && (
           <div className="bg-purple-50 border border-purple-200 rounded-xl p-4 mb-6 flex items-start gap-3 shadow-xs">
             <Lock className="w-5 h-5 text-purple-600 shrink-0 mt-0.5" />
-            <div>
-              <h4 className="text-xs font-bold text-purple-900 uppercase tracking-wide">
+            <div className="flex-1">
+              <h4 className="text-xs font-bold text-purple-900 uppercase tracking-wide flex items-center gap-2">
                 Terhubung ke Ijin Kerja Eksternal
+                {loadingParent && <span className="text-[11px] font-normal text-purple-600 animate-pulse">(Memuat data...)</span>}
               </h4>
               <p className="text-xs sm:text-sm text-purple-800 mt-0.5">
                 Form Hot Work ini otomatis tertaut ke form induk{" "}
                 <strong className="font-mono bg-purple-100 px-1.5 py-0.5 rounded">{idIjinKerja}</strong>.
+                Data nama kontraktor, lokasi pekerjaan, tanggal pelaksanaan, jam kerja, dan SPV pemberi izin telah terisi otomatis.
               </p>
             </div>
           </div>
@@ -1463,6 +1634,17 @@ function HotWorkPermitFormInner() {
             setEnabled={setPerluJsa}
             value={jsaData}
             setValue={setJsaData}
+            jsaMode={jsaMode}
+            setJsaMode={setJsaMode}
+            jsaFile={jsaFile}
+            setJsaFile={setJsaFile}
+            onJsaInfoLoaded={({ mode, fileUrl, enabled }) => {
+              setJsaMode(mode);
+              setPerluJsa(enabled);
+              if (mode === "upload" && fileUrl) {
+                setJsaFile({ name: fileUrl.split("/").pop() || "Dokumen_JSA", size: 0, url: fileUrl });
+              }
+            }}
           />
         ) : (
           <JsaMethodSection

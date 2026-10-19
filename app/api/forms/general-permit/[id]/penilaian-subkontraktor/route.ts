@@ -21,7 +21,7 @@ function getUser(req: NextRequest) {
   return token ? verifyToken(token) : null;
 }
 
-const MAX_ENTRIES = 5;
+const MAX_ENTRIES = 60;
 const VALID_RATINGS = ["baik_sekali", "baik", "sedang", "kurang", ""];
 const ITEM_KEYS = [
   "kelengkapanApd",
@@ -112,10 +112,27 @@ export async function PATCH(
       filledBy: e.filledBy ?? user.nama ?? user.username ?? null,
       filledAt: e.filledAt ?? new Date().toISOString(),
     })),
-    mengetahui: mengetahui ?? {
-      sfo: { nama: "", tanggal: "" },
-      purchasing: { nama: "", tanggal: "" },
-      picDept: { nama: "", tanggal: "" },
+    mengetahui: {
+      sfo: {
+        nama: mengetahui?.sfo?.nama ?? "",
+        nik: mengetahui?.sfo?.nik ?? "",
+        tanggal: mengetahui?.sfo?.tanggal ?? "",
+      },
+      purchasing: {
+        nama: mengetahui?.purchasing?.nama ?? "",
+        nik: mengetahui?.purchasing?.nik ?? "",
+        tanggal: mengetahui?.purchasing?.tanggal ?? "",
+      },
+      pengawasDept: {
+        nama: mengetahui?.pengawasDept?.nama ?? mengetahui?.picDept?.nama ?? "",
+        nik: mengetahui?.pengawasDept?.nik ?? mengetahui?.picDept?.nik ?? "",
+        tanggal: mengetahui?.pengawasDept?.tanggal ?? mengetahui?.picDept?.tanggal ?? "",
+      },
+      picDept: {
+        nama: mengetahui?.pengawasDept?.nama ?? mengetahui?.picDept?.nama ?? "",
+        nik: mengetahui?.pengawasDept?.nik ?? mengetahui?.picDept?.nik ?? "",
+        tanggal: mengetahui?.pengawasDept?.tanggal ?? mengetahui?.picDept?.tanggal ?? "",
+      },
     },
   };
 

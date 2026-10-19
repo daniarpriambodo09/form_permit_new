@@ -15,6 +15,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { query, queryOne } from '@/lib/db';
 import { verifyToken, COOKIE_NAME } from '@/lib/auth';
 import { notifyFirstApprover } from '@/lib/approval-email';
+import { syncJobFormsStageAndStatus } from '@/lib/approval-sync';
 
 async function generateId(): Promise<string> {
   const row = await queryOne<{ next_number: number }>(
@@ -138,10 +139,38 @@ export async function POST(req: NextRequest) {
       : 'Internal / Karyawan PT.JAI';
 
     const perluJsa   = formData.perluJsa === true;
-    const jsaFileUrl = perluJsa ? (formData.jsaFileUrl || null) : null;
-    const jsaData = formData.jsaData && typeof formData.jsaData === 'object' ? formData.jsaData : null;
-    const linkedJsaData = idIjinKerja && formData.jsaData && typeof formData.jsaData === 'object' ? formData.jsaData : null;
-    if (idIjinKerja && isSubmit && perluJsa && (!linkedJsaData || !String(linkedJsaData.area || '').trim() || !String(linkedJsaData.jenisPekerjaan || '').trim() || !String(linkedJsaData.pic || '').trim() || !Array.isArray(linkedJsaData.petugas) || !linkedJsaData.petugas.some((name: unknown) => typeof name === 'string' && name.trim()))) {
+    let jsaFileUrl   = perluJsa ? (formData.jsaFileUrl || null) : null;
+    let jsaData      = formData.jsaData && typeof formData.jsaData === 'object' ? formData.jsaData : null;
+    let linkedJsaData = idIjinKerja && formData.jsaData && typeof formData.jsaData === 'object' ? formData.jsaData : null;
+
+    // Jika idIjinKerja ada, sinkronkan fileUrl dari form induk jika client belum mengirim
+    if (idIjinKerja) {
+      const parentForm = await queryOne<{ jsa_file_url: string | null; jsa_data: any }>(
+        `SELECT jsa_file_url, jsa_data FROM form_ijin_kerja WHERE id_form = $1`,
+        [idIjinKerja]
+      );
+      if (parentForm) {
+        if (!jsaFileUrl && parentForm.jsa_file_url) {
+          jsaFileUrl = parentForm.jsa_file_url;
+        } else if (!jsaFileUrl && parentForm.jsa_data?.fileUrl) {
+          jsaFileUrl = parentForm.jsa_data.fileUrl;
+        }
+      }
+    }
+
+    // Validasi JSA manual HANYA jika bukan JSA upload (tidak ada jsaFileUrl)
+    if (
+      idIjinKerja &&
+      isSubmit &&
+      perluJsa &&
+      !jsaFileUrl &&
+      (!linkedJsaData ||
+        !String(linkedJsaData.area || '').trim() ||
+        !String(linkedJsaData.jenisPekerjaan || '').trim() ||
+        !String(linkedJsaData.pic || '').trim() ||
+        !Array.isArray(linkedJsaData.petugas) ||
+        !linkedJsaData.petugas.some((name: unknown) => typeof name === 'string' && name.trim()))
+    ) {
       return NextResponse.json({ error: 'JSA terhubung harus memiliki Area, Jenis Pekerjaan, PIC, dan minimal satu Petugas.' }, { status: 400 });
     }
 
@@ -253,6 +282,77 @@ export async function POST(req: NextRequest) {
 
     if (linkedJsaData) {
       await query(`UPDATE form_ijin_kerja SET jsa_data = $1 WHERE id_form = $2`, [JSON.stringify(linkedJsaData), idIjinKerja]);
+    }
+
+    // ── Pewarisan approval otomatis dari Ijin Kerja Eksternal induk ──
+    if (idIjinKerja) {
+      const parentForm = await queryOne<{
+        spv_approved: boolean;
+        spv_approved_by: string | null;
+        spv_approved_at: string | null;
+        spv_nik: string | null;
+        spv_terkait_pj: string | null;
+        nik_spv_terkait_pj: string | null;
+        sfo_approved: boolean;
+        sfo_approved_by: string | null;
+        sfo_approved_at: string | null;
+        sfo_nik: string | null;
+        pga_approved: boolean;
+        pga_approved_by: string | null;
+        pga_approved_at: string | null;
+        pga_nik: string | null;
+      }>(
+        `SELECT spv_approved, spv_approved_by, spv_approved_at, spv_nik,
+                spv_terkait_pj, nik_spv_terkait_pj,
+                sfo_approved, sfo_approved_by, sfo_approved_at, sfo_nik,
+                pga_approved, pga_approved_by, pga_approved_at, pga_nik
+           FROM form_ijin_kerja
+          WHERE id_form = $1`,
+        [idIjinKerja]
+      );
+
+      if (parentForm) {
+        if (parentForm.spv_approved) {
+          const spvName = parentForm.spv_approved_by || parentForm.spv_terkait_pj || formData.spv_terkait || null;
+          const spvNik = parentForm.spv_nik || parentForm.nik_spv_terkait_pj || null;
+          const spvAt = parentForm.spv_approved_at || now;
+          await query(
+            `UPDATE form_kerja_ketinggian
+                SET spv_approved = TRUE,
+                    spv_approved_by = $1,
+                    spv_approved_at = $2,
+                    spv_nik = $3
+              WHERE id_form = $4`,
+            [spvName, spvAt, spvNik, idForm]
+          );
+        }
+
+        if (parentForm.sfo_approved) {
+          await query(
+            `UPDATE form_kerja_ketinggian
+                SET sfo_approved = TRUE,
+                    sfo_approved_by = $1,
+                    sfo_approved_at = $2,
+                    sfo_nik = $3
+              WHERE id_form = $4`,
+            [parentForm.sfo_approved_by, parentForm.sfo_approved_at || now, parentForm.sfo_nik, idForm]
+          );
+        }
+
+        if (parentForm.pga_approved) {
+          await query(
+            `UPDATE form_kerja_ketinggian
+                SET mr_pga_approved = TRUE,
+                    mr_pga_approved_by = $1,
+                    mr_pga_approved_at = $2,
+                    mr_pga_nik = $3
+              WHERE id_form = $4`,
+            [parentForm.pga_approved_by, parentForm.pga_approved_at || now, parentForm.pga_nik, idForm]
+          );
+        }
+
+        await syncJobFormsStageAndStatus(idIjinKerja, now);
+      }
     }
 
     // ── Email: kirim ke approver pertama jika status submitted (fire-and-forget) ──

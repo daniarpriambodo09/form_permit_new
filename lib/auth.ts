@@ -30,13 +30,17 @@ export type UserRole =
   | 'admin_k3'
   | 'sfo'
   | 'smr'         // sebelumnya: 'pga'
-  | 'admin';
+  | 'admin'
+  | 'purchasing'
+  | 'pengawas';
 
 // ROLE_ORDER: dipakai untuk perbandingan hierarki role (bukan stage approval).
 // firewatch = 0, sama dengan worker — tidak punya hak approve.
 export const ROLE_ORDER: Record<UserRole, number> = {
   worker:     0,
   firewatch:  0,  // tidak punya hak approve
+  pengawas:   1,
+  purchasing: 2,
   security:   2,
   spv:        1,
   kontraktor: 2,
@@ -102,6 +106,8 @@ export const ROLE_TO_STAGE: Record<UserRole, number> = {
   sfo:         3,
   smr:         4,  // sebelumnya: pga: 4
   admin:       99,
+  purchasing:  -1,
+  pengawas:    -1,
 };
 
 // ── Password ──────────────────────────────────────────────────

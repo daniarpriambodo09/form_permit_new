@@ -14,7 +14,7 @@ import {
   Home, Plus, FileText, Clock, CheckCircle2, XCircle,
   AlertCircle, Eye, Edit3, RefreshCw, User, LogOut,
   Flame, Wrench, ClipboardCheck, ShieldCheck, ClipboardList, Paperclip,
-  Search, X, Calendar, CalendarClock, MapPin, ChevronRight,
+  Search, X, Calendar, CalendarClock, CalendarCheck, MapPin, ChevronRight,
   Filter, Layers, Check,
 } from "lucide-react";
 
@@ -43,6 +43,7 @@ interface FormItem {
   status: string;
   tanggal: string;
   tanggal_pelaksanaan?: string;
+  actual_tanggal_kerja?: string;
   lokasi?: string;
   catatan_reject?: string;
   approved_by?: string;
@@ -161,9 +162,9 @@ const getApprovalStages = (form: FormItem): { key: keyof FormItem; label: string
   if (form.jenis_form === "general-permit") {
     return [
       { key: "spv_approved",      label: "SPV" },
-      { key: "security_approved", label: "Security" },
       { key: "sfo_approved",      label: "SFO" },
       { key: "pga_approved",      label: "MGR" },
+      { key: "security_approved", label: "Security" },
     ];
   }
 
@@ -195,7 +196,7 @@ const renderApprovalStepper = (form: FormItem) => {
         </span>
         <span className="text-[10px] text-slate-400">
           {form.jenis_form === "general-permit"
-            ? "Alur: SPV → Security → SFO → MGR"
+            ? "Alur: SPV → SFO → MGR → Security"
             : "Alur: SPV → Admin K3 → SFO → SMR"}
         </span>
       </div>
@@ -425,6 +426,12 @@ export default function MyFormsPage() {
     formType: "" as "hot-work" | "height-work" | "workshop" | "general-permit",
   });
   const [cancelling, setCancelling]       = useState(false);
+  const [actualDateModal, setActualDateModal] = useState<{
+    isOpen: boolean;
+    formId: string;
+    dateValue: string;
+  }>({ isOpen: false, formId: "", dateValue: "" });
+  const [savingActualDate, setSavingActualDate] = useState(false);
 
   useEffect(() => {
     const handler = (e: any) => {
@@ -484,6 +491,36 @@ export default function MyFormsPage() {
     } finally {
       setCancelling(false);
       setCancelModal({ isOpen: false, formId: "", formType: "" as any });
+    }
+  };
+
+  const handleSaveActualDate = async () => {
+    if (!actualDateModal.formId) return;
+    setSavingActualDate(true);
+    try {
+      const res = await fetch(`/api/forms/general-permit/${actualDateModal.formId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          actual_tanggal_kerja: actualDateModal.dateValue || null,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Gagal menyimpan tanggal selesai kerja");
+
+      setForms((prev) =>
+        prev.map((f) =>
+          f.id_form === actualDateModal.formId
+            ? { ...f, actual_tanggal_kerja: actualDateModal.dateValue || undefined }
+            : f
+        )
+      );
+      setActualDateModal({ isOpen: false, formId: "", dateValue: "" });
+    } catch (err: any) {
+      alert(`❌ Gagal menyimpan: ${err.message}`);
+    } finally {
+      setSavingActualDate(false);
     }
   };
 
@@ -990,6 +1027,44 @@ export default function MyFormsPage() {
                         </div>
                       </div>
 
+                      {/* ── Aktual Tanggal Selesai Kerja (Khusus Ijin Kerja Eksternal) ── */}
+                      {isGeneralPermit && (
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 bg-emerald-50/70 border border-emerald-200/80 rounded-xl">
+                          <div className="flex items-center gap-2.5">
+                            <div className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
+                              <CalendarCheck className="w-4 h-4" />
+                            </div>
+                            <div>
+                              <span className="text-[10px] font-bold text-emerald-800 uppercase tracking-wider block">
+                                Aktual Tanggal Kerja Selesai
+                              </span>
+                              <span className="text-xs font-bold text-slate-800">
+                                {form.actual_tanggal_kerja ? formatDate(form.actual_tanggal_kerja) : (
+                                  <span className="text-slate-400 font-normal italic">Belum diisi (diinput setelah pekerjaan selesai)</span>
+                                )}
+                              </span>
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const raw = form.actual_tanggal_kerja
+                                ? new Date(form.actual_tanggal_kerja).toISOString().split("T")[0]
+                                : "";
+                              setActualDateModal({
+                                isOpen: true,
+                                formId: form.id_form,
+                                dateValue: raw,
+                              });
+                            }}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition-all shadow-xs active:scale-95 shrink-0 self-start sm:self-auto cursor-pointer"
+                          >
+                            <Calendar className="w-3.5 h-3.5" />
+                            <span>{form.actual_tanggal_kerja ? "Ubah Tanggal Selesai" : "+ Input Tanggal Selesai"}</span>
+                          </button>
+                        </div>
+                      )}
+
                       {/* ── Notifikasi Alasan Ditolak ── */}
                       {form.catatan_reject && (
                         <div className="p-3.5 bg-rose-50 border border-rose-200/80 rounded-xl flex items-start gap-2.5">
@@ -1070,6 +1145,76 @@ export default function MyFormsPage() {
         confirmText="Ya, Batalkan Pengajuan"
         cancelText="Tidak, Kembali"
       />
+
+      {/* Modal Input Aktual Tanggal Kerja Selesai */}
+      {actualDateModal.isOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs animate-in fade-in duration-150">
+          <div className="bg-white rounded-2xl shadow-xl border border-slate-200 max-w-md w-full overflow-hidden p-6 space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                  <CalendarCheck className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-slate-800 text-sm">Aktual Tanggal Kerja Selesai</h3>
+                  <p className="text-[11px] text-slate-500 font-mono">{actualDateModal.formId}</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setActualDateModal({ isOpen: false, formId: "", dateValue: "" })}
+                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-xs font-semibold text-slate-700 block">
+                Pilih Tanggal Selesai Aktual
+              </label>
+              <input
+                type="date"
+                value={actualDateModal.dateValue}
+                onChange={(e) => setActualDateModal({ ...actualDateModal, dateValue: e.target.value })}
+                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
+              />
+              <p className="text-[11px] text-slate-400">
+                Pilih tanggal saat pekerjaan di lapangan telah secara aktual selesai dilakukan.
+              </p>
+            </div>
+
+            <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setActualDateModal({ isOpen: false, formId: "", dateValue: "" })}
+                className="px-4 py-2 border border-slate-200 text-slate-600 rounded-xl text-xs font-semibold hover:bg-slate-50 transition-colors cursor-pointer"
+                disabled={savingActualDate}
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveActualDate}
+                disabled={savingActualDate}
+                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all shadow-sm shadow-emerald-600/20 active:scale-95 flex items-center gap-1.5 cursor-pointer"
+              >
+                {savingActualDate ? (
+                  <>
+                    <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    <span>Menyimpan...</span>
+                  </>
+                ) : (
+                  <>
+                    <Check className="w-3.5 h-3.5" />
+                    <span>Simpan Tanggal</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

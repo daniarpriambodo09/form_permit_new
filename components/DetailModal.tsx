@@ -8,6 +8,7 @@ import PenilaianSubkontraktorSection, {
   createEmptyPenilaianSubkontraktor,
   type PenilaianSubkontraktorData,
 } from "@/components/PenilaianSubkontraktorSection";
+import JsaViewer from "@/components/JsaViewer";
 
 interface DetailModalProps {
   isOpen: boolean;
@@ -126,47 +127,12 @@ function InfoModal({ title, onClose, children }: { title: string; onClose: () =>
 }
 
 const JsaDisplay = ({ perluJsa, jsaFileUrl, jsaData }: { perluJsa: boolean; jsaFileUrl?: string | null; jsaData?: any }) => {
-  if (!perluJsa) {
-    return (
-      <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg border border-slate-200">
-        <FileText className="w-5 h-5 text-slate-400 shrink-0" />
-        <span className="text-sm text-slate-600">JSA <strong>Tidak Diperlukan</strong> untuk pekerjaan ini.</span>
-      </div>
-    );
-  }
-  if (jsaData) {
-    return (
-      <div className="space-y-3 bg-green-50 border border-green-200 rounded-lg p-3">
-        <div className="grid grid-cols-2 gap-3"><F label="Area" value={jsaData.area} /><F label="Jenis Pekerjaan" value={jsaData.jenisPekerjaan} /><F label="Sect/Dept" value={jsaData.sectDept} /><F label="PIC" value={jsaData.pic} /></div>
-        <p className="text-xs font-semibold text-slate-600">Petugas: {(jsaData.petugas || []).filter(Boolean).join(", ") || "-"}</p>
-        <div className="overflow-x-auto"><table className="w-full min-w-[650px] text-xs"><thead className="bg-white"><tr>{["Tanggal", "Jenis Pekerjaan", "Langkah Kerja", "Potensi Bahaya", "Pengendalian", "Saran"].map(h => <th key={h} className="p-2 text-left">{h}</th>)}</tr></thead><tbody>{(jsaData.rows || []).map((row: any, i: number) => <tr key={i} className="border-t border-green-200 align-top">{[row.tanggal, row.jenisPekerjaan, row.langkahKerja, row.potensiBahaya, row.pengendalian, row.saran].map((v: any, j: number) => <td key={j} className="p-2 whitespace-pre-wrap">{v || "-"}</td>)}</tr>)}</tbody></table></div>
-      </div>
-    );
-  }
-  if (jsaFileUrl) {
-    const fileName = jsaFileUrl.split("/").pop() || "Dokumen JSA";
-    const fileUrl = jsaFileUrl.startsWith("http") ? jsaFileUrl : `${window.location.origin}${jsaFileUrl}`;
-    return (
-      <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg border border-green-200">
-        <div className="flex items-center gap-3 min-w-0">
-          <FileText className="w-5 h-5 text-green-600 shrink-0" />
-          <div className="min-w-0">
-            <p className="text-sm font-semibold text-green-800">File JSA Terlampir</p>
-            <p className="text-xs text-green-600 truncate">{fileName}</p>
-          </div>
-        </div>
-        <a href={fileUrl} target="_blank" rel="noopener noreferrer"
-          className="flex items-center gap-1.5 px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-xs font-semibold rounded-lg transition-colors shrink-0 ml-3">
-          <Eye className="w-3.5 h-3.5" /> Lihat File
-        </a>
-      </div>
-    );
-  }
   return (
-    <div className="flex items-center gap-3 p-3 bg-amber-50 rounded-lg border border-amber-200">
-      <AlertCircle className="w-5 h-5 text-amber-600 shrink-0" />
-      <span className="text-sm text-amber-800">JSA <strong>Diperlukan</strong>, namun file belum diupload.</span>
-    </div>
+    <JsaViewer
+      perluJsa={perluJsa}
+      jsaData={jsaData}
+      jsaFileUrl={jsaFileUrl || jsaData?.fileUrl}
+    />
   );
 };
 
@@ -277,19 +243,6 @@ function GeneralPermitApprovalGrid({ p }: { p: any }) {
         approved={p.spv_approved} approvedBy={p.spv_approved_by}
         approvedNik={p.spv_nik} approvedAt={p.spv_approved_at}
       />
-      <div className="rounded-xl border border-slate-200 p-3 flex flex-col justify-between">
-        <div className="flex items-center gap-2 mb-2">
-          <ShieldCheck className={`w-4 h-4 ${p.security_approved ? "text-green-600" : "text-slate-400"}`} />
-          <p className="text-sm font-semibold text-slate-800">Security</p>
-          {p.security_approved && (
-            <span className="ml-auto text-[10px] bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-semibold">✓ Disetujui</span>
-          )}
-        </div>
-        {p.security_approved_by && (
-          <p className="text-xs text-slate-500">{p.security_approved_by} — {formatDate(p.security_approved_at)}</p>
-        )}
-      </div>
-      <SignatureBox label="Security" signatureUrl={p.security_signature_url} />
       <ApprovalQRCard {...common}
         label="SFO" role="sfo"
         approved={p.sfo_approved} approvedBy={p.sfo_approved_by}
@@ -300,6 +253,12 @@ function GeneralPermitApprovalGrid({ p }: { p: any }) {
         approved={p.pga_approved} approvedBy={p.pga_approved_by}
         approvedNik={p.pga_nik} approvedAt={p.pga_approved_at}
       />
+      <ApprovalQRCard {...common}
+        label="Security" role="security"
+        approved={p.security_approved} approvedBy={p.security_approved_by}
+        approvedNik={p.security_nik} approvedAt={p.security_approved_at}
+      />
+      <SignatureBox label="Security (TTD)" signatureUrl={p.security_signature_url} />
     </div>
   );
 }
@@ -1211,7 +1170,8 @@ export default function DetailModal({ isOpen, onClose, formId, formType, initial
             <F label="Jumlah Tenaga Kerja" value={p.jumlah_tenaga_kerja} />
             <F label="Tanggal Mulai Kerja" value={formatDate(p.tgl_mulai_kerja)} />
             <F label="Tanggal Akhir Kerja" value={formatDate(p.tgl_akhir_kerja_rencana)} />
-            <F label="Waktu Kerja" value={formatTime(p.waktu_kerja)} />
+            <F label="Waktu Mulai Kerja" value={formatTime(p.waktu_kerja)} />
+            <F label="Waktu Selesai Kerja" value={formatTime(p.waktu_selesai || p.izin_kerja_sampai)} />
             <F label="Actual Tanggal Kerja" value={formatDate(p.actual_tanggal_kerja)} />
           </div>
         </MS>
@@ -1398,7 +1358,6 @@ export default function DetailModal({ isOpen, onClose, formId, formType, initial
             <F label="Lokasi Pembuangan di PT" value={p.limbah_lokasi_pt} />
             <F label="Jam Izin Kerja" value={p.izin_kerja_dari && p.izin_kerja_sampai ? `${formatTime(p.izin_kerja_dari)} – ${formatTime(p.izin_kerja_sampai)}` : "-"} />
             <F label="Periode Izin Kerja" value={p.izin_kerja_tanggal_dari && p.izin_kerja_tanggal_sampai ? `${formatDate(p.izin_kerja_tanggal_dari)} – ${formatDate(p.izin_kerja_tanggal_sampai)}` : "-"} />
-            <F label="Kontraktor Penanggung Jawab" value={p.kontraktor_pj} />
             <F label="SPV Terkait Penanggung Jawab" value={p.spv_terkait_pj ? `${p.spv_terkait_pj}${p.nik_spv_terkait_pj ? ` (NIK: ${p.nik_spv_terkait_pj})` : ""}` : undefined} />
           </div>
         </MS>
@@ -1584,14 +1543,19 @@ export default function DetailModal({ isOpen, onClose, formId, formType, initial
               <Loader2 className="w-6 h-6 text-orange-600 animate-spin" />
             </div>
           ) : (
-            <PenilaianSubkontraktorSection
-              value={penilaianData}
-              setValue={setPenilaianData}
-              onSave={savePenilaianSubkontraktor}
-              currentUserName={
-                typeof window !== "undefined" ? sessionStorage.getItem("user_nama") : null
-              }
-            />
+            <div className="space-y-3">
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs text-amber-800">
+                <strong>Informasi:</strong> Pengisian dan persetujuan Form Penilaian Sub Kontraktor hanya dapat dilakukan oleh <strong>Pengawas Dept</strong> melalui dashboard khusus Pengawas. Halaman ini hanya menampilkan preview/status penilaian.
+              </div>
+              <PenilaianSubkontraktorSection
+                value={penilaianData}
+                setValue={setPenilaianData}
+                readOnly={true}
+                formId={data?.id_form}
+                tanggalDari={data?.izin_kerja_tanggal_dari}
+                tanggalSampai={data?.izin_kerja_tanggal_sampai}
+              />
+            </div>
           )}
         </InfoModal>
       )}

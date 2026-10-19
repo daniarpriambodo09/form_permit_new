@@ -216,11 +216,19 @@ async function queryGeneralPermitByStage(
          LEFT JOIN users creator ON creator.id = gp.user_id
         WHERE gp.status = 'submitted' AND gp.current_stage = $1
           AND (
-            ($3::text IS NOT NULL AND $3 <> '' AND LOWER(TRIM(COALESCE(gp.spv_terkait_pj, ''))) = LOWER(TRIM($3)))
-            OR ($5::text IS NOT NULL AND $5 <> '' AND LOWER(TRIM(COALESCE(gp.spv_terkait_pj, ''))) = LOWER(TRIM($5)))
-            OR ($4::text IS NOT NULL AND $4 <> '' AND gp.nik_spv_terkait_pj = $4)
+            -- 1. Jika form memiliki SPV Terkait yang dipilih, HANYA SPV tersebut yang melihat
+            (
+              (gp.spv_terkait_pj IS NOT NULL AND TRIM(gp.spv_terkait_pj) <> '')
+              AND (
+                ($3::text IS NOT NULL AND $3 <> '' AND LOWER(TRIM(gp.spv_terkait_pj)) = LOWER(TRIM($3)))
+                OR ($5::text IS NOT NULL AND $5 <> '' AND LOWER(TRIM(gp.spv_terkait_pj)) = LOWER(TRIM($5)))
+                OR ($4::text IS NOT NULL AND $4 <> '' AND gp.nik_spv_terkait_pj = $4)
+              )
+            )
+            -- 2. ATAU jika form lama tidak ada SPV terkait (kosong/null), baru tampil untuk SPV satu departemen
             OR (
-              $2::text IS NOT NULL AND $2 <> '' AND $2 <> 'Unknown'
+              (gp.spv_terkait_pj IS NULL OR TRIM(gp.spv_terkait_pj) = '')
+              AND $2::text IS NOT NULL AND $2 <> '' AND $2 <> 'Unknown'
               AND LOWER(TRIM(COALESCE(creator.departmen, ''))) = LOWER(TRIM($2))
             )
           )
@@ -238,7 +246,8 @@ async function queryGeneralPermitByStage(
             pga_approved AS mr_pga_approved, pga_approved_by AS mr_pga_approved_by,
             NULL::boolean AS kontraktor_approved, NULL::boolean AS admin_k3_approved,
             NULL::text AS tipe_perusahaan, NULL::text AS id_ijin_kerja,
-            'general-permit' AS jenis_form
+            'general-permit' AS jenis_form,
+            spv_terkait_pj, nik_spv_terkait_pj
        FROM form_ijin_kerja
       WHERE status = 'submitted'
         AND (
@@ -254,14 +263,62 @@ async function queryGeneralPermitByStage(
 
 async function queryGeneralPermitApproved(
   col: 'spv_approved' | 'sfo_approved' | 'pga_approved',
-  spvDepartmen?: string | null
+  spvDepartmen?: string | null,
+  spvNama?: string | null,
+  spvNik?: string | null,
+  spvUsername?: string | null
 ) {
   if (spvDepartmen != null) {
+    if (col === 'spv_approved') {
+      return query(
+        `SELECT gp.id_form, gp.tanggal, gp.tanggal_pelaksanaan, gp.status, gp.current_stage,
+                gp.nama_kontraktor_pekerja AS nama_kontraktor_nik, gp.lokasi_pekerjaan,
+                gp.catatan_reject, gp.approved_by, gp.approved_at,
+                gp.spv_approved, gp.spv_approved_by, gp.spv_nik,
+                gp.spv_terkait_pj, gp.nik_spv_terkait_pj,
+                gp.security_approved, gp.security_approved_by,
+                gp.sfo_approved, gp.sfo_approved_by,
+                gp.pga_approved AS mr_pga_approved, gp.pga_approved_by AS mr_pga_approved_by,
+                NULL::boolean AS kontraktor_approved, NULL::boolean AS admin_k3_approved,
+                NULL::text AS tipe_perusahaan, NULL::text AS id_ijin_kerja,
+                'general-permit' AS jenis_form
+           FROM form_ijin_kerja gp
+           LEFT JOIN users creator ON creator.id = gp.user_id
+          WHERE gp.spv_approved = TRUE
+            AND (
+              (
+                (gp.spv_approved_by IS NOT NULL AND TRIM(gp.spv_approved_by) <> '')
+                AND (
+                  ($2::text IS NOT NULL AND $2 <> '' AND LOWER(TRIM(gp.spv_approved_by)) = LOWER(TRIM($2)))
+                  OR ($4::text IS NOT NULL AND $4 <> '' AND LOWER(TRIM(gp.spv_approved_by)) = LOWER(TRIM($4)))
+                  OR ($3::text IS NOT NULL AND $3 <> '' AND gp.spv_nik = $3)
+                )
+              )
+              OR (
+                (gp.spv_terkait_pj IS NOT NULL AND TRIM(gp.spv_terkait_pj) <> '')
+                AND (
+                  ($2::text IS NOT NULL AND $2 <> '' AND LOWER(TRIM(gp.spv_terkait_pj)) = LOWER(TRIM($2)))
+                  OR ($4::text IS NOT NULL AND $4 <> '' AND LOWER(TRIM(gp.spv_terkait_pj)) = LOWER(TRIM($4)))
+                  OR ($3::text IS NOT NULL AND $3 <> '' AND gp.nik_spv_terkait_pj = $3)
+                )
+              )
+              OR (
+                (gp.spv_approved_by IS NULL OR TRIM(gp.spv_approved_by) = '')
+                AND (gp.spv_terkait_pj IS NULL OR TRIM(gp.spv_terkait_pj) = '')
+                AND $1::text IS NOT NULL AND $1 <> '' AND $1 <> 'Unknown'
+                AND LOWER(TRIM(COALESCE(creator.departmen, ''))) = LOWER(TRIM($1))
+              )
+            )
+          ORDER BY gp.tanggal ASC`,
+        [spvDepartmen, spvNama ?? '', spvNik ?? null, spvUsername ?? '']
+      );
+    }
     return query(
       `SELECT gp.id_form, gp.tanggal, gp.tanggal_pelaksanaan, gp.status, gp.current_stage,
               gp.nama_kontraktor_pekerja AS nama_kontraktor_nik, gp.lokasi_pekerjaan,
               gp.catatan_reject, gp.approved_by, gp.approved_at,
-              gp.spv_approved, gp.spv_approved_by,
+              gp.spv_approved, gp.spv_approved_by, gp.spv_nik,
+              gp.spv_terkait_pj, gp.nik_spv_terkait_pj,
               gp.security_approved, gp.security_approved_by,
               gp.sfo_approved, gp.sfo_approved_by,
               gp.pga_approved AS mr_pga_approved, gp.pga_approved_by AS mr_pga_approved_by,
@@ -279,7 +336,8 @@ async function queryGeneralPermitApproved(
     `SELECT id_form, tanggal, tanggal_pelaksanaan, status, current_stage,
             nama_kontraktor_pekerja AS nama_kontraktor_nik, lokasi_pekerjaan,
             catatan_reject, approved_by, approved_at,
-            spv_approved, spv_approved_by,
+            spv_approved, spv_approved_by, spv_nik,
+            spv_terkait_pj, nik_spv_terkait_pj,
             security_approved, security_approved_by,
             sfo_approved, sfo_approved_by,
             pga_approved AS mr_pga_approved, pga_approved_by AS mr_pga_approved_by,
@@ -307,11 +365,19 @@ async function countGeneralPermitByStage(
          LEFT JOIN users creator ON creator.id = gp.user_id
         WHERE gp.status = 'submitted' AND gp.current_stage = $1
           AND (
-            ($3::text IS NOT NULL AND $3 <> '' AND LOWER(TRIM(COALESCE(gp.spv_terkait_pj, ''))) = LOWER(TRIM($3)))
-            OR ($5::text IS NOT NULL AND $5 <> '' AND LOWER(TRIM(COALESCE(gp.spv_terkait_pj, ''))) = LOWER(TRIM($5)))
-            OR ($4::text IS NOT NULL AND $4 <> '' AND gp.nik_spv_terkait_pj = $4)
+            -- 1. Jika form memiliki SPV Terkait yang dipilih, HANYA SPV tersebut yang melihat
+            (
+              (gp.spv_terkait_pj IS NOT NULL AND TRIM(gp.spv_terkait_pj) <> '')
+              AND (
+                ($3::text IS NOT NULL AND $3 <> '' AND LOWER(TRIM(gp.spv_terkait_pj)) = LOWER(TRIM($3)))
+                OR ($5::text IS NOT NULL AND $5 <> '' AND LOWER(TRIM(gp.spv_terkait_pj)) = LOWER(TRIM($5)))
+                OR ($4::text IS NOT NULL AND $4 <> '' AND gp.nik_spv_terkait_pj = $4)
+              )
+            )
+            -- 2. ATAU jika form lama tidak ada SPV terkait (kosong/null), baru tampil untuk SPV satu departemen
             OR (
-              $2::text IS NOT NULL AND $2 <> '' AND $2 <> 'Unknown'
+              (gp.spv_terkait_pj IS NULL OR TRIM(gp.spv_terkait_pj) = '')
+              AND $2::text IS NOT NULL AND $2 <> '' AND $2 <> 'Unknown'
               AND LOWER(TRIM(COALESCE(creator.departmen, ''))) = LOWER(TRIM($2))
             )
           )`,
@@ -336,9 +402,46 @@ async function countGeneralPermitByStage(
 
 async function countGeneralPermitApproved(
   col: 'spv_approved' | 'sfo_approved' | 'pga_approved',
-  spvDepartmen?: string | null
+  spvDepartmen?: string | null,
+  spvNama?: string | null,
+  spvNik?: string | null,
+  spvUsername?: string | null
 ): Promise<number> {
   if (spvDepartmen != null) {
+    if (col === 'spv_approved') {
+      const res = await query(
+        `SELECT COUNT(*) AS count
+           FROM form_ijin_kerja gp
+           LEFT JOIN users creator ON creator.id = gp.user_id
+          WHERE gp.spv_approved = TRUE
+            AND (
+              (
+                (gp.spv_approved_by IS NOT NULL AND TRIM(gp.spv_approved_by) <> '')
+                AND (
+                  ($2::text IS NOT NULL AND $2 <> '' AND LOWER(TRIM(gp.spv_approved_by)) = LOWER(TRIM($2)))
+                  OR ($4::text IS NOT NULL AND $4 <> '' AND LOWER(TRIM(gp.spv_approved_by)) = LOWER(TRIM($4)))
+                  OR ($3::text IS NOT NULL AND $3 <> '' AND gp.spv_nik = $3)
+                )
+              )
+              OR (
+                (gp.spv_terkait_pj IS NOT NULL AND TRIM(gp.spv_terkait_pj) <> '')
+                AND (
+                  ($2::text IS NOT NULL AND $2 <> '' AND LOWER(TRIM(gp.spv_terkait_pj)) = LOWER(TRIM($2)))
+                  OR ($4::text IS NOT NULL AND $4 <> '' AND LOWER(TRIM(gp.spv_terkait_pj)) = LOWER(TRIM($4)))
+                  OR ($3::text IS NOT NULL AND $3 <> '' AND gp.nik_spv_terkait_pj = $3)
+                )
+              )
+              OR (
+                (gp.spv_approved_by IS NULL OR TRIM(gp.spv_approved_by) = '')
+                AND (gp.spv_terkait_pj IS NULL OR TRIM(gp.spv_terkait_pj) = '')
+                AND $1::text IS NOT NULL AND $1 <> '' AND $1 <> 'Unknown'
+                AND LOWER(TRIM(COALESCE(creator.departmen, ''))) = LOWER(TRIM($1))
+              )
+            )`,
+        [spvDepartmen, spvNama ?? '', spvNik ?? null, spvUsername ?? '']
+      );
+      return parseInt(res[0].count);
+    }
     const res = await query(
       `SELECT COUNT(*) AS count
          FROM form_ijin_kerja gp
@@ -475,7 +578,7 @@ export async function GET(req: NextRequest) {
           ]),
           Promise.all([
             ...allFormTypes.map(f => countByQuery(f, `spv_approved = TRUE`, [], spvDepartmen)),
-            countGeneralPermitApproved('spv_approved', spvDepartmen),
+            countGeneralPermitApproved('spv_approved', spvDepartmen, spvNama, spvNik, spvUsername),
           ]),
           Promise.all([
             ...allFormTypes.map(f => countByQuery(f, `status = $1`, ['rejected'], spvDepartmen)),
@@ -496,7 +599,7 @@ export async function GET(req: NextRequest) {
       if (statusFilter === 'approved') {
         const results = await Promise.all([
           ...allFormTypes.map(f => query(...buildSelectQuery(f, `spv_approved = TRUE`, [], spvDepartmen))),
-          queryGeneralPermitApproved('spv_approved', spvDepartmen),
+          queryGeneralPermitApproved('spv_approved', spvDepartmen, spvNama, spvNik, spvUsername),
         ]);
         return NextResponse.json({ data: results.flat(), total: results.flat().length });
       }

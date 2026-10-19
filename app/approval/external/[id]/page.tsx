@@ -14,6 +14,7 @@ import { useApproverAuth } from "@/hooks/useApproverAuth";
 import AuthLoadingSpinner from "@/components/AuthLoadingSpinner";
 import type { JsaData } from "@/components/JsaBuilderSection";
 import JsaApprovalCard from "@/components/JsaApprovalCard";
+import JsaViewer from "@/components/JsaViewer";
 import SafetyInductionSection, { createEmptySafetyInduction, type SafetyInductionData } from "@/components/SafetyInductionSection";
 import PenilaianSubkontraktorSection, {
   createEmptyPenilaianSubkontraktor,
@@ -120,17 +121,8 @@ export default function ExternalApprovalPage({ params }: { params: Promise<{ id:
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || "Gagal menyetujui Penilaian Sub Kontraktor");
-      setMessage("Form Penilaian Sub Kontraktor berhasil disetujui oleh SFO.");
-      setPenilaianData(json.data);
-      if (data) {
-        setData({
-          ...data,
-          general: {
-            ...data.general,
-            penilaian_subkontraktor: json.data,
-          },
-        });
-      }
+      setMessage("Form Penilaian Sub Kontraktor dan seluruh lampiran terkait berhasil disetujui otomatis.");
+      await loadData();
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -154,11 +146,8 @@ export default function ExternalApprovalPage({ params }: { params: Promise<{ id:
     }));
     const approved = results.filter((result) => result.ok).length;
     const failed = results.filter((result) => !result.ok);
-    setMessage(`${approved} lampiran berhasil diproses${failed.length ? `. ${failed.length} lampiran belum dapat diproses karena belum giliran approval atau sudah diproses.` : "."}`);
-    if (approved) {
-      const refreshed = await fetch(`/api/approval/external/${id}`, { credentials: "include" });
-      if (refreshed.ok) setData((await refreshed.json()).data);
-    }
+    setMessage(`${approved} lampiran berhasil diproses${failed.length ? `. ${failed.length} lampiran belum dapat diproses karena belum giliran approval atau sudah diproses.` : "."} Status lampiran dan form induk telah disinkronkan.`);
+    await loadData();
     setActionLoading(false);
   };
 
@@ -172,9 +161,10 @@ export default function ExternalApprovalPage({ params }: { params: Promise<{ id:
     });
     const result = await response.json();
     if (!response.ok) setError(result.error || "JSA tidak dapat disetujui");
-    else setMessage(`JSA berhasil diproses oleh role ${user?.role}.`);
-    const refreshed = await fetch(`/api/approval/external/${id}`, { credentials: "include" });
-    if (refreshed.ok) setData((await refreshed.json()).data);
+    else {
+      setMessage(`JSA dan seluruh lampiran terkait berhasil disetujui otomatis untuk role ${user?.role}.`);
+      await loadData();
+    }
     setActionLoading(false);
   };
 
@@ -242,10 +232,10 @@ export default function ExternalApprovalPage({ params }: { params: Promise<{ id:
       });
       const result = await res.json();
       if (!res.ok) throw new Error(result.error || "Gagal memproses approval");
-      setMessage(action === "approve" ? "Form berhasil disetujui." : "Form berhasil ditolak.");
+      setMessage(action === "approve" ? "Form induk dan seluruh lampiran terkait berhasil disetujui otomatis." : "Form berhasil ditolak.");
       setShowReject(false);
       setCatatan("");
-      loadData();
+      await loadData();
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -276,14 +266,47 @@ export default function ExternalApprovalPage({ params }: { params: Promise<{ id:
 
   const general = data.general;
   const attachments = Array.isArray(data.attachments) ? data.attachments : [];
-  const jsa = general.jsa_data as JsaData | null;
+  const jsa = (general.jsa_data as JsaData | null) || (general.perlu_jsa || general.jsa_file_url ? {
+    area: "",
+    jenisPekerjaan: "",
+    sectDept: "",
+    pic: "",
+    petugas: [],
+    rows: [],
+    fileUrl: general.jsa_file_url || null,
+    approval: {
+      currentStage: 1,
+      status: "submitted",
+      catatanReject: null,
+      firewatch: { approved: false, approvedBy: null, approvedNik: null, approvedAt: null },
+      spv: { approved: false, approvedBy: null, approvedNik: null, approvedAt: null },
+      sfo: { approved: false, approvedBy: null, approvedNik: null, approvedAt: null },
+    },
+  } : null);
   const pendingAttachments = attachments.some((att) => att.status === "submitted");
   const jsaApproval = jsa?.approval;
   const jsaRole: "firewatch" | "spv" | "sfo" | null =
     jsaApproval && typeof jsaApproval.currentStage === "number"
       ? (["firewatch", "spv", "sfo"] as const)[jsaApproval.currentStage - 1] ?? null
       : null;
-  const canApproveJsa = Boolean(jsaApproval && jsaApproval.status === "submitted" && (user?.role === jsaRole || isAdmin));
+
+  const isAssignedSpv =
+    user.role !== "spv" ||
+    isAdmin ||
+    Boolean(
+      !general.spv_terkait_pj ||
+      general.spv_terkait_pj.trim() === "" ||
+      (user.nama && general.spv_terkait_pj.trim().toLowerCase() === user.nama.trim().toLowerCase()) ||
+      (user.username && general.spv_terkait_pj.trim().toLowerCase() === user.username.trim().toLowerCase()) ||
+      ((user as any).nik && general.nik_spv_terkait_pj && String((user as any).nik).trim() === String(general.nik_spv_terkait_pj).trim())
+    );
+
+  const canApproveJsa = Boolean(
+    jsaApproval &&
+    jsaApproval.status === "submitted" &&
+    (user?.role === jsaRole || isAdmin) &&
+    (jsaRole !== "spv" || isAssignedSpv)
+  );
 
   const siStatus = general.safety_induction?.status;
   const siApproved = siStatus === "approved";
@@ -296,7 +319,8 @@ export default function ExternalApprovalPage({ params }: { params: Promise<{ id:
   const canActOnGeneralPermit =
     general.status === "submitted" &&
     (currentStage === 1 || currentStage === 2 || currentStage === 3 || (currentStage === 4 && isAdmin)) &&
-    isMyStageRole;
+    isMyStageRole &&
+    (currentStage !== 1 || isAssignedSpv);
 
   // ── Helper lists for Section rendering ──
   const spesifikasiItems = [
@@ -562,6 +586,18 @@ export default function ExternalApprovalPage({ params }: { params: Promise<{ id:
           </div>
         )}
 
+        {user.role === "spv" && currentStage === 1 && !isAssignedSpv && (
+          <div className="p-4 bg-amber-50 border border-amber-300 rounded-2xl text-sm text-amber-900 flex items-start gap-3 shadow-xs">
+            <AlertCircle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+            <div>
+              <p className="font-bold">Bukan SPV Terkait yang Ditugaskan</p>
+              <p className="text-xs mt-0.5">
+                Form pengajuan ini secara khusus ditugaskan kepada SPV Terkait: <strong>{general.spv_terkait_pj}</strong> {general.nik_spv_terkait_pj ? `(NIK: ${general.nik_spv_terkait_pj})` : ""}. Anda masuk sebagai <strong>{user.nama}</strong> ({user.role.toUpperCase()}) sehingga tidak memiliki hak approval pada tahap SPV.
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* ── Approval Stepper Progress ── */}
         <section className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs">
           <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
@@ -822,8 +858,10 @@ export default function ExternalApprovalPage({ params }: { params: Promise<{ id:
                 <div>
                   <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider block mb-1">Jam Izin Kerja</span>
                   <p className="font-semibold text-slate-700">
-                    {general.izin_kerja_dari && general.izin_kerja_sampai
+                    {(general.izin_kerja_dari && general.izin_kerja_sampai)
                       ? `${formatTime(general.izin_kerja_dari)} – ${formatTime(general.izin_kerja_sampai)}`
+                      : (general.waktu_kerja && general.waktu_selesai)
+                      ? `${formatTime(general.waktu_kerja)} – ${formatTime(general.waktu_selesai)}`
                       : general.waktu_kerja
                       ? formatTime(general.waktu_kerja)
                       : "-"}
@@ -840,6 +878,19 @@ export default function ExternalApprovalPage({ params }: { params: Promise<{ id:
                 <div>
                   <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider block mb-1">Tanggal Pelaksanaan Aktual</span>
                   <p className="font-semibold text-slate-700">{formatDate(general.actual_tanggal_kerja || general.tanggal_pelaksanaan)}</p>
+                </div>
+                <div>
+                  <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider block mb-1">Pemberi Izin / SPV Terkait</span>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <p className="font-bold text-slate-800">
+                      {general.spv_terkait_pj || general.spv_approved_by || "-"}
+                    </p>
+                    {(general.nik_spv_terkait_pj || general.spv_nik) && (
+                      <span className="text-xs font-mono text-slate-600 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">
+                        NIK: {general.nik_spv_terkait_pj || general.spv_nik}
+                      </span>
+                    )}
+                  </div>
                 </div>
                 <div className="sm:col-span-2 md:col-span-3 pt-2 border-t border-slate-100">
                   <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider block mb-1">Deskripsi Pekerjaan</span>
@@ -1157,13 +1208,7 @@ export default function ExternalApprovalPage({ params }: { params: Promise<{ id:
                 <User className="w-4 h-4 text-orange-600" />
                 <h3 className="font-bold text-slate-800 text-sm">Bagian 11: Penanggung Jawab & Tanda Tangan</h3>
               </div>
-              <div className="p-6 grid grid-cols-1 sm:grid-cols-3 gap-6 text-sm">
-                <div>
-                  <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider block mb-1">Kontraktor Penanggung Jawab</span>
-                  <p className="font-bold text-slate-800">
-                    {general.kontraktor_pj || general.nama_kontraktor_pekerja || general.nama_pengawas_pic_subkont || "-"}
-                  </p>
-                </div>
+              <div className="p-6 grid grid-cols-1 sm:grid-cols-2 gap-6 text-sm">
                 <div>
                   <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider block mb-1">SPV Terkait Penanggung Jawab</span>
                   <p className="font-bold text-slate-800">
@@ -1313,93 +1358,50 @@ export default function ExternalApprovalPage({ params }: { params: Promise<{ id:
               </span>
             </div>
 
-            <div className="p-6">
-              {!general.perlu_jsa ? (
-                <div className="text-center py-10 text-slate-500 space-y-2">
-                  <FileText className="w-10 h-10 text-slate-300 mx-auto" />
-                  <p className="font-medium text-sm">JSA tidak diwajibkan untuk pengajuan pekerjaan ini.</p>
-                </div>
-              ) : !jsa ? (
-                <div className="text-center py-10 text-amber-700 space-y-2">
-                  <AlertCircle className="w-10 h-10 text-amber-400 mx-auto" />
-                  <p className="font-medium text-sm">Dokumen data JSA belum dibuat atau tidak ditemukan.</p>
-                </div>
-              ) : (
-                <div className="space-y-6">
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm bg-slate-50 p-4 rounded-xl border border-slate-200">
-                    {[
-                      ["Area", jsa.area],
-                      ["Jenis Pekerjaan", jsa.jenisPekerjaan],
-                      ["Sect / Dept", jsa.sectDept],
-                      ["PIC Proyek", jsa.pic],
-                    ].map(([label, value]) => (
-                      <div key={label}>
-                        <span className="text-xs text-slate-400 font-semibold uppercase">{label}</span>
-                        <p className="font-bold text-slate-800 mt-0.5">{value || "-"}</p>
-                      </div>
-                    ))}
-                  </div>
+            <div className="p-6 space-y-6">
+              <JsaViewer
+                perluJsa={Boolean(general.perlu_jsa)}
+                jsaData={jsa}
+                jsaFileUrl={general.jsa_file_url || (jsa as any)?.fileUrl || null}
+              />
 
-                  <div>
-                    <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Petugas yang Mengerjakan</h4>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
-                      {(Array.isArray(jsa.petugas) ? jsa.petugas : []).filter(Boolean).map((name, index) => (
-                        <div key={index} className="text-xs font-semibold p-2.5 bg-slate-50 border border-slate-200 rounded-xl flex items-center gap-2">
-                          <span className="w-5 h-5 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-[10px] font-bold">
-                            {index + 1}
-                          </span>
-                          <span className="truncate text-slate-700">{name}</span>
-                        </div>
-                      ))}
-                    </div>
+              {/* JSA Approvers */}
+              {general.perlu_jsa && !isSecurity && (
+                <div className="space-y-3 pt-4 border-t border-slate-100">
+                  <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+                    Persetujuan Khusus JSA
+                  </h4>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    {(["firewatch", "spv", "sfo"] as const).map((role) => {
+                      const roleLabel: Record<string, string> = {
+                        firewatch: "Pengawas Pekerjaan",
+                        spv: "SPV",
+                        sfo: "SFO",
+                      };
+                      const fallbackEntry = { approved: false, approvedBy: null, approvedNik: null, approvedAt: null };
+                      return (
+                        <JsaApprovalCard
+                          key={role}
+                          label={roleLabel[role]}
+                          role={role}
+                          entry={jsaApproval?.[role] ?? fallbackEntry}
+                          formId={id}
+                        />
+                      );
+                    })}
                   </div>
-
-                  <div>
-                    <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Tabel Analisis Langkah Kerja</h4>
-                    <div className="overflow-x-auto border border-slate-200 rounded-xl">
-                      <table className="w-full min-w-[800px] text-xs">
-                        <thead className="bg-slate-100 text-slate-700">
-                          <tr>
-                            {["Tanggal", "Jenis Pekerjaan", "Langkah Kerja", "Potensi Bahaya", "Pengendalian", "Saran"].map((heading) => (
-                              <th key={heading} className="p-3 text-left font-bold border-b border-slate-200">{heading}</th>
-                            ))}
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100">
-                          {(Array.isArray(jsa.rows) ? jsa.rows : []).map((row, index) => (
-                            <tr key={index} className="hover:bg-slate-50 transition-colors align-top">
-                              {[row.tanggal, row.jenisPekerjaan, row.langkahKerja, row.potensiBahaya, row.pengendalian, row.saran].map((value, cellIndex) => (
-                                <td key={cellIndex} className="p-3 whitespace-pre-wrap text-slate-700 leading-relaxed">{value || "-"}</td>
-                              ))}
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-
-                  {/* JSA Approvers */}
-                  {!isSecurity && (
-                    <div className="space-y-3 pt-2">
-                      <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Persetujuan Khusus JSA</h4>
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                        {jsaApproval && (["firewatch", "spv", "sfo"] as const).map((role) => {
-                          const roleLabel: Record<string, string> = { firewatch: "Pengawas Pekerjaan", spv: "SPV", sfo: "SFO" };
-                          return <JsaApprovalCard key={role} label={roleLabel[role]} role={role} entry={jsaApproval[role]} formId={id} />;
-                        })}
-                      </div>
-                      {canApproveJsa && (
-                        <div className="pt-2 flex justify-end">
-                          <button
-                            type="button"
-                            onClick={approveJsa}
-                            disabled={actionLoading}
-                            className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-colors cursor-pointer shadow-sm"
-                          >
-                            {actionLoading ? "Memproses..." : `Approve JSA (${jsaRole?.toUpperCase()})`}
-                          </button>
-                        </div>
-                      )}
+                  {canApproveJsa && (
+                    <div className="pt-2 flex justify-end">
+                      <button
+                        type="button"
+                        onClick={approveJsa}
+                        disabled={actionLoading}
+                        className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-colors cursor-pointer shadow-sm"
+                      >
+                        {actionLoading
+                          ? "Memproses..."
+                          : `Approve JSA (${jsaRole?.toUpperCase()})`}
+                      </button>
                     </div>
                   )}
                 </div>
@@ -1441,6 +1443,9 @@ export default function ExternalApprovalPage({ params }: { params: Promise<{ id:
                 value={penilaianData}
                 setValue={setPenilaianData}
                 readOnly={true}
+                formId={id}
+                tanggalDari={data?.general?.izin_kerja_tanggal_dari}
+                tanggalSampai={data?.general?.izin_kerja_tanggal_sampai}
               />
 
               {/* SFO Approval Action Box */}
@@ -1577,7 +1582,10 @@ export default function ExternalApprovalPage({ params }: { params: Promise<{ id:
                   </h2>
                 </div>
                 <p className="text-xs text-slate-600 mt-1">
-                  Anda masuk sebagai <strong>{user.nama}</strong> ({user.role.toUpperCase()}). Form ini memerlukan keputusan persetujuan Anda untuk lanjut ke tahap berikutnya.
+                  Anda masuk sebagai <strong>{user.nama}</strong> ({user.role.toUpperCase()})
+                  {currentStage === 1 && general.spv_terkait_pj ? (
+                    <> — Ditugaskan sebagai <strong>SPV Terkait: {general.spv_terkait_pj}</strong></>
+                  ) : null}. Form ini memerlukan keputusan persetujuan Anda untuk lanjut ke tahap berikutnya.
                 </p>
               </div>
 

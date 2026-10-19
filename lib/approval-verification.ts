@@ -1,84 +1,59 @@
 // lib/approval-verification.ts
 // Logic verifikasi QR Code approval — dipakai LANGSUNG (in-process, tanpa
-// HTTP fetch) baik oleh app/api/approval-verification/[jenisForm]/[id]/[role]/route.ts
-// (dipanggil dari luar, mis. Postman/aplikasi lain) maupun oleh
-// app/approval-verification/[jenisForm]/[id]/[role]/page.tsx (server
-// component, memanggil ini langsung — TIDAK fetch ke URL publiknya sendiri).
-//
-// Kenapa ini penting: sebelumnya page.tsx melakukan fetch() ke
-// NEXT_PUBLIC_APP_URL (URL publik aplikasi lewat reverse proxy). Ini rapuh
-// karena:
-//  1. NEXT_PUBLIC_APP_URL harus di-hardcode ke IP LAN yang bisa berubah
-//     (DHCP) — begitu IP server berubah, semua verifikasi gagal.
-//  2. Request itu "hairpin" — server men-fetch dirinya sendiri lewat
-//     reverse proxy publik (port 80) yang belum tentu reachable dari
-//     proses Next.js itu sendiri, menyebabkan ECONNREFUSED.
-// Dengan memanggil fungsi ini langsung (bukan lewat network), page.tsx
-// tidak lagi tergantung IP, port, atau reverse proxy sama sekali.
+// HTTP fetch) baik oleh endpoint API maupun server components.
 
-import { query, queryOne } from "@/lib/db";
+import { queryOne } from "@/lib/db";
 
-export type VerificationFormType = "hot-work" | "workshop" | "height-work";
-export type VerificationRoleKey  = "kontraktor" | "spv" | "admin_k3" | "sfo" | "mr_pga";
+export type VerificationFormType =
+  | "hot-work"
+  | "workshop"
+  | "height-work"
+  | "general-permit"
+  | "jsa"
+  | "penilaian-subkontraktor";
+
+export type VerificationRoleKey =
+  | "kontraktor"
+  | "spv"
+  | "admin_k3"
+  | "sfo"
+  | "mr_pga"
+  | "pga"
+  | "security"
+  | "firewatch"
+  | "purchasing"
+  | "picDept";
 
 // ── Mapping tabel per form type ─────────────────────────────
-const TABLE_MAP: Record<VerificationFormType, { table: string; lokCol: string }> = {
+const TABLE_MAP: Record<string, { table: string; lokCol: string }> = {
   "hot-work":    { table: "form_kerja_panas",      lokCol: "lokasi_pekerjaan" },
   "workshop":    { table: "form_kerja_workshop",   lokCol: "lokasi_pekerjaan" },
   "height-work": { table: "form_kerja_ketinggian", lokCol: "lokasi" },
 };
 
-const JENIS_LABEL: Record<VerificationFormType, string> = {
-  "hot-work":    "Hot Work Permit",
-  "workshop":    "Workshop Permit",
-  "height-work": "Kerja Ketinggian",
+const JENIS_LABEL: Record<string, string> = {
+  "hot-work":               "Hot Work Permit (Ijin Kerja Panas)",
+  "workshop":               "Workshop Permit (Ijin Kerja Workshop)",
+  "height-work":            "Kerja Ketinggian (Height Work Permit)",
+  "general-permit":         "Form Ijin Kerja Eksternal",
+  "jsa":                    "Job Safety Analysis (JSA)",
+  "penilaian-subkontraktor": "Form Penilaian Sub Kontraktor",
 };
 
-// ── Mapping role → kolom DB ──────────────────────────────────
-const ROLE_COL_MAP: Record<VerificationRoleKey, {
-  approved:    string;
-  approved_by: string;
-  approved_at: string;
-  nik:         string;
-}> = {
-  kontraktor: {
-    approved:    "kontraktor_approved",
-    approved_by: "kontraktor_approved_by",
-    approved_at: "kontraktor_approved_at",
-    nik:         "kontraktor_nik",
-  },
-  spv: {
-    approved:    "spv_approved",
-    approved_by: "spv_approved_by",
-    approved_at: "spv_approved_at",
-    nik:         "spv_nik",
-  },
-  admin_k3: {
-    approved:    "admin_k3_approved",
-    approved_by: "admin_k3_approved_by",
-    approved_at: "admin_k3_approved_at",
-    nik:         "admin_k3_nik",
-  },
-  sfo: {
-    approved:    "sfo_approved",
-    approved_by: "sfo_approved_by",
-    approved_at: "sfo_approved_at",
-    nik:         "sfo_nik",
-  },
-  mr_pga: {
-    approved:    "mr_pga_approved",
-    approved_by: "mr_pga_approved_by",
-    approved_at: "mr_pga_approved_at",
-    nik:         "mr_pga_nik",
-  },
-};
-
-const ROLE_LABEL: Record<VerificationRoleKey, string> = {
-  kontraktor: "Kontraktor",
+// ── Mapping role label ───────────────────────────────────────
+const ROLE_LABEL: Record<string, string> = {
+  kontraktor: "Kontraktor / Penanggung Jawab",
   spv:        "Supervisor (SPV)",
   admin_k3:   "Admin K3",
-  sfo:        "SFO",
+  sfo:        "Safety Officer (SFO)",
   mr_pga:     "MR / PGA Manager",
+  pga:        "SMR / PGA Manager",
+  security:   "Security",
+  firewatch:  "Pengawas Pekerjaan / Firewatch",
+  purchasing: "Purchasing",
+  picDept:    "Pengawas Dept",
+  pengawasDept: "Pengawas Dept",
+  pengawas:   "Pengawas Dept",
 };
 
 function isTruthy(v: any): boolean {
@@ -91,7 +66,7 @@ export type VerificationResult =
       form: {
         id_form: string;
         jenis_form: string;
-        jenis_form_raw: VerificationFormType;
+        jenis_form_raw: string;
         lokasi: string | null;
         status: string;
         tanggal_pelaksanaan: string | null;
@@ -101,7 +76,7 @@ export type VerificationResult =
         nama: string | null;
         nik: string | null;
         jabatan: string | null;
-        role: VerificationRoleKey;
+        role: string;
         role_label: string;
         approved_at: string | null;
       };
@@ -113,20 +88,205 @@ export async function getApprovalVerification(
   id: string,
   role: string
 ): Promise<VerificationResult> {
-  const formType = jenisForm as VerificationFormType;
-  const roleKey  = role as VerificationRoleKey;
-
-  const tableInfo = TABLE_MAP[formType];
-  if (!tableInfo) {
-    return { success: false, error: "Jenis form tidak valid", status: 400 };
-  }
-
-  const roleCols = ROLE_COL_MAP[roleKey];
-  if (!roleCols) {
-    return { success: false, error: "Role tidak valid", status: 400 };
-  }
+  const formType = jenisForm.toLowerCase();
+  const roleKey = role.toLowerCase();
 
   try {
+    // 1. Verifikasi JSA (tersimpan di jsonb jsa_data form_ijin_kerja)
+    if (formType === "jsa") {
+      const row = await queryOne<{
+        id_form: string;
+        status: string;
+        nama_kontraktor_pekerja: string | null;
+        lokasi_pekerjaan: string | null;
+        tanggal: string | null;
+        jsa_data: any;
+      }>(
+        `SELECT id_form, status, nama_kontraktor_pekerja, lokasi_pekerjaan, tanggal, jsa_data
+           FROM form_ijin_kerja
+          WHERE id_form = $1`,
+        [id]
+      );
+
+      if (!row) return { success: false, error: "Form Ijin Kerja Eksternal tidak ditemukan", status: 404 };
+
+      const jsaData = typeof row.jsa_data === "string" ? JSON.parse(row.jsa_data) : (row.jsa_data || {});
+      const entry = jsaData.approval?.[roleKey];
+
+      if (!entry || !entry.approved) {
+        return { success: false, error: `Approval JSA untuk role ${ROLE_LABEL[roleKey] || role} belum dilakukan`, status: 404 };
+      }
+
+      return {
+        success: true,
+        form: {
+          id_form: row.id_form,
+          jenis_form: JENIS_LABEL["jsa"],
+          jenis_form_raw: "jsa",
+          lokasi: row.lokasi_pekerjaan,
+          status: row.status,
+          tanggal_pelaksanaan: row.tanggal,
+          tipe_perusahaan: row.nama_kontraktor_pekerja,
+        },
+        approver: {
+          nama: entry.approvedBy || null,
+          nik: entry.approvedNik || null,
+          jabatan: "Approver JSA",
+          role: roleKey,
+          role_label: ROLE_LABEL[roleKey] || roleKey,
+          approved_at: entry.approvedAt || null,
+        },
+      };
+    }
+
+    // 2. Verifikasi Penilaian Sub Kontraktor (tersimpan di jsonb penilaian_subkontraktor form_ijin_kerja)
+    if (formType === "penilaian-subkontraktor") {
+      const row = await queryOne<{
+        id_form: string;
+        status: string;
+        nama_kontraktor_pekerja: string | null;
+        lokasi_pekerjaan: string | null;
+        tanggal: string | null;
+        penilaian_subkontraktor: any;
+      }>(
+        `SELECT id_form, status, nama_kontraktor_pekerja, lokasi_pekerjaan, tanggal, penilaian_subkontraktor
+           FROM form_ijin_kerja
+          WHERE id_form = $1`,
+        [id]
+      );
+
+      if (!row) return { success: false, error: "Form Ijin Kerja Eksternal tidak ditemukan", status: 404 };
+
+      const penData = typeof row.penilaian_subkontraktor === "string"
+        ? JSON.parse(row.penilaian_subkontraktor)
+        : (row.penilaian_subkontraktor || {});
+
+      const mgt = penData.mengetahui?.[roleKey] || (roleKey === "pengawasDept" || roleKey === "pengawas" ? penData.mengetahui?.picDept : (roleKey === "picDept" ? (penData.mengetahui?.pengawasDept || penData.mengetahui?.pengawas) : null));
+
+      if (!mgt || !mgt.nama || !mgt.nama.trim()) {
+        return {
+          success: false,
+          error: `Persetujuan / Mengetahui ${ROLE_LABEL[roleKey] || role} belum dilakukan`,
+          status: 404,
+        };
+      }
+
+      return {
+        success: true,
+        form: {
+          id_form: row.id_form,
+          jenis_form: JENIS_LABEL["penilaian-subkontraktor"],
+          jenis_form_raw: "penilaian-subkontraktor",
+          lokasi: row.lokasi_pekerjaan,
+          status: row.status,
+          tanggal_pelaksanaan: row.tanggal,
+          tipe_perusahaan: row.nama_kontraktor_pekerja,
+        },
+        approver: {
+          nama: mgt.nama,
+          nik: mgt.nik || null,
+          jabatan: `Mengetahui — ${ROLE_LABEL[roleKey] || roleKey}`,
+          role: roleKey,
+          role_label: ROLE_LABEL[roleKey] || roleKey,
+          approved_at: mgt.tanggal || null,
+        },
+      };
+    }
+
+    // 3. Verifikasi Form Induk General Permit (form_ijin_kerja)
+    if (formType === "general-permit") {
+      const row = await queryOne<any>(
+        `SELECT
+           id_form, status, lokasi_pekerjaan, tanggal, nama_kontraktor_pekerja,
+           kontraktor_pj,
+           spv_approved, spv_approved_by, spv_approved_at, spv_nik,
+           sfo_approved, sfo_approved_by, sfo_approved_at, sfo_nik,
+           pga_approved, pga_approved_by, pga_approved_at, pga_nik,
+           security_approved, security_approved_by, security_approved_at, security_nik
+         FROM form_ijin_kerja
+        WHERE id_form = $1`,
+        [id]
+      );
+
+      if (!row) return { success: false, error: "Form Ijin Kerja Eksternal tidak ditemukan", status: 404 };
+
+      let isApproved = false;
+      let appBy: string | null = null;
+      let appNik: string | null = null;
+      let appAt: string | null = null;
+
+      if (roleKey === "spv") {
+        isApproved = isTruthy(row.spv_approved);
+        appBy = row.spv_approved_by;
+        appNik = row.spv_nik;
+        appAt = row.spv_approved_at;
+      } else if (roleKey === "sfo") {
+        isApproved = isTruthy(row.sfo_approved);
+        appBy = row.sfo_approved_by;
+        appNik = row.sfo_nik;
+        appAt = row.sfo_approved_at;
+      } else if (roleKey === "pga" || roleKey === "mr_pga") {
+        isApproved = isTruthy(row.pga_approved);
+        appBy = row.pga_approved_by;
+        appNik = row.pga_nik;
+        appAt = row.pga_approved_at;
+      } else if (roleKey === "security") {
+        isApproved = isTruthy(row.security_approved);
+        appBy = row.security_approved_by;
+        appNik = row.security_nik;
+        appAt = row.security_approved_at;
+      } else if (roleKey === "kontraktor") {
+        isApproved = Boolean(row.kontraktor_pj);
+        appBy = row.kontraktor_pj;
+        appAt = row.tanggal;
+      }
+
+      if (!isApproved) {
+        return { success: false, error: `Approval untuk role ${ROLE_LABEL[roleKey] || role} belum dilakukan`, status: 404 };
+      }
+
+      return {
+        success: true,
+        form: {
+          id_form: row.id_form,
+          jenis_form: JENIS_LABEL["general-permit"],
+          jenis_form_raw: "general-permit",
+          lokasi: row.lokasi_pekerjaan,
+          status: row.status,
+          tanggal_pelaksanaan: row.tanggal,
+          tipe_perusahaan: row.nama_kontraktor_pekerja,
+        },
+        approver: {
+          nama: appBy,
+          nik: appNik,
+          jabatan: ROLE_LABEL[roleKey] || roleKey,
+          role: roleKey,
+          role_label: ROLE_LABEL[roleKey] || roleKey,
+          approved_at: appAt,
+        },
+      };
+    }
+
+    // 4. Verifikasi Form Kerja Khusus (hot-work, workshop, height-work)
+    const tableInfo = TABLE_MAP[formType];
+    if (!tableInfo) {
+      return { success: false, error: "Jenis form tidak valid", status: 400 };
+    }
+
+    const roleColMap: Record<string, { approved: string; approved_by: string; approved_at: string; nik: string }> = {
+      kontraktor: { approved: "kontraktor_approved", approved_by: "kontraktor_approved_by", approved_at: "kontraktor_approved_at", nik: "kontraktor_nik" },
+      spv:        { approved: "spv_approved", approved_by: "spv_approved_by", approved_at: "spv_approved_at", nik: "spv_nik" },
+      admin_k3:   { approved: "admin_k3_approved", approved_by: "admin_k3_approved_by", approved_at: "admin_k3_approved_at", nik: "admin_k3_nik" },
+      sfo:        { approved: "sfo_approved", approved_by: "sfo_approved_by", approved_at: "sfo_approved_at", nik: "sfo_nik" },
+      mr_pga:     { approved: "mr_pga_approved", approved_by: "mr_pga_approved_by", approved_at: "mr_pga_approved_at", nik: "mr_pga_nik" },
+      pga:        { approved: "mr_pga_approved", approved_by: "mr_pga_approved_by", approved_at: "mr_pga_approved_at", nik: "mr_pga_nik" },
+    };
+
+    const roleCols = roleColMap[roleKey];
+    if (!roleCols) {
+      return { success: false, error: "Role tidak valid", status: 400 };
+    }
+
     const row = await queryOne<any>(
       `SELECT
          id_form,
@@ -148,10 +308,9 @@ export async function getApprovalVerification(
     }
 
     if (!isTruthy(row.is_approved)) {
-      return { success: false, error: "Approval dari role ini belum dilakukan", status: 404 };
+      return { success: false, error: `Approval untuk role ${ROLE_LABEL[roleKey] || role} belum dilakukan`, status: 404 };
     }
 
-    // Coba ambil jabatan approver dari tabel users (by nama, karena kita simpan nama bukan ID)
     let jabatan: string | null = null;
     if (row.approved_by) {
       const userRow = await queryOne<{ jabatan: string | null }>(

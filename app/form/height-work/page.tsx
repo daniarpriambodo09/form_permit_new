@@ -380,30 +380,171 @@ function HeightWorkFormPageInner() {
   const [jsaData, setJsaData] = useState<JsaData>(createEmptyJsa());
   const [jsaMode, setJsaMode] = useState<JsaMode>("upload");
 
-  // ── Kunci tipePerusahaan ke eksternal jika form ini dibuka dari Ijin Kerja Eksternal
+  const [loadingParent, setLoadingParent] = useState(false);
+
+  // ── Hubungkan & Isi Otomatis Data dari Ijin Kerja Eksternal
   useEffect(() => {
-    if (idIjinKerja) {
-      setTipePerusahaan("eksternal");
-    }
+    if (!idIjinKerja) return;
+
+    setTipePerusahaan("eksternal");
+
+    // Cek dulu dari sessionStorage untuk prefill instan
+    try {
+      const sess = sessionStorage.getItem("last_ijin_kerja_eksternal");
+      if (sess) {
+        const p = JSON.parse(sess);
+        if (p && (!p.id_form || p.id_form === idIjinKerja)) {
+          if (p.deskripsiPekerjaan) setDeskripsiPekerjaan(p.deskripsiPekerjaan);
+          if (p.lokasi) setLokasi(p.lokasi);
+          if (p.tanggalPelaksanaan) setTanggalPelaksanaan(p.tanggalPelaksanaan.slice(0, 10));
+          if (p.waktuMulai) setWaktuMulai(p.waktuMulai.slice(0, 5));
+          if (p.waktuSelesai) setWaktuSelesai(p.waktuSelesai.slice(0, 5));
+          if (p.namaKontraktor || p.namaPengawasPicSubkont) {
+            setNamaPengawasKontraktor(p.namaKontraktor || p.namaPengawasPicSubkont || "");
+          }
+          if (p.spvPemberiIzin?.nama) {
+            setSpvPemberiIzin({
+              nama: p.spvPemberiIzin.nama,
+              nik: p.spvPemberiIzin.nik || "",
+              jabatan: p.spvPemberiIzin.jabatan || "Supervisor",
+            });
+          }
+          if (p.perluJsa !== undefined) setPerluJsa(Boolean(p.perluJsa));
+          if (p.jsaMode === "upload" || p.jsaFileUrl || p.jsaFile?.url) {
+            setJsaMode("upload");
+            const u = p.jsaFileUrl || p.jsaFile?.url;
+            setJsaFile(p.jsaFile || { url: u, name: "Dokumen_JSA", size: 0 });
+          } else if (p.jsaData) {
+            setJsaMode("build");
+            setJsaData(p.jsaData);
+          }
+          setJsaData((prev) => ({
+            ...prev,
+            area: p.lokasi || prev.area,
+            pic: p.namaPengawasPicSubkont || prev.pic,
+            jenisPekerjaan: p.deskripsiPekerjaan ? `Kerja Ketinggian - ${p.deskripsiPekerjaan}` : prev.jenisPekerjaan,
+          }));
+        }
+      }
+    } catch {}
+
+    // Fetch langsung dari API general-permit untuk data pasti dan akurat
+    setLoadingParent(true);
+    fetch(`/api/forms/general-permit/${idIjinKerja}`, { credentials: "include" })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (!data || !data.data) return;
+        const p = data.data;
+
+        if (p.deskripsi_pekerjaan) setDeskripsiPekerjaan(p.deskripsi_pekerjaan);
+        if (p.lokasi_pekerjaan) setLokasi(p.lokasi_pekerjaan);
+        if (p.tgl_mulai_kerja) {
+          const tgl = new Date(p.tgl_mulai_kerja).toISOString().split("T")[0];
+          setTanggalPelaksanaan(tgl);
+        }
+        const wMulai = p.waktu_kerja ? p.waktu_kerja.slice(0, 5) : (p.izin_kerja_dari ? p.izin_kerja_dari.slice(0, 5) : "");
+        const wSelesai = p.waktu_selesai ? p.waktu_selesai.slice(0, 5) : (p.izin_kerja_sampai ? p.izin_kerja_sampai.slice(0, 5) : "");
+        if (wMulai) setWaktuMulai(wMulai);
+        if (wSelesai) setWaktuSelesai(wSelesai);
+
+        const pengawas = p.nama_kontraktor_pekerja || p.nama_pengawas_pic_subkont || "";
+        if (pengawas) setNamaPengawasKontraktor(pengawas);
+
+        const spvName = p.spv_terkait_pj || p.spvPemberiIzin?.nama || "";
+        const spvNik = p.nik_spv_terkait_pj || p.spvPemberiIzin?.nik || "";
+        if (spvName) {
+          setSpvPemberiIzin({
+            nama: spvName,
+            nik: spvNik,
+            jabatan: "Supervisor",
+          });
+          setSpvOptions((prev) => {
+            if (prev.some((s) => s.nama === spvName)) return prev;
+            return [{ id: 999999, nama: spvName, nik: spvNik, jabatan: "Supervisor", departmen: p.departemen_pengawas || null }, ...prev];
+          });
+        }
+
+        if (p.perlu_jsa !== undefined) setPerluJsa(Boolean(p.perlu_jsa));
+        const fileUrl = p.jsa_file_url || (p.jsa_data as any)?.fileUrl;
+        if (fileUrl || (p.jsa_data as any)?.mode === "upload") {
+          setJsaMode("upload");
+          setJsaFile({ url: fileUrl, name: fileUrl ? fileUrl.split("/").pop() || "Dokumen_JSA" : "Dokumen_JSA", size: 0 });
+        } else if (p.jsa_data) {
+          setJsaMode("build");
+          setJsaData(p.jsa_data);
+        }
+
+        setJsaData((prev) => ({
+          ...prev,
+          area: p.lokasi_pekerjaan || prev.area,
+          pic: p.nama_pengawas_pic_subkont || prev.pic,
+          jenisPekerjaan: p.deskripsi_pekerjaan ? `Kerja Ketinggian - ${p.deskripsi_pekerjaan}` : prev.jenisPekerjaan,
+        }));
+      })
+      .catch((err) => console.error("Gagal memuat data parent permit:", err))
+      .finally(() => setLoadingParent(false));
   }, [idIjinKerja]);
 
   useEffect(() => {
-    fetch("/api/admin-users/approvers", { credentials: "include" })
-      .then((r) => (r.ok ? r.json() : { users: [] }))
-      .then((d) => {
-        const options = (d.users ?? []).filter((user: { role: string }) => user.role === "spv");
-        setSpvOptions(options);
-        if (options.length > 0) {
-          const defaultSpv = options[0];
-          setSpvPemberiIzin({
-            nama: defaultSpv.nama ?? "",
-            nik: (defaultSpv.nik && defaultSpv.nik.trim()) ? defaultSpv.nik.trim() : (defaultSpv.username ?? ""),
-            jabatan: defaultSpv.jabatan ?? "Supervisor",
+    const fetchApprovers = async () => {
+      try {
+        let userDept = "";
+        try {
+          const meRes = await fetch("/api/auth/me", { credentials: "include" });
+          if (meRes.ok) {
+            const meData = await meRes.json();
+            userDept = meData.user?.departmen || "";
+          }
+        } catch {}
+
+        const r = await fetch("/api/admin-users/approvers", { credentials: "include" });
+        if (!r.ok) return;
+        const d = await r.json();
+        const allSpvs = (d.users ?? []).filter((user: { role: string; is_active?: boolean }) => user.role === "spv" && user.is_active !== false);
+
+        // Opsi SPV HANYA dari departemen yang sama dengan user
+        let filteredSpvs = allSpvs;
+        if (userDept && userDept !== "Unknown") {
+          const byDept = allSpvs.filter(
+            (s: any) => s.departmen?.toLowerCase() === userDept.toLowerCase()
+          );
+          if (byDept.length > 0) filteredSpvs = byDept;
+        }
+
+        setSpvOptions((prev) => {
+          if (spvPemberiIzin.nama && !filteredSpvs.some((s: any) => s.nama === spvPemberiIzin.nama)) {
+            return [
+              {
+                id: 999999,
+                nama: spvPemberiIzin.nama,
+                nik: spvPemberiIzin.nik,
+                jabatan: spvPemberiIzin.jabatan || "Supervisor",
+                departmen: userDept || null,
+              },
+              ...filteredSpvs,
+            ];
+          }
+          return filteredSpvs;
+        });
+
+        if (!idIjinKerja) {
+          setSpvPemberiIzin((prev) => {
+            if (prev.nama) return prev;
+            const defaultSpv = filteredSpvs[0];
+            if (!defaultSpv) return prev;
+            return {
+              nama: defaultSpv.nama ?? "",
+              nik: (defaultSpv.nik && defaultSpv.nik.trim()) ? defaultSpv.nik.trim() : (defaultSpv.username ?? ""),
+              jabatan: defaultSpv.jabatan ?? "Supervisor",
+            };
           });
         }
-      })
-      .catch(() => setSpvOptions([]));
-  }, []);
+      } catch {
+        setSpvOptions([]);
+      }
+    };
+    fetchApprovers();
+  }, [idIjinKerja]);
 
   // Auto-isi Sect/Dept JSA dari Nama Departemen (Internal)
   useEffect(() => {
@@ -541,7 +682,7 @@ function HeightWorkFormPageInner() {
     helmKondisiBaik,
     perluJsa,
     jsaFileUrl: jsaFile?.url ?? null,
-    ...(idIjinKerja || jsaMode === "build" ? { jsaData } : {}),
+    ...(jsaMode === "build" && !jsaFile?.url ? { jsaData } : {}),
     idIjinKerja,
   });
 
@@ -593,7 +734,7 @@ function HeightWorkFormPageInner() {
       return;
     }
 
-    if ((idIjinKerja || jsaMode === "build") && perluJsa && (!jsaData.area.trim() || !jsaData.jenisPekerjaan.trim() || !jsaData.pic.trim() || !jsaData.petugas.some((name) => name.trim()))) {
+    if (jsaMode === "build" && !jsaFile?.url && perluJsa && (!jsaData.area.trim() || !jsaData.jenisPekerjaan.trim() || !jsaData.pic.trim() || !jsaData.petugas.some((name) => name.trim()))) {
       setError("Area, Jenis Pekerjaan, PIC, dan minimal satu Petugas wajib diisi pada JSA");
       document.getElementById("bagian-jsa")?.scrollIntoView({ behavior: "smooth", block: "center" });
       return;
@@ -697,9 +838,15 @@ function HeightWorkFormPageInner() {
           {idIjinKerja && (
             <div className="bg-purple-50 border border-purple-200 rounded-2xl p-4 flex items-start gap-3 shadow-xs">
               <Lock className="w-5 h-5 text-purple-600 shrink-0 mt-0.5" />
-              <div className="text-xs sm:text-sm text-purple-900">
-                <p className="font-bold">Terhubung dengan Ijin Kerja Eksternal</p>
-                <p className="mt-0.5 text-purple-700">Formulir ini dikaitkan dengan nomor izin <strong className="font-mono bg-purple-100 px-1.5 py-0.5 rounded">{idIjinKerja}</strong>. Tipe petugas dikunci ke Eksternal.</p>
+              <div className="text-xs sm:text-sm text-purple-900 flex-1">
+                <p className="font-bold flex items-center gap-2">
+                  Terhubung dengan Ijin Kerja Eksternal
+                  {loadingParent && <span className="text-[11px] font-normal text-purple-600 animate-pulse">(Memuat data...)</span>}
+                </p>
+                <p className="mt-0.5 text-purple-700">
+                  Formulir ini dikaitkan dengan nomor izin <strong className="font-mono bg-purple-100 px-1.5 py-0.5 rounded">{idIjinKerja}</strong>.
+                  Data kontraktor/pengawas, lokasi pekerjaan, deskripsi, tanggal pelaksanaan, jam kerja, dan SPV pemberi izin telah terisi otomatis.
+                </p>
               </div>
             </div>
           )}
@@ -1356,6 +1503,17 @@ function HeightWorkFormPageInner() {
                 setEnabled={setPerluJsa}
                 value={jsaData}
                 setValue={setJsaData}
+                jsaMode={jsaMode}
+                setJsaMode={setJsaMode}
+                jsaFile={jsaFile}
+                setJsaFile={setJsaFile}
+                onJsaInfoLoaded={({ mode, fileUrl, enabled }) => {
+                  setJsaMode(mode);
+                  setPerluJsa(enabled);
+                  if (mode === "upload" && fileUrl) {
+                    setJsaFile({ name: fileUrl.split("/").pop() || "Dokumen_JSA", size: 0, url: fileUrl });
+                  }
+                }}
               />
             ) : (
               <JsaMethodSection

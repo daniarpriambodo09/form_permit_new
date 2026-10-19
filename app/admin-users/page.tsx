@@ -83,6 +83,8 @@ const APPROVER_ROLE_OPTIONS = [
   { value: "smr",        label: "SMR" },
   { value: "security",   label: "Security" },
   { value: "admin",      label: "Admin" },
+  { value: "pengawas",   label: "Pengawas Dept" },
+  { value: "purchasing", label: "Purchasing" },
 ] as const;
 
 const ROLE_LABEL: Record<string, string> = {
@@ -95,6 +97,8 @@ const ROLE_LABEL: Record<string, string> = {
   admin:      "Admin",
   worker:     "Worker",
   firewatch:  "Fire Watch",
+  pengawas:   "Pengawas Dept",
+  purchasing: "Purchasing",
 };
 
 const ROLE_COLOR: Record<string, string> = {
@@ -104,6 +108,10 @@ const ROLE_COLOR: Record<string, string> = {
   sfo:        "bg-teal-50 text-teal-700 border-teal-200",
   smr:        "bg-rose-50 text-rose-700 border-rose-200",
   admin:      "bg-slate-50 text-slate-700 border-slate-300",
+  pengawas:   "bg-indigo-50 text-indigo-700 border-indigo-200",
+  purchasing: "bg-amber-50 text-amber-700 border-amber-200",
+  worker:     "bg-cyan-50 text-cyan-700 border-cyan-200",
+  firewatch:  "bg-amber-50 text-amber-700 border-amber-200",
 };
 
 function formatDate(iso: string): string {
@@ -416,6 +424,115 @@ export default function AdminUsersPage() {
     password: "", password2: "",
   };
   const [approverForm, setApproverForm] = useState(emptyApproverForm);
+
+  // ── State Tambah Purchasing / Pengawas ──────────────────────
+  const [ppModalOpen, setPpModalOpen] = useState(false);
+  const [ppRole, setPpRole] = useState<"purchasing" | "pengawas">("purchasing");
+  const [ppNama, setPpNama] = useState("");
+  const [ppNik, setPpNik] = useState("");
+  const [ppUsername, setPpUsername] = useState("");
+  const [ppDepartmen, setPpDepartmen] = useState("");
+  const [ppPassword, setPpPassword] = useState("");
+  const [ppPassword2, setPpPassword2] = useState("");
+  const [ppShowPass, setPpShowPass] = useState(false);
+  const [ppSubmitting, setPpSubmitting] = useState(false);
+  const [ppError, setPpError] = useState("");
+  const [ppSuccess, setPpSuccess] = useState(false);
+
+  const openPpModal = () => {
+    setPpRole("purchasing");
+    setPpNama("");
+    setPpNik("");
+    setPpUsername("");
+    setPpDepartmen("");
+    setPpPassword("");
+    setPpPassword2("");
+    setPpShowPass(false);
+    setPpError("");
+    setPpSuccess(false);
+    setPpModalOpen(true);
+  };
+
+  const closePpModal = () => {
+    if (ppSubmitting) return;
+    setPpModalOpen(false);
+  };
+
+  const handlePpSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPpError("");
+
+    if (!ppNama.trim()) {
+      setPpError("Nama lengkap wajib diisi");
+      return;
+    }
+    if (!ppNik.trim()) {
+      setPpError("NIK wajib diisi");
+      return;
+    }
+    const nikRe = /^[0-9]{4,20}$/;
+    if (!nikRe.test(ppNik.trim())) {
+      setPpError("Format NIK tidak valid (4-20 digit angka)");
+      return;
+    }
+    if (!ppUsername.trim()) {
+      setPpError("Username wajib diisi");
+      return;
+    }
+    const userRegex = /^[a-zA-Z0-9_]{3,20}$/;
+    if (!userRegex.test(ppUsername.trim())) {
+      setPpError("Username harus 3-20 karakter, hanya huruf, angka, dan underscore");
+      return;
+    }
+    if (ppRole === "pengawas" && !ppDepartmen) {
+      setPpError("Departemen wajib dipilih untuk Pengawas Dept");
+      return;
+    }
+    if (ppPassword.length < 6) {
+      setPpError("Password minimal 6 karakter");
+      return;
+    }
+    if (ppPassword !== ppPassword2) {
+      setPpError("Password dan konfirmasi password tidak cocok");
+      return;
+    }
+
+    setPpSubmitting(true);
+    try {
+      const res = await fetch("/api/auth/register-approver", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          nama: ppNama.trim(),
+          nik: ppNik.trim(),
+          username: ppUsername.trim(),
+          role: ppRole,
+          departmen: ppRole === "pengawas" ? ppDepartmen : null,
+          password: ppPassword,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        setPpError(data.error || "Registrasi gagal");
+        return;
+      }
+
+      setPpSuccess(true);
+      await fetchApproverUsers();
+      setTimeout(() => {
+        setPpModalOpen(false);
+        const roleLabel = ppRole === "purchasing" ? "Purchasing" : `Pengawas Dept (${ppDepartmen})`;
+        setSuccessMsg(`Akun ${roleLabel} "${ppNama}" berhasil dibuat.`);
+        setTimeout(() => setSuccessMsg(""), 4000);
+      }, 1200);
+    } catch {
+      setPpError("Terjadi kesalahan koneksi. Coba lagi.");
+    } finally {
+      setPpSubmitting(false);
+    }
+  };
 
   // ── Edit modal state ──────────────────────────────────────────
   interface EditUserData {
@@ -791,13 +908,27 @@ export default function AdminUsersPage() {
                   : "Kelola akun administrator departemen dan approver sistem izin kerja."}
               </p>
             </div>
-            <button onClick={openModal}
-              className="inline-flex items-center gap-2 px-5 py-2.5 bg-orange-600 hover:bg-orange-500
-                        text-white font-semibold rounded-xl text-sm transition-colors
-                        shadow-md shadow-orange-600/20 whitespace-nowrap self-start sm:self-auto">
-              <UserPlus className="w-4 h-4" />
-              {ctaLabel}
-            </button>
+            <div className="flex flex-wrap items-center gap-2.5">
+              {pageMode === "admin" && (
+                <button
+                  type="button"
+                  onClick={openPpModal}
+                  className="inline-flex items-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500
+                            text-white font-semibold rounded-xl text-sm transition-colors
+                            shadow-md shadow-indigo-600/20 whitespace-nowrap cursor-pointer"
+                >
+                  <UserPlus className="w-4 h-4" />
+                  Tambah Purchasing / Pengawas
+                </button>
+              )}
+              <button onClick={openModal}
+                className="inline-flex items-center gap-2 px-5 py-2.5 bg-orange-600 hover:bg-orange-500
+                          text-white font-semibold rounded-xl text-sm transition-colors
+                          shadow-md shadow-orange-600/20 whitespace-nowrap self-start sm:self-auto cursor-pointer">
+                <UserPlus className="w-4 h-4" />
+                {ctaLabel}
+              </button>
+            </div>
           </div>
 
           {/* Tab Switch — hanya untuk admin */}
@@ -1896,6 +2027,229 @@ export default function AdminUsersPage() {
                 </div>
               </form>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal Tambah Purchasing / Pengawas ── */}
+      {ppModalOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto"
+          style={{ backgroundColor: "rgba(0,0,0,0.7)", backdropFilter: "blur(4px)" }}
+        >
+          <div className="bg-slate-800 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-lg my-8 overflow-hidden">
+            {/* Header */}
+            <div className="flex items-center justify-between p-6 border-b border-slate-700/80">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-indigo-500/20 rounded-xl flex items-center justify-center">
+                  <UserPlus className="w-5 h-5 text-indigo-400" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-white">Tambah Akun Khusus</h3>
+                  <p className="text-xs text-slate-400">Purchasing & Pengawas Departemen</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={closePpModal}
+                disabled={ppSubmitting}
+                className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Form */}
+            <form onSubmit={handlePpSubmit} className="p-6 space-y-4">
+              {ppError && (
+                <div className="flex items-center gap-2 p-3 bg-red-500/10 border border-red-500/30 rounded-lg text-red-400 text-xs">
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  <span>{ppError}</span>
+                </div>
+              )}
+
+              {ppSuccess && (
+                <div className="flex items-center gap-2 p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-lg text-emerald-400 text-xs">
+                  <CheckCircle className="w-4 h-4 shrink-0" />
+                  <span>Akun berhasil dibuat! Menutup form…</span>
+                </div>
+              )}
+
+              {/* Pilih Role */}
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-2">
+                  Pilih Role Pengguna <span className="text-red-400">*</span>
+                </label>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setPpRole("purchasing")}
+                    className={`py-2.5 px-4 rounded-xl border text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                      ppRole === "purchasing"
+                        ? "bg-amber-500/20 border-amber-500 text-amber-300 shadow-sm"
+                        : "bg-slate-700/60 border-slate-600 text-slate-400 hover:text-white"
+                    }`}
+                  >
+                    <span>Purchasing</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPpRole("pengawas")}
+                    className={`py-2.5 px-4 rounded-xl border text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                      ppRole === "pengawas"
+                        ? "bg-indigo-500/20 border-indigo-500 text-indigo-300 shadow-sm"
+                        : "bg-slate-700/60 border-slate-600 text-slate-400 hover:text-white"
+                    }`}
+                  >
+                    <span>Pengawas Dept</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Nama Lengkap */}
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-1.5">
+                  Nama Lengkap <span className="text-red-400">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={ppNama}
+                  onChange={(e) => setPpNama(e.target.value)}
+                  placeholder="Contoh: Budi Santoso"
+                  required
+                  className={inputCls}
+                />
+              </div>
+
+              {/* NIK */}
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-1.5">
+                  NIK <span className="text-red-400">*</span> <span className="text-xs text-slate-400 font-normal">(4-20 digit angka)</span>
+                </label>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={ppNik}
+                  onChange={(e) => setPpNik(e.target.value.replace(/[^0-9]/g, ""))}
+                  placeholder="Contoh: 123456"
+                  required
+                  maxLength={20}
+                  className={inputCls}
+                />
+              </div>
+
+              {/* Departemen khusus Pengawas */}
+              {ppRole === "pengawas" && (
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-1.5">
+                    Departemen <span className="text-red-400">*</span>
+                  </label>
+                  <div className="relative">
+                    <select
+                      value={ppDepartmen}
+                      onChange={(e) => setPpDepartmen(e.target.value)}
+                      required
+                      className={`${selectCls} ${ppDepartmen ? "text-white" : "text-slate-400"}`}
+                    >
+                      <option value="" disabled>- Pilih Departemen -</option>
+                      {DEPARTMENT_OPTIONS.map((d) => (
+                        <option key={d} value={d} className="text-white bg-slate-700">
+                          {d}
+                        </option>
+                      ))}
+                    </select>
+                    <div className="pointer-events-none absolute inset-y-0 right-3 flex items-center">
+                      <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Username */}
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-1.5">
+                  Username <span className="text-red-400">*</span> <span className="text-xs text-slate-400 font-normal">(3-20 karakter)</span>
+                </label>
+                <input
+                  type="text"
+                  value={ppUsername}
+                  onChange={(e) => setPpUsername(e.target.value)}
+                  placeholder="3-20 karakter, huruf/angka/underscore"
+                  required
+                  className={inputCls}
+                />
+              </div>
+
+              {/* Password */}
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-1.5">
+                  Password <span className="text-red-400">*</span> <span className="text-xs text-slate-400 font-normal">(minimal 6 karakter)</span>
+                </label>
+                <div className="relative">
+                  <input
+                    type={ppShowPass ? "text" : "password"}
+                    value={ppPassword}
+                    onChange={(e) => setPpPassword(e.target.value)}
+                    placeholder="Minimal 6 karakter"
+                    required
+                    className={`${inputCls} pr-11`}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setPpShowPass(!ppShowPass)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200 transition-colors"
+                  >
+                    {ppShowPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+
+              {/* Konfirmasi Password */}
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-1.5">
+                  Konfirmasi Password <span className="text-red-400">*</span>
+                </label>
+                <input
+                  type={ppShowPass ? "text" : "password"}
+                  value={ppPassword2}
+                  onChange={(e) => setPpPassword2(e.target.value)}
+                  placeholder="Ulangi password"
+                  required
+                  className={inputCls}
+                />
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex gap-3 pt-3 border-t border-slate-700/80">
+                <button
+                  type="button"
+                  onClick={closePpModal}
+                  disabled={ppSubmitting}
+                  className="flex-1 py-2.5 bg-slate-700 hover:bg-slate-600 disabled:opacity-50 text-slate-300 font-semibold rounded-lg text-sm transition-colors cursor-pointer"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  disabled={ppSubmitting}
+                  className="flex-1 py-2.5 bg-indigo-600 hover:bg-indigo-500 disabled:bg-indigo-600/50 text-white font-semibold rounded-lg text-sm transition-colors flex items-center justify-center gap-2 cursor-pointer shadow-md"
+                >
+                  {ppSubmitting ? (
+                    <>
+                      <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      <span>Menyimpan…</span>
+                    </>
+                  ) : (
+                    <>
+                      <UserPlus className="w-4 h-4" />
+                      <span>Simpan Akun</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

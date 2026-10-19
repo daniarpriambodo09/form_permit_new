@@ -10,7 +10,7 @@ import { hashPassword, verifyToken, COOKIE_NAME } from '@/lib/auth';
 import { encryptPassword } from '@/lib/crypto';
 
 const APPROVER_ROLES = [
-  'spv', 'kontraktor', 'admin_k3', 'sfo', 'smr', 'security', 'admin',
+  'spv', 'kontraktor', 'admin_k3', 'sfo', 'smr', 'security', 'admin', 'pengawas', 'purchasing',
 ] as const;
 
 type ApproverRole = (typeof APPROVER_ROLES)[number];
@@ -28,6 +28,8 @@ const JABATAN_LABEL: Record<ApproverRole, string> = {
   smr:        'SMR',
   security:   'Security',
   admin:      'Administrator',
+  pengawas:   'Pengawas Dept',
+  purchasing: 'Purchasing',
 };
 
 export async function POST(req: NextRequest) {
@@ -72,26 +74,29 @@ export async function POST(req: NextRequest) {
 
     const approverRole = role as ApproverRole;
 
-    // ── Validasi departemen (wajib untuk SPV) ────────────────
-    if (approverRole === 'spv') {
+    // ── Validasi departemen (wajib untuk SPV dan Pengawas) ──
+    if (approverRole === 'spv' || approverRole === 'pengawas') {
       if (!departmen) {
-        return NextResponse.json({ error: 'Departemen wajib dipilih untuk role SPV' }, { status: 400 });
+        return NextResponse.json({ error: `Departemen wajib dipilih untuk role ${JABATAN_LABEL[approverRole]}` }, { status: 400 });
       }
       if (!(DEPARTMENT_OPTIONS as readonly string[]).includes(departmen)) {
         return NextResponse.json({ error: 'Departemen tidak valid' }, { status: 400 });
       }
     }
 
-    // ── Validasi email — WAJIB DIISI ─────────────────────────
-    if (!email || typeof email !== 'string' || email.trim() === '') {
+    // ── Validasi email (opsional untuk purchasing & pengawas) ──
+    let emailValue: string | null = null;
+    if (email && typeof email === 'string' && email.trim() !== '') {
+      emailValue = email.trim().toLowerCase();
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(emailValue)) {
+        return NextResponse.json({ error: 'Format email tidak valid' }, { status: 400 });
+      }
+    } else if (approverRole === 'purchasing' || approverRole === 'pengawas') {
+      emailValue = `${username.toLowerCase().trim()}@jai.co.id`;
+    } else {
       return NextResponse.json({ error: 'Email wajib diisi' }, { status: 400 });
     }
-    const emailValue = email.trim().toLowerCase();
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(emailValue)) {
-      return NextResponse.json({ error: 'Format email tidak valid' }, { status: 400 });
-    }
-    // CATATAN: Duplikat email DIIZINKAN — tidak ada cek unique di sini.
 
     // ── Validasi NIK — WAJIB DIISI, hanya angka, 4-20 digit ──
     if (!nik || typeof nik !== 'string' || nik.trim() === '') {
@@ -116,7 +121,7 @@ export async function POST(req: NextRequest) {
     const hashedPassword    = await hashPassword(password);
     const encryptedPassword = encryptPassword(password);
 
-    const departmenValue = approverRole === 'spv' ? departmen : null;
+    const departmenValue = (approverRole === 'spv' || approverRole === 'pengawas') ? departmen : null;
 
     await query(
       `INSERT INTO users

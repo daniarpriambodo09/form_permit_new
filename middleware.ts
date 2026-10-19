@@ -90,6 +90,8 @@ export async function middleware(req: NextRequest) {
     'firewatch',
     'admin_k3',
     'security',
+    'purchasing',
+    'pengawas',
   ];
   const { pathname } = req.nextUrl;
 
@@ -153,11 +155,6 @@ export async function middleware(req: NextRequest) {
     // 🔐 Worker mencoba akses halaman approver
     if (APPROVER_ROUTES.some((r) => pathname.startsWith(r)) && !allowedApproverRoles.includes(role)) {
       return NextResponse.redirect(new URL('/my-forms', req.url));
-    }
-
-    // 🔐 Approver mencoba akses halaman worker
-    if (WORKER_ROUTES.some((r) => pathname.startsWith(r)) && role !== 'worker') {
-      return NextResponse.redirect(new URL('/approval', req.url));
     }
 
     // ✅ Lolos semua check

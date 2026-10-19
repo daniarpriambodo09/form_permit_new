@@ -11,6 +11,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { query, queryOne } from "@/lib/db";
 import { verifyToken, COOKIE_NAME, UserRole } from "@/lib/auth";
 import { notifyGeneralPermitNextApprover, notifyGeneralPermitRejected } from "@/lib/approval-email";
+import { syncCascadeApproval } from "@/lib/approval-sync";
 
 function getUser(req: NextRequest) {
     const token = req.cookies.get(COOKIE_NAME)?.value;
@@ -70,7 +71,7 @@ export async function PATCH(
 
     try {
         const form = await queryOne<any>(
-            `SELECT id_form, status, current_stage, user_id, tanggal, nama_kontraktor_pekerja
+            `SELECT id_form, status, current_stage, user_id, tanggal, nama_kontraktor_pekerja, spv_terkait_pj, nik_spv_terkait_pj
              FROM form_ijin_kerja WHERE id_form = $1`,
             [id]
         );
@@ -128,9 +129,35 @@ export async function PATCH(
             );
         }
 
+        // Jika tahap 1 (SPV) dan form telah menunjuk SPV tertentu, pastikan hanya SPV tersebut yang berhak approve
+        if (currentStage === 1 && userRole === "spv") {
+            const spvTarget = (form.spv_terkait_pj ?? "").trim().toLowerCase();
+            const spvNikTarget = (form.nik_spv_terkait_pj ?? "").trim();
+            const uNama = (user.nama ?? "").trim().toLowerCase();
+            const uUser = (user.username ?? "").trim().toLowerCase();
+            const uNik = ((user as any).nik ?? "").trim();
+
+            const isMatch =
+                !spvTarget ||
+                spvTarget === uNama ||
+                spvTarget === uUser ||
+                (spvNikTarget && uNik && spvNikTarget === uNik);
+
+            if (!isMatch) {
+                return NextResponse.json(
+                    { error: `Form ini ditugaskan khusus untuk SPV: ${form.spv_terkait_pj}. Anda tidak berwenang menyetujuinya.` },
+                    { status: 403 }
+                );
+            }
+        }
+
         const isLastStage = currentStage === 4;
         const nextStage = currentStage + 1;
         const cols = stageInfo!;
+
+        // Jika stage 1 (SPV), otomatis input nama & NIK dari SPV Terkait yang telah dipilih
+        const approverName = (currentStage === 1 && form.spv_terkait_pj) ? form.spv_terkait_pj : userName;
+        const approverNik = (currentStage === 1 && form.nik_spv_terkait_pj) ? form.nik_spv_terkait_pj : ((user as any).nik ?? null);
 
         const setClauses: string[] = [
             `${cols.approvedCol} = $1`,
@@ -138,7 +165,7 @@ export async function PATCH(
             `${cols.atCol} = $3`,
             `${cols.nikCol} = $4`,
         ];
-        const values: any[] = [true, userName, now, (user as any).nik ?? null];
+        const values: any[] = [true, approverName, now, approverNik];
         let idx = values.length + 1;
 
         if (isLastStage) {
@@ -155,6 +182,16 @@ export async function PATCH(
             `UPDATE form_ijin_kerja SET ${setClauses.join(", ")} WHERE id_form = $${idx}`,
             values
         );
+
+        // Sinkronisasi otomatis ke seluruh lampiran terkait untuk role yang sama
+        await syncCascadeApproval({
+            idIjinKerja: id,
+            role: stageInfo.role,
+            approverName,
+            approverNik,
+            now,
+            origin: "general-permit",
+        });
 
         if (!isLastStage) {
             notifyGeneralPermitNextApprover({

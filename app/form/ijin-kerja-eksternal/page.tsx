@@ -52,6 +52,7 @@ interface FormState {
   tglMulaiKerja: string;
   tglAkhirKerjaRencana: string;
   waktuKerja: string;
+  waktuSelesai: string;
   actualTanggalKerja: string;
   spesifikasiPekerjaan: {
     areaWorkshop: boolean;
@@ -121,7 +122,6 @@ interface FormState {
   aparLainnya: string;
   limbah: { kontraktor: boolean; ptJai: boolean; luarJai: boolean };
   limbahLokasiPt: string;
-  kontraktorPj: string;
   pernyataanDiperiksa: boolean;
   pengawasPekerjaanUser: string;
 }
@@ -133,6 +133,7 @@ const defaultForm = (): FormState => ({
   tglMulaiKerja: "",
   tglAkhirKerjaRencana: "",
   waktuKerja: "",
+  waktuSelesai: "",
   actualTanggalKerja: "",
   spesifikasiPekerjaan: {
     areaWorkshop: false,
@@ -202,7 +203,6 @@ const defaultForm = (): FormState => ({
   aparLainnya: "",
   limbah: { kontraktor: false, ptJai: false, luarJai: false },
   limbahLokasiPt: "",
-  kontraktorPj: "",
   pernyataanDiperiksa: false,
   pengawasPekerjaanUser: "",
 });
@@ -536,6 +536,9 @@ function IjinKerjaEksternalPageInner() {
       alatLainnya: computedAlatLainnya,
       alatLainnyaKondisi: computedAlatLainnyaKondisi,
       waktuKerja: normalizeTo24h(form.waktuKerja),
+      waktuSelesai: normalizeTo24h(form.waktuSelesai),
+      izinKerjaDari: normalizeTo24h(form.waktuKerja),
+      izinKerjaSampai: normalizeTo24h(form.waktuSelesai),
       perluJsa,
       jsaFileUrl: perluJsa && jsaMode === "upload" ? jsaFile?.url || null : null,
       jsaData: perluJsa && jsaMode === "build" ? jsa : null,
@@ -563,7 +566,26 @@ function IjinKerjaEksternalPageInner() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Gagal menyimpan draft");
-      setCreatedFormId(data.id_form || createdFormId);
+      const savedId = data.id_form || createdFormId;
+      try {
+        sessionStorage.setItem("last_ijin_kerja_eksternal", JSON.stringify({
+          id_form: savedId,
+          namaKontraktor: form.namaKontraktorPekerja,
+          namaPengawasPicSubkont: form.namaPengawasPicSubkont,
+          lokasi: form.lokasiPekerjaan,
+          deskripsiPekerjaan: form.deskripsiPekerjaan,
+          tanggalPelaksanaan: form.tglMulaiKerja,
+          waktuMulai: form.waktuKerja,
+          waktuSelesai: form.waktuSelesai,
+          spvPemberiIzin,
+          perluJsa,
+          jsaMode,
+          jsaFile,
+          jsaFileUrl: perluJsa && jsaMode === "upload" ? jsaFile?.url || null : null,
+          jsaData: perluJsa && jsaMode === "build" ? jsa : null,
+        }));
+      } catch {}
+      setCreatedFormId(savedId);
       router.push("/my-forms");
     } catch (err: any) {
       setError(err.message);
@@ -656,6 +678,24 @@ function IjinKerjaEksternalPageInner() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Gagal mengajukan form");
       const savedId = data.id_form || createdFormId;
+      try {
+        sessionStorage.setItem("last_ijin_kerja_eksternal", JSON.stringify({
+          id_form: savedId,
+          namaKontraktor: form.namaKontraktorPekerja,
+          namaPengawasPicSubkont: form.namaPengawasPicSubkont,
+          lokasi: form.lokasiPekerjaan,
+          deskripsiPekerjaan: form.deskripsiPekerjaan,
+          tanggalPelaksanaan: form.tglMulaiKerja,
+          waktuMulai: form.waktuKerja,
+          waktuSelesai: form.waktuSelesai,
+          spvPemberiIzin,
+          perluJsa,
+          jsaMode,
+          jsaFile,
+          jsaFileUrl: perluJsa && jsaMode === "upload" ? jsaFile?.url || null : null,
+          jsaData: perluJsa && jsaMode === "build" ? jsa : null,
+        }));
+      } catch {}
       setCreatedFormId(savedId);
       setSuccessId(savedId);
       setSuccess(true);
@@ -839,18 +879,6 @@ function IjinKerjaEksternalPageInner() {
                   </div>
                   <div>
                     <label className="block text-xs sm:text-sm font-bold text-slate-800 mb-1.5">
-                      Kontraktor Penanggung Jawab Lapangan
-                    </label>
-                    <input
-                      type="text"
-                      value={form.kontraktorPj}
-                      onChange={(e) => set("kontraktorPj", e.target.value)}
-                      placeholder="Nama penanggung jawab operasional dari kontraktor"
-                      className={inputCls}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs sm:text-sm font-bold text-slate-800 mb-1.5">
                       Jumlah Tenaga Kerja (Orang) <span className="text-rose-500">*</span>
                     </label>
                     <input
@@ -892,7 +920,7 @@ function IjinKerjaEksternalPageInner() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
                   <div>
                     <label className="block text-xs sm:text-sm font-bold text-slate-800 mb-1.5">
                       Waktu Mulai Kerja (Format 24 Jam)
@@ -901,15 +929,29 @@ function IjinKerjaEksternalPageInner() {
                   </div>
                   <div>
                     <label className="block text-xs sm:text-sm font-bold text-slate-800 mb-1.5">
-                      Aktual Tanggal Kerja Selesai
+                      Waktu Selesai (Format 24 Jam)
                     </label>
-                    <input
-                      type="date"
-                      value={form.actualTanggalKerja}
-                      onChange={(e) => set("actualTanggalKerja", e.target.value)}
-                      className={inputCls}
-                    />
+                    <TimeInput24 value={form.waktuSelesai} onChange={(v) => set("waktuSelesai", v)} />
                   </div>
+                </div>
+
+                <div className="pt-2">
+                  <label className="block text-xs sm:text-sm font-bold text-slate-500 mb-1.5 flex items-center gap-2">
+                    <span>Aktual Tanggal Kerja Selesai</span>
+                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 border border-slate-200">
+                      Disabled — Input di /my-forms
+                    </span>
+                  </label>
+                  <input
+                    type="date"
+                    value={form.actualTanggalKerja}
+                    disabled
+                    readOnly
+                    className={`${inputCls} bg-slate-100 cursor-not-allowed text-slate-400 border-dashed`}
+                  />
+                  <p className="text-[11px] text-slate-400 mt-1">
+                    Field ini dinonaktifkan pada saat pengajuan. Pengisian dilakukan di halaman <strong>/my-forms</strong> saat pekerjaan selesai.
+                  </p>
                 </div>
 
                 {/* ── Pemberi Izin / Supervisor Departemen ── */}

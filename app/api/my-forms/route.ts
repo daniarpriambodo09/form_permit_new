@@ -108,6 +108,7 @@ export async function GET(req: NextRequest) {
           gp.catatan_reject, gp.approved_by, gp.approved_at,
           gp.spv_approved, gp.security_approved, gp.sfo_approved, gp.pga_approved,
           gp.nama_kontraktor_pekerja,
+          gp.actual_tanggal_kerja,
           gp.kontraktor_signature_url,
           'general-permit' AS jenis_form,
           'eksternal' AS tipe_perusahaan,

@@ -30,6 +30,29 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     );
     if (!general) return NextResponse.json({ error: "Form eksternal tidak ditemukan" }, { status: 404 });
 
+    // Pastikan jsa_data terisi dengan fallback file jika user mengunggah file JSA
+    if (!general.jsa_data && (general.perlu_jsa || general.jsa_file_url)) {
+      general.jsa_data = {
+        area: "",
+        jenisPekerjaan: "",
+        sectDept: "",
+        pic: "",
+        petugas: [],
+        rows: [],
+        fileUrl: general.jsa_file_url || null,
+        approval: {
+          currentStage: 1,
+          status: "submitted",
+          catatanReject: null,
+          firewatch: { approved: false, approvedBy: null, approvedNik: null, approvedAt: null },
+          spv: { approved: false, approvedBy: null, approvedNik: null, approvedAt: null },
+          sfo: { approved: false, approvedBy: null, approvedNik: null, approvedAt: null },
+        },
+      };
+    } else if (general.jsa_data && typeof general.jsa_data === "object" && !general.jsa_data.fileUrl && general.jsa_file_url) {
+      general.jsa_data.fileUrl = general.jsa_file_url;
+    }
+
     const attachments = await query(
       `SELECT 'hot-work' AS jenis_form, id_form, id_ijin_kerja, status, current_stage,
               tipe_perusahaan, tanggal, tanggal_pelaksanaan, lokasi_pekerjaan,

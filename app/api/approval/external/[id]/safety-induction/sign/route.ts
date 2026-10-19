@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { query, queryOne } from "@/lib/db";
 import { verifyToken, COOKIE_NAME } from "@/lib/auth";
 import { notifyGeneralPermitNextApprover } from "@/lib/approval-email";
+import { syncCascadeApproval } from "@/lib/approval-sync";
 
 function getUser(req: NextRequest) {
   const token = req.cookies.get(COOKIE_NAME)?.value;
@@ -67,6 +68,16 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       WHERE id_form = $4`,
     [JSON.stringify(finalData), user.nama || user.username, signatureUrl, id]
   );
+
+  await syncCascadeApproval({
+    idIjinKerja: id,
+    role: "security",
+    approverName: user.nama || user.username,
+    approverNik: (user as any).nik ?? null,
+    signatureUrl,
+    now: new Date().toISOString(),
+    origin: "safety-induction",
+  });
 
   return NextResponse.json({ success: true, data: finalData });
 }

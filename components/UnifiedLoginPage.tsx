@@ -99,14 +99,15 @@ export default function UnifiedLoginPage({ defaultRole = "worker" }: UnifiedLogi
       }
 
       // Validasi role sesuai tab yang dipilih
+      const workerAllowedRoles = ["worker", "purchasing", "pengawas"];
       if (role === "worker") {
-        if (data.user.role !== "worker") {
+        if (!workerAllowedRoles.includes(data.user.role)) {
           await fetch("/api/auth/logout", {
             method: "POST",
             credentials: "include",
           });
           sessionStorage.clear();
-          setError("Akun ini bukan pekerja/departemen. Silakan klik tombol 'Login Approver / Admin' di atas.");
+          setError("Akun ini bukan pekerja / pengawas dept / purchasing. Silakan klik tombol 'Approver / K3' di atas.");
           return;
         }
       } else {
@@ -117,7 +118,7 @@ export default function UnifiedLoginPage({ defaultRole = "worker" }: UnifiedLogi
             credentials: "include",
           });
           sessionStorage.clear();
-          setError("Akun ini bukan approver. Silakan klik tombol 'Login Pekerja / Dept' di atas.");
+          setError("Akun ini bukan approver. Silakan klik tombol 'Pekerja / Pengawas Dept' di atas.");
           return;
         }
       }

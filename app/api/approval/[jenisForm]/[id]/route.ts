@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { query, queryOne } from '@/lib/db';
 import { verifyToken, COOKIE_NAME, UserRole, canUserApproveAtStage, getStageToRoleMap, getStageConfig } from '@/lib/auth';
 import { notifyNextApprover, notifyFormRejected, FormType } from '@/lib/approval-email';
+import { syncCascadeApproval } from '@/lib/approval-sync';
 
 function getUser(req: NextRequest) {
   const token = req.cookies.get(COOKIE_NAME)?.value;
@@ -227,6 +228,7 @@ export async function PATCH(
     // Fetch form (dengan atau tanpa filter departemen)
     let form: {
       id_form: string;
+      id_ijin_kerja?: string | null;
       status: string;
       current_stage: number;
       tipe_perusahaan: string;
@@ -236,20 +238,20 @@ export async function PATCH(
 
     if (spvDepartmen !== null) {
       form = await queryOne(
-        `SELECT f.id_form, f.status, f.current_stage, f.user_id, f.tanggal,
+        `SELECT f.id_form, f.id_ijin_kerja, f.status, f.current_stage, f.user_id, f.tanggal,
                 (${tipeExpr.replace(/tipe_perusahaan/g, 'f.tipe_perusahaan').replace(/petugas_ketinggian/g, 'f.petugas_ketinggian')}) AS tipe_perusahaan
          FROM ${config.table} f
          JOIN users creator ON creator.id = f.user_id
-         WHERE f.id_form = $1
+         WHERE f.${config.idColumn} = $1
            AND creator.departmen = $2`,
         [id, spvDepartmen]
       );
     } else {
       form = await queryOne(
-        `SELECT id_form, status, current_stage, user_id, tanggal,
+        `SELECT id_form, id_ijin_kerja, status, current_stage, user_id, tanggal,
                 (${tipeExpr}) AS tipe_perusahaan
          FROM ${config.table}
-         WHERE id_form = $1`,
+         WHERE ${config.idColumn} = $1`,
         [id]
       );
     }
@@ -365,6 +367,19 @@ export async function PATCH(
       `UPDATE ${config.table} SET ${setClauses.join(', ')} WHERE id_form = $${paramIdx}`,
       queryParams
     );
+
+    // Jika form ini terhubung ke form ijin kerja eksternal, sinkronkan approval otomatis untuk role yang sama
+    if (form.id_ijin_kerja) {
+      await syncCascadeApproval({
+        idIjinKerja: form.id_ijin_kerja,
+        role: userRole,
+        approverName: userName,
+        approverNik: userNik,
+        now,
+        origin: "job-form",
+        originFormId: id,
+      });
+    }
 
     // ── Email: kirim ke approver berikutnya (fire-and-forget) ──
     // Hanya kirim jika bukan stage terakhir

@@ -35,6 +35,8 @@ interface FormItem {
   mr_pga_approved?: boolean; // kolom DB tetap, bukan pga_approved
   security_approved?: boolean; // untuk form external-permit (Safety Induction)
   id_ijin_kerja?: string | null;
+  spv_terkait_pj?: string;
+  nik_spv_terkait_pj?: string;
 }
 
 interface FormCounts {
@@ -510,6 +512,12 @@ export default function ApprovalPage() {
                           <p className="text-[10px] text-slate-400 mt-1">
                             Alur: SPV → SFO → MGR → Security
                           </p>
+                        )}
+                        {form.jenis_form === "general-permit" && form.spv_terkait_pj && (
+                          <div className="mt-2 text-xs text-indigo-700 bg-indigo-50 border border-indigo-100 rounded-lg px-3 py-1.5 flex items-center gap-1.5">
+                            <User className="w-3.5 h-3.5 shrink-0 text-indigo-500" />
+                            <span>SPV Terkait Ditugaskan: <strong>{form.spv_terkait_pj}</strong>{form.nik_spv_terkait_pj ? ` (NIK: ${form.nik_spv_terkait_pj})` : ""}</span>
+                          </div>
                         )}
 
                         {form.catatan_reject && (

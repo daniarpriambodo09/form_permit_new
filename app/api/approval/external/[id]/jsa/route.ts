@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query, queryOne } from "@/lib/db";
 import { verifyToken, COOKIE_NAME, UserRole } from "@/lib/auth";
+import { syncCascadeApproval } from "@/lib/approval-sync";
 
 const STAGE_ROLES: UserRole[] = ["firewatch", "spv", "sfo"];
 
@@ -24,13 +25,41 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   }
 
   try {
-    const row = await queryOne<{ jsa_data: any; user_id: number | null }>(
-      `SELECT jsa_data, user_id FROM form_ijin_kerja WHERE id_form = $1`,
+    const row = await queryOne<{
+      jsa_data: any;
+      jsa_file_url: string | null;
+      perlu_jsa: boolean;
+      user_id: number | null;
+      spv_terkait_pj: string | null;
+      nik_spv_terkait_pj: string | null;
+    }>(
+      `SELECT jsa_data, jsa_file_url, perlu_jsa, user_id, spv_terkait_pj, nik_spv_terkait_pj FROM form_ijin_kerja WHERE id_form = $1`,
       [id]
     );
-    if (!row?.jsa_data) return NextResponse.json({ error: "JSA tidak ditemukan" }, { status: 404 });
+    if (!row) return NextResponse.json({ error: "Form tidak ditemukan" }, { status: 404 });
 
-    const jsa = row.jsa_data;
+    let jsa = row.jsa_data;
+    if (!jsa && (row.perlu_jsa || row.jsa_file_url)) {
+      jsa = {
+        area: "",
+        jenisPekerjaan: "",
+        sectDept: "",
+        pic: "",
+        petugas: [],
+        rows: [],
+        fileUrl: row.jsa_file_url || null,
+        approval: {
+          currentStage: 1,
+          status: "submitted",
+          catatanReject: null,
+          firewatch: { approved: false, approvedBy: null, approvedNik: null, approvedAt: null },
+          spv: { approved: false, approvedBy: null, approvedNik: null, approvedAt: null },
+          sfo: { approved: false, approvedBy: null, approvedNik: null, approvedAt: null },
+        },
+      };
+    }
+    if (!jsa) return NextResponse.json({ error: "JSA tidak ditemukan" }, { status: 404 });
+
     const approval = jsa.approval;
     if (!approval || !Number.isInteger(approval.currentStage) || approval.currentStage < 1 || approval.currentStage > 3) {
       return NextResponse.json({ error: "Status approval JSA tidak valid" }, { status: 409 });
@@ -42,12 +71,25 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     }
 
     if (user.role === "spv") {
-      const allowed = await queryOne(
-        `SELECT 1 FROM form_ijin_kerja f JOIN users creator ON creator.id = f.user_id JOIN users approver ON approver.id = $2
-          WHERE f.id_form = $1 AND creator.departmen = approver.departmen`,
-        [id, user.userId]
-      );
-      if (!allowed) return NextResponse.json({ error: "SPV hanya dapat menyetujui JSA dari departemennya." }, { status: 403 });
+      const spvTarget = (row.spv_terkait_pj ?? "").trim().toLowerCase();
+      const spvNikTarget = (row.nik_spv_terkait_pj ?? "").trim();
+      const uNama = (user.nama ?? "").trim().toLowerCase();
+      const uUser = (user.username ?? "").trim().toLowerCase();
+      const uNik = ((user as any).nik ?? "").trim();
+
+      if (spvTarget) {
+        const isMatch = spvTarget === uNama || spvTarget === uUser || (spvNikTarget && uNik && spvNikTarget === uNik);
+        if (!isMatch) {
+          return NextResponse.json({ error: `JSA ini memerlukan persetujuan dari SPV terkait: ${row.spv_terkait_pj}.` }, { status: 403 });
+        }
+      } else {
+        const allowed = await queryOne(
+          `SELECT 1 FROM form_ijin_kerja f JOIN users creator ON creator.id = f.user_id JOIN users approver ON approver.id = $2
+            WHERE f.id_form = $1 AND (creator.departmen = approver.departmen OR creator.departmen = 'Unknown')`,
+          [id, user.userId]
+        );
+        if (!allowed) return NextResponse.json({ error: "SPV hanya dapat menyetujui JSA dari departemennya." }, { status: 403 });
+      }
     }
 
     const now = new Date().toISOString();
@@ -58,8 +100,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       approval.catatanReject = String(body.catatan_reject).trim();
     } else {
       entry.approved = true;
-      entry.approvedBy = user.nama || user.username;
-      entry.approvedNik = (user as { nik?: string | null }).nik ?? null;
+      entry.approvedBy = (role === "spv" && row.spv_terkait_pj) ? row.spv_terkait_pj : (user.nama || user.username);
+      entry.approvedNik = (role === "spv" && row.nik_spv_terkait_pj) ? row.nik_spv_terkait_pj : ((user as { nik?: string | null }).nik ?? null);
       entry.approvedAt = now;
       approval[role] = entry;
       if (approval.currentStage === 3) {
@@ -70,6 +112,18 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     }
 
     await query(`UPDATE form_ijin_kerja SET jsa_data = $1, updated_at = $2 WHERE id_form = $3`, [JSON.stringify(jsa), now, id]);
+
+    if (action === "approve" && (role === "spv" || role === "sfo")) {
+      await syncCascadeApproval({
+        idIjinKerja: id,
+        role: role as UserRole,
+        approverName: entry.approvedBy || user.nama || user.username,
+        approverNik: entry.approvedNik || (user as { nik?: string | null }).nik || null,
+        now,
+        origin: "jsa",
+      });
+    }
+
     return NextResponse.json({ success: true, action, status: approval.status, currentStage: approval.currentStage });
   } catch (error: any) {
     console.error(`[PATCH /api/approval/external/${id}/jsa]`, error);

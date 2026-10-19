@@ -11,6 +11,7 @@ import {
 import React from "react";
 import { useApproverAuth } from "@/hooks/useApproverAuth";
 import AuthLoadingSpinner from "@/components/AuthLoadingSpinner";
+import JsaViewer from "@/components/JsaViewer";
 
 // ── Helpers ───────────────────────────────────────────────────
 const formatDate = (d?: string) => {
@@ -107,67 +108,12 @@ const Sec = ({ title, children }: { title: string; children: React.ReactNode }) 
 
 // ── JSA Display Component ────────────────────────────────────
 const JsaDisplay = ({ perluJsa, jsaFileUrl, jsaData }: { perluJsa: boolean; jsaFileUrl?: string | null; jsaData?: any }) => {
-  if (!perluJsa) {
-    return (
-      <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg border border-slate-200">
-        <FileText className="w-5 h-5 text-slate-400 shrink-0" />
-        <span className="text-sm text-slate-600">JSA <strong>Tidak Diperlukan</strong> untuk pekerjaan ini.</span>
-      </div>
-    );
-  }
-
-  if (jsaData) {
-    return (
-      <div className="space-y-3 bg-green-50 rounded-lg border border-green-200 p-3">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <F label="Area" value={jsaData.area} />
-          <F label="Jenis Pekerjaan" value={jsaData.jenisPekerjaan} />
-          <F label="Sect/Dept" value={jsaData.sectDept} />
-          <F label="PIC" value={jsaData.pic} />
-        </div>
-        <p className="text-xs font-semibold text-slate-600">Petugas: {(jsaData.petugas || []).filter(Boolean).join(", ") || "-"}</p>
-        {(jsaData.rows || []).length > 0 && (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[650px] text-xs">
-              <thead className="bg-white"><tr>{["Tanggal", "Jenis Pekerjaan", "Langkah Kerja", "Potensi Bahaya", "Pengendalian", "Saran"].map((header) => <th key={header} className="p-2 text-left">{header}</th>)}</tr></thead>
-              <tbody>{jsaData.rows.map((row: any, index: number) => <tr key={index} className="border-t border-green-200 align-top">{[row.tanggal, row.jenisPekerjaan, row.langkahKerja, row.potensiBahaya, row.pengendalian, row.saran].map((value: any, cellIndex: number) => <td key={cellIndex} className="p-2 whitespace-pre-wrap">{value || "-"}</td>)}</tr>)}</tbody>
-            </table>
-          </div>
-        )}
-      </div>
-    );
-  }
-
-  if (jsaFileUrl) {
-    const fileName = jsaFileUrl.split("/").pop() || "Dokumen JSA";
-    const fileUrl = resolveFileUrl(jsaFileUrl);
-
-    return (
-      <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg border border-green-200">
-        <div className="flex items-center gap-3 min-w-0">
-          <FileText className="w-5 h-5 text-green-600 shrink-0" />
-          <div className="min-w-0">
-            <p className="text-sm font-semibold text-green-800">File JSA Terlampir</p>
-            <p className="text-xs text-green-600 truncate">{fileName}</p>
-          </div>
-        </div>
-        <a
-          href={fileUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex items-center gap-1.5 px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-xs font-semibold rounded-lg transition-colors shrink-0 ml-3"
-        >
-          <Eye className="w-3.5 h-3.5" /> Lihat File
-        </a>
-      </div>
-    );
-  }
-
   return (
-    <div className="flex items-center gap-3 p-3 bg-amber-50 rounded-lg border border-amber-200">
-      <AlertCircle className="w-5 h-5 text-amber-600 shrink-0" />
-      <span className="text-sm text-amber-800">JSA <strong>Diperlukan</strong>, namun file belum diupload.</span>
-    </div>
+    <JsaViewer
+      perluJsa={perluJsa}
+      jsaData={jsaData}
+      jsaFileUrl={jsaFileUrl || jsaData?.fileUrl}
+    />
   );
 };
 
@@ -251,46 +197,13 @@ const PetugasKetinggianSection = ({ form }: { form: any }) => {
 };
 
 // ── Approval chain ────────────────────────────────────────────
-const renderApprovalChain = (form: any, jenisForm: string) => {
-  const isEksternal = form.tipe_perusahaan === "eksternal" || form.petugas_ketinggian === "eksternal";
-
-  let stages: { label: string; key: string; icon: string; dbStage: number }[];
-
-  if (jenisForm === "height-work") {
-    if (isEksternal) {
-      stages = [
-        { label: "Kontraktor", key: "kontraktor", icon: "🏢", dbStage: 1 },
-        { label: "SPV",        key: "spv",        icon: "👷", dbStage: 2 },
-        { label: "Admin K3",   key: "admin_k3",   icon: "🛡️", dbStage: 3 },
-        { label: "SFO",        key: "sfo",        icon: "🔒", dbStage: 4 },
-        { label: "SMR",        key: "mr_pga",     icon: "✅", dbStage: 5 },
-      ];
-    } else {
-      stages = [
-        { label: "SPV",      key: "spv",      icon: "👷", dbStage: 1 },
-        { label: "Admin K3", key: "admin_k3", icon: "🛡️", dbStage: 2 },
-        { label: "SFO",      key: "sfo",      icon: "🔒", dbStage: 3 },
-        { label: "SMR",      key: "mr_pga",   icon: "✅", dbStage: 4 },
-      ];
-    }
-  } else {
-    if (isEksternal) {
-      stages = [
-        { label: "Kontraktor", key: "kontraktor", icon: "🏢", dbStage: 1 },
-        { label: "SPV",        key: "spv",        icon: "👷", dbStage: 2 },
-        { label: "Admin K3",   key: "admin_k3",   icon: "🛡️", dbStage: 3 },
-        { label: "SFO",        key: "sfo",        icon: "🔒", dbStage: 4 },
-        { label: "SMR",        key: "mr_pga",     icon: "✅", dbStage: 5 },
-      ];
-    } else {
-      stages = [
-        { label: "SPV",      key: "spv",      icon: "👷", dbStage: 1 },
-        { label: "Admin K3", key: "admin_k3", icon: "🛡️", dbStage: 2 },
-        { label: "SFO",      key: "sfo",      icon: "🔒", dbStage: 3 },
-        { label: "SMR",      key: "mr_pga",   icon: "✅", dbStage: 4 },
-      ];
-    }
-  }
+const renderApprovalChain = (form: any, _jenisForm: string) => {
+  const stages: { label: string; key: string; icon: string; dbStage: number }[] = [
+    { label: "SPV",      key: "spv",      icon: "👷", dbStage: 1 },
+    { label: "Admin K3", key: "admin_k3", icon: "🛡️", dbStage: 2 },
+    { label: "SFO",      key: "sfo",      icon: "🔒", dbStage: 3 },
+    { label: "SMR",      key: "mr_pga",   icon: "✅", dbStage: 4 },
+  ];
 
   const currentDbStage = form.current_stage ?? 1;
 
@@ -547,14 +460,48 @@ export default function ApprovalDetailPage({
   const isFirewatchRole = userRole === "firewatch" || userRole === "worker";
 
   // ── Height-work: kapan Bagian 5 (Helm, Body Harness & Lanyard) editable ──
-  // Stage Admin K3: internal = 2, eksternal = 3 (lihat penomoran di renderApprovalChain).
-  const heightWorkAdminK3Stage = isEksternal ? 3 : 2;
+  // Stage Admin K3 selalu tahap 2 (spv=1, admin_k3=2, sfo=3, smr=4)
+  const heightWorkAdminK3Stage = 2;
   const harnessAlreadyApproved = isTruthy(form.admin_k3_approved);
   const isAdminK3TurnForHarness =
     jenisForm === "height-work" &&
     userRole === "admin_k3" &&
     form.status === "submitted" &&
     (form.current_stage ?? 1) === heightWorkAdminK3Stage;
+
+  // ── Penentuan stage & status approval role yang login ──
+  const currentDbStage = form.current_stage ?? 1;
+
+  const isAlreadyApprovedByMe =
+    userRole === "spv" ? isTruthy(form.spv_approved) :
+    userRole === "admin_k3" ? isTruthy(form.admin_k3_approved) :
+    userRole === "sfo" ? isTruthy(form.sfo_approved) :
+    userRole === "smr" ? (isTruthy(form.mr_pga_approved) || isTruthy(form.pga_approved)) :
+    false;
+
+  const myApprovalDetails =
+    userRole === "spv" ? { by: form.spv_approved_by, at: form.spv_approved_at, nik: form.spv_nik } :
+    userRole === "admin_k3" ? { by: form.admin_k3_approved_by, at: form.admin_k3_approved_at, nik: form.admin_k3_nik } :
+    userRole === "sfo" ? { by: form.sfo_approved_by, at: form.sfo_approved_at, nik: form.sfo_nik } :
+    userRole === "smr" ? { by: form.mr_pga_approved_by || form.pga_approved_by, at: form.mr_pga_approved_at || form.pga_approved_at, nik: form.mr_pga_nik } :
+    null;
+
+  const stageRoleNames: Record<number, string> = {
+    1: "SPV / Pemberi Izin",
+    2: "Admin K3",
+    3: "SFO",
+    4: "SMR / PGA Manager",
+  };
+  const waitingRoleName = stageRoleNames[currentDbStage] || `Tahap ${currentDbStage}`;
+
+  const roleToStageNumber: Partial<Record<string, number>> = {
+    spv: 1,
+    admin_k3: 2,
+    sfo: 3,
+    smr: 4,
+  };
+  const myExpectedStage = roleToStageNumber[userRole];
+  const isMyTurn = userRole === "admin" || (myExpectedStage !== undefined && currentDbStage === myExpectedStage && !isAlreadyApprovedByMe);
 
   // Badge area berisiko tinggi (hot-work & workshop)
   const areaBerisikoBadges: { label: string; active: boolean }[] = [
@@ -1029,19 +976,103 @@ export default function ApprovalDetailPage({
         )}
 
         {/* ── ACTION PANEL ── */}
-        {form.status === "submitted" && (
+        {form.status === "approved" ? (
+          <div className="bg-emerald-50 rounded-xl border-2 border-emerald-300 p-6 shadow-sm">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 bg-emerald-100 rounded-xl text-emerald-600 shrink-0">
+                <CheckCircle className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="font-bold text-emerald-950 text-base">Form Telah Disetujui Sepenuhnya</h3>
+                <p className="text-xs text-emerald-800 mt-0.5">
+                  Seluruh tahapan verifikasi dan approval untuk form ini telah selesai. Form dinyatakan sah dan aktif.
+                </p>
+              </div>
+            </div>
+          </div>
+        ) : form.status === "rejected" ? (
+          <div className="bg-red-50 rounded-xl border-2 border-red-300 p-6 shadow-sm">
+            <div className="flex items-start gap-3">
+              <div className="p-2.5 bg-red-100 rounded-xl text-red-600 shrink-0">
+                <XCircle className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="font-bold text-red-950 text-base">Form Telah Ditolak</h3>
+                <p className="text-xs text-red-800 mt-0.5">
+                  Form ini ditolak oleh <strong>{form.approved_by || "Approver"}</strong>.
+                </p>
+                {form.catatan_reject && (
+                  <div className="mt-2 p-3 bg-white/80 rounded-lg border border-red-200 text-xs text-red-900">
+                    <span className="font-bold">Alasan Penolakan:</span> {form.catatan_reject}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        ) : form.status === "submitted" && (
           userRole === "admin" ? (
-            <div className="bg-slate-50 rounded-xl border-2 border-slate-300 p-6">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-slate-200 rounded-lg shrink-0">
-                  <Eye className="w-5 h-5 text-slate-500" />
-                </div>
+            <div className="bg-white rounded-xl border-2 border-slate-200 p-6 shadow-sm">
+              <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
                 <div>
-                  <h3 className="font-bold text-slate-700 text-base">Mode Monitoring (Admin)</h3>
-                  <p className="text-sm text-slate-500 mt-0.5">
-                    Admin hanya dapat melihat detail form. Tindakan approve dan reject tidak tersedia untuk role ini.
+                  <h3 className="font-bold text-slate-900 text-base">Mode Administrator</h3>
+                  <p className="text-xs text-slate-500">
+                    Sebagai Admin, Anda dapat memantau atau mengambil tindakan persetujuan darurat.
                   </p>
                 </div>
+                <span className="text-xs px-2.5 py-1 bg-amber-100 text-amber-800 font-bold rounded-lg">
+                  Tahap {currentDbStage}: {waitingRoleName}
+                </span>
+              </div>
+              <div className="flex items-center gap-3 flex-wrap">
+                {!showReject ? (
+                  <>
+                    <button
+                      onClick={() => handleAction("approve")}
+                      disabled={submitting}
+                      className="flex items-center gap-2 px-6 py-3 bg-green-600 hover:bg-green-700 disabled:bg-green-300 text-white rounded-xl font-semibold text-sm transition-colors shadow-sm"
+                    >
+                      {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
+                      Setujui sebagai Admin
+                    </button>
+                    <button
+                      onClick={() => setShowReject(true)}
+                      className="flex items-center gap-2 px-6 py-3 border-2 border-red-300 text-red-600 hover:bg-red-50 rounded-xl font-semibold text-sm transition-colors"
+                    >
+                      <XCircle className="w-4 h-4" /> Tolak Form
+                    </button>
+                  </>
+                ) : (
+                  <div className="w-full space-y-3">
+                    <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
+                      <label className="block text-sm font-bold text-red-700 mb-2">
+                        Catatan Alasan Penolakan <span className="text-red-500">*</span>
+                      </label>
+                      <textarea
+                        rows={3}
+                        value={catatan}
+                        onChange={e => setCatatan(e.target.value)}
+                        placeholder="Jelaskan alasan penolakan secara spesifik..."
+                        className="w-full px-3 py-2 border border-red-300 rounded-lg text-sm focus:ring-2 focus:ring-red-400 focus:border-transparent text-black resize-none"
+                      />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => handleAction("reject")}
+                        disabled={submitting || !catatan.trim()}
+                        className="flex items-center gap-2 px-5 py-3 bg-red-600 hover:bg-red-700 disabled:bg-red-300 text-white rounded-xl font-semibold text-sm transition-colors"
+                      >
+                        {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <XCircle className="w-4 h-4" />}
+                        Konfirmasi Tolak
+                      </button>
+                      <button
+                        onClick={() => { setShowReject(false); setCatatan(""); setError(""); }}
+                        className="px-4 py-3 border border-slate-300 text-slate-600 hover:bg-slate-100 rounded-xl text-sm font-medium transition-colors"
+                      >
+                        Batal
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           ) : isFirewatchRole ? (
@@ -1053,13 +1084,62 @@ export default function ApprovalDetailPage({
                 <div>
                   <h3 className="font-bold text-amber-700 text-base">Fire Watch — Tidak Dapat Approve</h3>
                   <p className="text-sm text-amber-600 mt-0.5">
-                    Role Fire Watch tidak lagi termasuk dalam rantai approval. Form ini menunggu persetujuan dari{" "}
-                    <strong>{isEksternal ? "Kontraktor" : "SPV"}</strong>.
+                    Role Fire Watch tidak termasuk dalam rantai approval. Form ini saat ini menunggu persetujuan dari{" "}
+                    <strong>{waitingRoleName}</strong>.
+                  </p>
+                </div>
+              </div>
+            </div>
+          ) : isAlreadyApprovedByMe ? (
+            /* Role sudah approve (termasuk cascade otomatis dari form induk) */
+            <div className="bg-emerald-50 rounded-xl border-2 border-emerald-300 p-6 shadow-sm">
+              <div className="flex items-start gap-4">
+                <div className="p-3 bg-emerald-100 rounded-xl text-emerald-600 shrink-0">
+                  <CheckCircle className="w-6 h-6" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h3 className="font-bold text-emerald-950 text-base">
+                      Anda Telah Menyetujui Form Ini
+                    </h3>
+                    <span className="text-xs bg-emerald-100 text-emerald-800 font-bold px-2.5 py-0.5 rounded-full border border-emerald-300">
+                      Disetujui ({roleLabel[userRole] || userRole})
+                    </span>
+                  </div>
+                  <p className="text-xs text-emerald-800 mt-1">
+                    Persetujuan Anda telah tercatat atas nama <strong>{myApprovalDetails?.by || userNama}</strong>
+                    {myApprovalDetails?.nik && <> (NIK: <span className="font-mono">{myApprovalDetails.nik}</span>)</>}
+                    {myApprovalDetails?.at && <> pada <strong>{formatDate(myApprovalDetails.at)}</strong></>}.
+                  </p>
+                  <div className="mt-3 pt-3 border-t border-emerald-200 text-xs text-emerald-700 flex items-center gap-1.5">
+                    <Clock className="w-4 h-4 text-emerald-600 shrink-0" />
+                    <span>
+                      Status saat ini: Menunggu persetujuan dari <strong>{waitingRoleName}</strong> (Tahap {currentDbStage}).
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : !isMyTurn ? (
+            /* Belum giliran role user */
+            <div className="bg-slate-50 rounded-xl border-2 border-slate-300 p-6 shadow-sm">
+              <div className="flex items-start gap-4">
+                <div className="p-3 bg-slate-200 rounded-xl text-slate-500 shrink-0">
+                  <Lock className="w-6 h-6" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h3 className="font-bold text-slate-800 text-base">Belum Giliran Anda</h3>
+                  <p className="text-xs text-slate-600 mt-1">
+                    Anda login sebagai: <strong>{roleLabel[userRole] || userRole}</strong>. Form ini saat ini sedang menunggu persetujuan dari <strong>{waitingRoleName}</strong> (Tahap {currentDbStage}).
+                  </p>
+                  <p className="text-xs text-slate-500 mt-2">
+                    Anda akan dapat memberikan keputusan persetujuan setelah tahap sebelumnya disetujui.
                   </p>
                 </div>
               </div>
             </div>
           ) : (
+            /* Saat ini giliran role user */
             <div className="bg-white rounded-xl border-2 border-slate-200 p-6 shadow-sm">
               <h3 className="font-bold text-slate-900 mb-1 text-base">Keputusan Approval</h3>
               <p className="text-xs text-slate-500 mb-5">

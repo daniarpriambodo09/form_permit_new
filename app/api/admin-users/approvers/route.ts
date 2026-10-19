@@ -40,7 +40,7 @@ export async function GET(req: NextRequest) {
          is_active,
          created_at
        FROM users
-       WHERE role IN ('spv', 'kontraktor', 'admin_k3', 'sfo', 'smr', 'admin', 'security')
+       WHERE role IN ('spv', 'kontraktor', 'admin_k3', 'sfo', 'smr', 'admin', 'security', 'pengawas', 'purchasing')
     `;
     const params: any[] = [];
     if (roleParam) {

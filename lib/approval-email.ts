@@ -506,3 +506,36 @@ export async function notifyGeneralPermitNextApprover(params: {
     console.error(`[EMAIL] Failed to send general-permit approval notification for ${idForm}:`, err);
   }
 }
+
+export async function notifySfoPenilaianApproved(params: {
+  idForm: string;
+  namaKontraktor?: string | null;
+  lokasi?: string | null;
+  tanggal?: string | null;
+}): Promise<void> {
+  const { idForm, namaKontraktor, lokasi, tanggal } = params;
+
+  try {
+    const approvers = await getApproverEmails('sfo');
+    if (approvers.length === 0) {
+      console.log(`[EMAIL] Tidak ada approver dengan role "sfo" untuk notifikasi Penilaian Sub Kontraktor ${idForm}.`);
+      return;
+    }
+
+    for (const approver of approvers) {
+      if (!approver.email) continue;
+      await sendExternalApprovalNotification({
+        idForm,
+        namaPemohon: `${namaKontraktor || "-"} (Penilaian Sub Kontraktor disetujui Purchasing)`,
+        tanggal: formatTanggal(tanggal || new Date().toISOString()),
+        approverName: approver.nama,
+        approverEmail: approver.email,
+        attachmentCount: 0,
+      });
+    }
+
+    console.log(`[EMAIL] Notifikasi Penilaian Sub Kontraktor ${idForm} dikirim ke SFO (${approvers.length} penerima).`);
+  } catch (err) {
+    console.error(`[EMAIL] Failed to send SFO notification for Penilaian Sub Kontraktor ${idForm}:`, err);
+  }
+}

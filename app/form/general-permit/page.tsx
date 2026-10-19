@@ -85,7 +85,6 @@ interface FormState {
   izinKerjaDari: string;
   izinKerjaSampai: string;
 
-  kontraktorPj: string;
   spvTerkaitPj: string;
 
   pernyataanDiperiksa: boolean;
@@ -132,7 +131,7 @@ const defaultForm = (): FormState => ({
   limbah: { kontraktor: false, ptJai: false, luarJai: false },
   limbahLokasiPt: "",
   izinKerjaDari: "", izinKerjaSampai: "",
-  kontraktorPj: "", spvTerkaitPj: "",
+  spvTerkaitPj: "",
   pernyataanDiperiksa: false, pengawasPekerjaanUser: "",
 });
 
@@ -600,15 +599,9 @@ export default function GeneralPermitFormPage() {
           {/* BAGIAN 11 */}
           <SectionCard nomor={11} title="Penanggung Jawab Pelaksanaan Pekerjaan">
             <p className="text-xs text-slate-400 -mt-1 mb-2">Informasi penanggung jawab — bukan approver form ini.</p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2">Kontraktor</label>
-                <input type="text" value={form.kontraktorPj} onChange={(e) => set("kontraktorPj", e.target.value)} className={inputCls} />
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2">SPV Terkait</label>
-                <input type="text" value={form.spvTerkaitPj} onChange={(e) => set("spvTerkaitPj", e.target.value)} className={inputCls} />
-              </div>
+            <div>
+              <label className="block text-sm font-semibold text-slate-700 mb-2">SPV Terkait</label>
+              <input type="text" value={form.spvTerkaitPj} onChange={(e) => set("spvTerkaitPj", e.target.value)} className={inputCls} />
             </div>
           </SectionCard>
 

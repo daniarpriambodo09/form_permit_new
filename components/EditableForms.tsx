@@ -808,18 +808,22 @@ export default function EditableForms({ formType, formData, onChange }: Editable
             <input type="text" value={localData.nama_pengawas_pic_subkont || ""} onChange={(e) => handleLocalChange("nama_pengawas_pic_subkont", e.target.value)} onBlur={(e) => handleBlur("nama_pengawas_pic_subkont", e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm text-black" />
           </div>
 
-          <div className="grid grid-cols-2 gap-3 mt-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-3">
             <div>
               <label className="block text-xs font-medium text-slate-600 mb-1">Jumlah Tenaga Kerja</label>
               <input type="number" value={localData.jumlah_tenaga_kerja || ""} onChange={(e) => handleLocalChange("jumlah_tenaga_kerja", e.target.value)} onBlur={(e) => handleBlur("jumlah_tenaga_kerja", e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm text-black" />
             </div>
             <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">Waktu Kerja</label>
+              <label className="block text-xs font-medium text-slate-600 mb-1">Waktu Mulai Kerja</label>
               <input type="time" value={localData.waktu_kerja || ""} onChange={(e) => handleLocalChange("waktu_kerja", e.target.value)} onBlur={(e) => handleBlur("waktu_kerja", e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm text-black" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">Waktu Selesai Kerja</label>
+              <input type="time" value={localData.waktu_selesai || localData.izin_kerja_sampai || ""} onChange={(e) => handleLocalChange("waktu_selesai", e.target.value)} onBlur={(e) => handleBlur("waktu_selesai", e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm text-black" />
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3 mt-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-3">
             <div>
               <label className="block text-xs font-medium text-slate-600 mb-1">Tanggal Mulai Kerja</label>
               <input type="date" value={localData.tgl_mulai_kerja ? new Date(localData.tgl_mulai_kerja).toISOString().split("T")[0] : ""} onChange={(e) => handleLocalChange("tgl_mulai_kerja", e.target.value)} onBlur={(e) => handleBlur("tgl_mulai_kerja", e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm text-black" />
@@ -827,6 +831,10 @@ export default function EditableForms({ formType, formData, onChange }: Editable
             <div>
               <label className="block text-xs font-medium text-slate-600 mb-1">Tanggal Akhir Kerja (Rencana)</label>
               <input type="date" value={localData.tgl_akhir_kerja_rencana ? new Date(localData.tgl_akhir_kerja_rencana).toISOString().split("T")[0] : ""} onChange={(e) => handleLocalChange("tgl_akhir_kerja_rencana", e.target.value)} onBlur={(e) => handleBlur("tgl_akhir_kerja_rencana", e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm text-black" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">Aktual Tanggal Kerja Selesai</label>
+              <input type="date" value={localData.actual_tanggal_kerja ? new Date(localData.actual_tanggal_kerja).toISOString().split("T")[0] : ""} onChange={(e) => handleLocalChange("actual_tanggal_kerja", e.target.value)} onBlur={(e) => handleBlur("actual_tanggal_kerja", e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm text-black" />
             </div>
           </div>
         </div>
@@ -845,15 +853,9 @@ export default function EditableForms({ formType, formData, onChange }: Editable
 
         <div className="border border-slate-200 rounded-lg p-4">
           <h4 className="font-bold text-slate-800 mb-3 text-sm">Bagian 11: Penanggung Jawab</h4>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">Kontraktor PJ</label>
-              <input type="text" value={localData.kontraktor_pj || ""} onChange={(e) => handleLocalChange("kontraktor_pj", e.target.value)} onBlur={(e) => handleBlur("kontraktor_pj", e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm text-black" />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">SPV Terkait PJ</label>
-              <input type="text" value={localData.spv_terkait_pj || ""} onChange={(e) => handleLocalChange("spv_terkait_pj", e.target.value)} onBlur={(e) => handleBlur("spv_terkait_pj", e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm text-black" />
-            </div>
+          <div>
+            <label className="block text-xs font-medium text-slate-600 mb-1">SPV Terkait PJ</label>
+            <input type="text" value={localData.spv_terkait_pj || ""} onChange={(e) => handleLocalChange("spv_terkait_pj", e.target.value)} onBlur={(e) => handleBlur("spv_terkait_pj", e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm text-black" />
           </div>
         </div>
 

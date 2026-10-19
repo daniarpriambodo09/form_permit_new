@@ -4,6 +4,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query, queryOne } from "@/lib/db";
 import { verifyToken, COOKIE_NAME } from "@/lib/auth";
+import { syncCascadeApproval } from "@/lib/approval-sync";
 
 function getUser(req: NextRequest) {
   const token = req.cookies.get(COOKIE_NAME)?.value;
@@ -53,6 +54,7 @@ export async function PATCH(
         ...mengetahui,
         sfo: {
           nama: user.nama || user.username || "SFO",
+          nik: (user as any).nik || "",
           tanggal: new Date().toISOString().slice(0, 10),
         },
       },
@@ -65,6 +67,16 @@ export async function PATCH(
         WHERE id_form = $2`,
       [JSON.stringify(updatedData), id]
     );
+
+    // Sinkronisasi approval otomatis ke form induk, JSA, dan lampiran kerja untuk role SFO
+    await syncCascadeApproval({
+      idIjinKerja: id,
+      role: "sfo",
+      approverName: user.nama || user.username || "SFO",
+      approverNik: (user as any).nik ?? null,
+      now: new Date().toISOString(),
+      origin: "penilaian-subkontraktor",
+    });
 
     return NextResponse.json({
       success: true,

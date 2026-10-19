@@ -25,7 +25,9 @@ export type UserRole =
   | "sfo"
   | "smr"
   | "security"
-  | "admin";
+  | "admin"
+  | "purchasing"
+  | "pengawas";
 
 export const ROLE_LABEL: Record<UserRole, string> = {
   worker: "Worker",
@@ -37,6 +39,8 @@ export const ROLE_LABEL: Record<UserRole, string> = {
   smr: "SMR",
   security: "Security",
   admin: "Admin",
+  purchasing: "Purchasing",
+  pengawas: "Pengawas Dept",
 };
 
 const APPROVER_ROLES: UserRole[] = ["firewatch", "kontraktor", "admin_k3", "sfo", "smr", "security"];
@@ -114,6 +118,30 @@ export function getNavSections(role: UserRole): NavSection[] {
     ];
   }
 
+  if (role === "purchasing") {
+    return [
+      {
+        label: "Menu Utama",
+        items: [
+          beranda,
+          { label: "Penilaian Sub Kontraktor", href: "/purchasing", icon: ClipboardList },
+        ],
+      },
+    ];
+  }
+
+  if (role === "pengawas") {
+    return [
+      {
+        label: "Menu Utama",
+        items: [
+          beranda,
+          { label: "Penilaian Sub Kontraktor", href: "/pengawas", icon: ClipboardList },
+        ],
+      },
+    ];
+  }
+
   // worker
   return [
     {
@@ -179,6 +207,28 @@ export function getFeaturedCards(role: UserRole): FeaturedCard[] {
         description: "Ijin Kerja Eksternal yang menunggu Safety Induction & tanda tangan Anda.",
         href: "/approval",
         icon: ShieldCheck,
+      },
+    ];
+  }
+
+  if (role === "purchasing") {
+    return [
+      {
+        title: "Penilaian Sub Kontraktor",
+        description: "Daftar form ijin kerja eksternal untuk verifikasi penilaian sub kontraktor & ekspor dokumen (Excel / PDF).",
+        href: "/purchasing",
+        icon: ClipboardList,
+      },
+    ];
+  }
+
+  if (role === "pengawas") {
+    return [
+      {
+        title: "Penilaian Sub Kontraktor",
+        description: "Input dan persetujuan checklist evaluasi harian sub kontraktor pekerjaan eksternal.",
+        href: "/pengawas",
+        icon: ClipboardList,
       },
     ];
   }

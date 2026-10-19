@@ -20,6 +20,8 @@ import {
   Check,
   Loader2,
   AlertTriangle,
+  Home,
+  Info,
 } from "lucide-react";
 import JsaMethodSection, { type JsaMode } from "@/components/JsaMethodSection";
 import { type JsaFileInfo, type JsaUploadStatus as JsaStatus } from "@/components/JsaUploadSection";
@@ -296,10 +298,148 @@ function WorkshopPermitFormInner() {
   const searchParams = useSearchParams();
   const idIjinKerja = searchParams.get("id_ijin_kerja");
 
+  const [hasRestoredDraft, setHasRestoredDraft] = useState(false);
+  const draftKey = idIjinKerja ? `draft_workshop_ext_${idIjinKerja}` : "draft_workshop_internal";
+
   useEffect(() => {
-    if (idIjinKerja) {
-      setFormData((p) => ({ ...p, tipePerusahaan: "eksternal" }));
-    }
+    try {
+      localStorage.removeItem("draft_workshop");
+      const saved = localStorage.getItem(draftKey);
+      if (saved && !hasRestoredDraft) {
+        const parsed = JSON.parse(saved);
+        if (parsed && typeof parsed === "object") {
+          const isSubmitted = Boolean(parsed._draftMeta?.isSubmitted || parsed.isSubmitted);
+          const savedPermitId = parsed._draftMeta?.idIjinKerja ?? parsed.idIjinKerja ?? null;
+          const currentPermitId = idIjinKerja || null;
+
+          if (!isSubmitted && savedPermitId === currentPermitId) {
+            const draftForm = parsed.formData || parsed;
+            setFormData((prev) => ({ ...prev, ...draftForm }));
+            setHasRestoredDraft(true);
+          } else {
+            localStorage.removeItem(draftKey);
+          }
+        }
+      }
+    } catch {}
+  }, [draftKey, idIjinKerja, hasRestoredDraft]);
+
+  const saveLocalDraft = (data: FormData) => {
+    try {
+      const payload = {
+        formData: data,
+        _draftMeta: {
+          idIjinKerja: idIjinKerja || null,
+          savedAt: new Date().toISOString(),
+          isSubmitted: false,
+        },
+      };
+      localStorage.setItem(draftKey, JSON.stringify(payload));
+    } catch {}
+  };
+
+  const [loadingParent, setLoadingParent] = useState(false);
+  const [parentPermit, setParentPermit] = useState<any>(null);
+
+  useEffect(() => {
+    if (!idIjinKerja) return;
+
+    // Cek dulu dari sessionStorage untuk prefill instan
+    try {
+      const sess = sessionStorage.getItem("last_ijin_kerja_eksternal");
+      if (sess) {
+        const p = JSON.parse(sess);
+        if (p && (!p.id_form || p.id_form === idIjinKerja)) {
+          setFormData((prev) => ({
+            ...prev,
+            tipePerusahaan: "eksternal",
+            namaKontraktor: p.namaKontraktor || prev.namaKontraktor,
+            lokasi: p.lokasi || prev.lokasi,
+            tanggalPelaksanaan: p.tanggalPelaksanaan ? p.tanggalPelaksanaan.slice(0, 10) : prev.tanggalPelaksanaan,
+            waktuPukul: p.waktuMulai ? p.waktuMulai.slice(0, 5) : prev.waktuPukul,
+            waktuSelesai: p.waktuSelesai ? p.waktuSelesai.slice(0, 5) : prev.waktuSelesai,
+          }));
+          if (p.spvPemberiIzin?.nama) {
+            setSpvPemberiIzin({
+              nama: p.spvPemberiIzin.nama,
+              nik: p.spvPemberiIzin.nik || "",
+              jabatan: p.spvPemberiIzin.jabatan || "Supervisor",
+            });
+          }
+          if (p.perluJsa !== undefined) setPerluJsa(Boolean(p.perluJsa));
+          if (p.jsaMode === "upload" || p.jsaFileUrl || p.jsaFile?.url) {
+            setJsaMode("upload");
+            const u = p.jsaFileUrl || p.jsaFile?.url;
+            setJsaFile(p.jsaFile || { url: u, name: "Dokumen_JSA", size: 0 });
+          } else if (p.jsaData) {
+            setJsaMode("build");
+            setJsaData(p.jsaData);
+          }
+          setJsaData((prev) => ({
+            ...prev,
+            area: p.lokasi || prev.area,
+            pic: p.namaPengawasPicSubkont || prev.pic,
+            jenisPekerjaan: p.deskripsiPekerjaan ? `Workshop - ${p.deskripsiPekerjaan}` : prev.jenisPekerjaan,
+          }));
+        }
+      }
+    } catch {}
+
+    // Fetch langsung dari database via API general-permit
+    setLoadingParent(true);
+    fetch(`/api/forms/general-permit/${idIjinKerja}`, { credentials: "include" })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (!data || !data.data) return;
+        const p = data.data;
+
+        const tgl = p.tgl_mulai_kerja ? new Date(p.tgl_mulai_kerja).toISOString().split("T")[0] : "";
+        const wMulai = p.waktu_kerja ? p.waktu_kerja.slice(0, 5) : (p.izin_kerja_dari ? p.izin_kerja_dari.slice(0, 5) : "");
+        const wSelesai = p.waktu_selesai ? p.waktu_selesai.slice(0, 5) : (p.izin_kerja_sampai ? p.izin_kerja_sampai.slice(0, 5) : "");
+
+        setFormData((prev) => ({
+          ...prev,
+          tipePerusahaan: "eksternal",
+          namaKontraktor: p.nama_kontraktor_pekerja || prev.namaKontraktor,
+          lokasi: p.lokasi_pekerjaan || prev.lokasi,
+          tanggalPelaksanaan: tgl || prev.tanggalPelaksanaan,
+          waktuPukul: wMulai || prev.waktuPukul,
+          waktuSelesai: wSelesai || prev.waktuSelesai,
+        }));
+
+        const spvName = p.spv_terkait_pj || p.spvPemberiIzin?.nama || "";
+        const spvNik = p.nik_spv_terkait_pj || p.spvPemberiIzin?.nik || "";
+        if (spvName) {
+          setSpvPemberiIzin({
+            nama: spvName,
+            nik: spvNik,
+            jabatan: "Supervisor",
+          });
+          setSpvOptions((prev) => {
+            if (prev.some((s) => s.nama === spvName)) return prev;
+            return [{ id: 999999, nama: spvName, nik: spvNik, jabatan: "Supervisor", departmen: p.departemen_pengawas || null }, ...prev];
+          });
+        }
+
+        if (p.perlu_jsa !== undefined) setPerluJsa(Boolean(p.perlu_jsa));
+        const fileUrl = p.jsa_file_url || (p.jsa_data as any)?.fileUrl;
+        if (fileUrl || (p.jsa_data as any)?.mode === "upload") {
+          setJsaMode("upload");
+          setJsaFile({ url: fileUrl, name: fileUrl ? fileUrl.split("/").pop() || "Dokumen_JSA" : "Dokumen_JSA", size: 0 });
+        } else if (p.jsa_data) {
+          setJsaMode("build");
+          setJsaData(p.jsa_data);
+        }
+
+        setJsaData((prev) => ({
+          ...prev,
+          area: p.lokasi_pekerjaan || prev.area,
+          pic: p.nama_pengawas_pic_subkont || prev.pic,
+          jenisPekerjaan: p.deskripsi_pekerjaan ? `Workshop - ${p.deskripsi_pekerjaan}` : prev.jenisPekerjaan,
+        }));
+      })
+      .catch((err) => console.error("Gagal memuat data parent permit:", err))
+      .finally(() => setLoadingParent(false));
   }, [idIjinKerja]);
 
   useEffect(() => {
@@ -319,15 +459,43 @@ function WorkshopPermitFormInner() {
         if (spvRes.ok) {
           const spvData = await spvRes.json();
           const allSpvs = (spvData.users ?? []).filter((u: any) => u.role === "spv" && u.is_active !== false);
-          setSpvOptions(allSpvs);
-          if (allSpvs.length > 0 && !spvPemberiIzin.nama) {
-            const matchingSpv = data.user?.departmen
-              ? allSpvs.find((s: any) => s.departmen === data.user.departmen) || allSpvs[0]
-              : allSpvs[0];
-            setSpvPemberiIzin({
-              nama: matchingSpv.nama ?? "",
-              nik: (matchingSpv.nik && matchingSpv.nik.trim()) ? matchingSpv.nik.trim() : (matchingSpv.username ?? ""),
-              jabatan: matchingSpv.jabatan ?? "Supervisor",
+
+          // Opsi SPV HANYA dari departemen yang sama dengan user
+          const dept = data.user?.departmen;
+          let filteredSpvs = allSpvs;
+          if (dept && dept !== "Unknown") {
+            const byDept = allSpvs.filter(
+              (s: any) => s.departmen?.toLowerCase() === dept.toLowerCase()
+            );
+            if (byDept.length > 0) filteredSpvs = byDept;
+          }
+
+          setSpvOptions((prev) => {
+            if (spvPemberiIzin.nama && !filteredSpvs.some((s: any) => s.nama === spvPemberiIzin.nama)) {
+              return [
+                {
+                  id: 999999,
+                  nama: spvPemberiIzin.nama,
+                  nik: spvPemberiIzin.nik,
+                  jabatan: spvPemberiIzin.jabatan || "Supervisor",
+                  departmen: dept || null,
+                },
+                ...filteredSpvs,
+              ];
+            }
+            return filteredSpvs;
+          });
+
+          if (!idIjinKerja) {
+            setSpvPemberiIzin((prev) => {
+              if (prev.nama) return prev;
+              const defaultSpv = filteredSpvs[0];
+              if (!defaultSpv) return prev;
+              return {
+                nama: defaultSpv.nama ?? "",
+                nik: (defaultSpv.nik && defaultSpv.nik.trim()) ? defaultSpv.nik.trim() : (defaultSpv.username ?? ""),
+                jabatan: defaultSpv.jabatan ?? "Supervisor",
+              };
             });
           }
         }
@@ -336,7 +504,7 @@ function WorkshopPermitFormInner() {
       }
     };
     fetchUser();
-  }, []);
+  }, [idIjinKerja]);
 
   // ── Fetch pekerja Workshop dari Master Lisence saat Internal ──
   useEffect(() => {
@@ -395,7 +563,8 @@ function WorkshopPermitFormInner() {
     }
 
     if (
-      (idIjinKerja || jsaMode === "build") &&
+      jsaMode === "build" &&
+      !jsaFile?.url &&
       perluJsa &&
       (!jsaData.area.trim() ||
         !jsaData.jenisPekerjaan.trim() ||
@@ -443,7 +612,7 @@ function WorkshopPermitFormInner() {
             ...spvPemberiIzin,
             nik: spvPemberiIzin.nik.trim() || "-",
           },
-          ...(idIjinKerja || jsaMode === "build" ? { jsaData } : {}),
+          ...(jsaMode === "build" && !jsaFile?.url ? { jsaData } : {}),
           idIjinKerja,
         }),
       });
@@ -519,9 +688,15 @@ function WorkshopPermitFormInner() {
           {idIjinKerja && (
             <div className="bg-purple-50 border border-purple-200 rounded-2xl p-4 flex items-start gap-3 shadow-xs">
               <Lock className="w-5 h-5 text-purple-600 shrink-0 mt-0.5" />
-              <div className="text-xs sm:text-sm text-purple-900">
-                <p className="font-bold">Terhubung dengan Ijin Kerja Eksternal</p>
-                <p className="mt-0.5 text-purple-700">Formulir ini dikaitkan dengan nomor izin <strong className="font-mono bg-purple-100 px-1.5 py-0.5 rounded">{idIjinKerja}</strong>.</p>
+              <div className="text-xs sm:text-sm text-purple-900 flex-1">
+                <p className="font-bold flex items-center gap-2">
+                  Terhubung dengan Ijin Kerja Eksternal
+                  {loadingParent && <span className="text-[11px] font-normal text-purple-600 animate-pulse">(Memuat data...)</span>}
+                </p>
+                <p className="mt-0.5 text-purple-700">
+                  Formulir ini dikaitkan dengan nomor izin <strong className="font-mono bg-purple-100 px-1.5 py-0.5 rounded">{idIjinKerja}</strong>.
+                  Data kontraktor, lokasi pekerjaan, tanggal pelaksanaan, jam kerja, dan SPV pemberi izin telah terisi otomatis.
+                </p>
               </div>
             </div>
           )}
@@ -1141,6 +1316,17 @@ function WorkshopPermitFormInner() {
                 setEnabled={setPerluJsa}
                 value={jsaData}
                 setValue={setJsaData}
+                jsaMode={jsaMode}
+                setJsaMode={setJsaMode}
+                jsaFile={jsaFile}
+                setJsaFile={setJsaFile}
+                onJsaInfoLoaded={({ mode, fileUrl, enabled }) => {
+                  setJsaMode(mode);
+                  setPerluJsa(enabled);
+                  if (mode === "upload" && fileUrl) {
+                    setJsaFile({ name: fileUrl.split("/").pop() || "Dokumen_JSA", size: 0, url: fileUrl });
+                  }
+                }}
               />
             ) : (
               <JsaMethodSection
