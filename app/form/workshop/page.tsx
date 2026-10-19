@@ -528,11 +528,23 @@ function WorkshopPermitFormInner() {
   const toggle = (s: string) =>
     setExpanded((prev) => ({ ...prev, [s]: !prev[s as keyof typeof prev] }));
   const setJ = (patch: any) =>
-    setFormData((prev) => ({ ...prev, jenisPekerjaan: { ...prev.jenisPekerjaan, ...patch } }));
+    setFormData((prev) => {
+      const next = { ...prev, jenisPekerjaan: { ...prev.jenisPekerjaan, ...patch } };
+      saveLocalDraft(next);
+      return next;
+    });
   const setA = (patch: any) =>
-    setFormData((prev) => ({ ...prev, areaBerisiko: { ...prev.areaBerisiko, ...patch } }));
+    setFormData((prev) => {
+      const next = { ...prev, areaBerisiko: { ...prev.areaBerisiko, ...patch } };
+      saveLocalDraft(next);
+      return next;
+    });
   const setP = (patch: any) =>
-    setFormData((prev) => ({ ...prev, pencegahan: { ...prev.pencegahan, ...patch } }));
+    setFormData((prev) => {
+      const next = { ...prev, pencegahan: { ...prev.pencegahan, ...patch } };
+      saveLocalDraft(next);
+      return next;
+    });
   const setWork = (key: "cutting" | "grinding" | "welding" | "painting", field: keyof WorkDetail, val: string) =>
     setJ({ [key]: { ...formData.jenisPekerjaan[key], [field]: val } });
 
@@ -600,6 +612,7 @@ function WorkshopPermitFormInner() {
           painting: normalizeWork(formData.jenisPekerjaan.painting),
         },
       };
+
       const res = await fetch("/api/forms/workshop", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -618,6 +631,14 @@ function WorkshopPermitFormInner() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Terjadi kesalahan server");
+
+      // Hapus draft lokal setelah berhasil submit atau simpan ke server
+      try {
+        localStorage.removeItem(draftKey);
+        localStorage.removeItem("draft_workshop");
+      } catch {}
+      setHasRestoredDraft(false);
+
       return data;
     } finally {
       setSubmitting(false);
@@ -657,6 +678,13 @@ function WorkshopPermitFormInner() {
       <header className="bg-white border-b border-slate-200 sticky top-0 z-40 backdrop-blur-md bg-white/90">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 py-3.5 flex items-center justify-between">
           <div className="flex items-center gap-3">
+            <Link
+              href="/home"
+              className="w-9 h-9 rounded-xl bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-600 transition-colors cursor-pointer"
+              title="Kembali ke Beranda"
+            >
+              <Home className="w-4 h-4" />
+            </Link>
             <div className="w-10 h-10 bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl flex items-center justify-center shadow-md shadow-orange-500/20 text-white">
               <Wrench className="w-5 h-5" />
             </div>
@@ -669,15 +697,58 @@ function WorkshopPermitFormInner() {
               </div>
             </div>
           </div>
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-orange-50 border border-orange-200 rounded-full text-xs font-bold text-orange-700">
-            <Flame className="w-3.5 h-3.5" /> Workshop
-          </span>
+          <div className="flex items-center gap-2 sm:gap-3">
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-orange-50 border border-orange-200 rounded-full text-xs font-bold text-orange-700">
+              <Flame className="w-3.5 h-3.5" /> Workshop
+            </span>
+            <Link
+              href="/my-forms"
+              className="text-xs font-semibold text-orange-600 hover:text-orange-700 bg-orange-50 hover:bg-orange-100/80 px-3 py-1.5 rounded-lg border border-orange-200 transition-colors cursor-pointer"
+            >
+              Lihat Riwayat &rarr;
+            </Link>
+          </div>
         </div>
       </header>
 
       {/* ── MAIN CONTENT ── */}
       <main className="max-w-4xl mx-auto px-4 sm:px-6 pt-6 sm:pt-8">
         <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Banner Pemulihan Draft */}
+          {hasRestoredDraft && (
+            <div className="bg-amber-50 border border-amber-300/80 rounded-xl p-3.5 sm:p-4 flex items-center justify-between gap-3 text-xs sm:text-sm text-amber-900 shadow-xs">
+              <div className="flex items-center gap-2.5">
+                <Info className="w-4 h-4 text-amber-600 shrink-0" />
+                <span>Memuat draft isian terakhir yang tersimpan di perangkat ini (belum diajukan).</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  try {
+                    localStorage.removeItem(draftKey);
+                    localStorage.removeItem("draft_workshop");
+                  } catch {}
+                  setHasRestoredDraft(false);
+                  const fresh = defaultForm();
+                  if (parentPermit) {
+                    fresh.tipePerusahaan = "eksternal";
+                    fresh.namaKontraktor = parentPermit.nama_kontraktor_pekerja || "";
+                    fresh.lokasi = parentPermit.lokasi_pekerjaan || "";
+                    fresh.tanggalPelaksanaan = parentPermit.tgl_mulai_kerja
+                      ? new Date(parentPermit.tgl_mulai_kerja).toISOString().split("T")[0]
+                      : "";
+                    fresh.waktuPukul = parentPermit.waktu_kerja ? parentPermit.waktu_kerja.slice(0, 5) : "";
+                    fresh.waktuSelesai = parentPermit.waktu_selesai ? parentPermit.waktu_selesai.slice(0, 5) : "";
+                  }
+                  setFormData(fresh);
+                }}
+                className="text-xs font-bold text-amber-700 hover:text-amber-900 underline shrink-0 cursor-pointer"
+              >
+                Reset Formulir
+              </button>
+            </div>
+          )}
+
           {validationError && (
             <div className="bg-rose-50 border border-rose-200 rounded-2xl p-4 flex items-start gap-3 text-rose-700 animate-in fade-in duration-200">
               <AlertCircle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />

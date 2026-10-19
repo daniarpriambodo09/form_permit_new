@@ -8,7 +8,7 @@ import {
   AlertTriangle, Shield, ChevronRight, AlertCircle,
   CheckCircle, Loader2, Camera, Upload, X, ZoomIn, ImageIcon, Lock,
   Eye, CalendarClock, Clock, Check, Save, Send, ChevronDown, ChevronUp,
-  HardHat, ShieldAlert, Sparkles, Building2, UserCheck
+  HardHat, ShieldAlert, Sparkles, Building2, UserCheck, Home, Info
 } from "lucide-react";
 import JsaMethodSection, { type JsaMode } from "@/components/JsaMethodSection";
 import { type JsaFileInfo, type JsaUploadStatus as JsaStatus } from "@/components/JsaUploadSection";
@@ -806,6 +806,13 @@ function HeightWorkFormPageInner() {
       <header className="bg-white border-b border-slate-200 sticky top-0 z-40 backdrop-blur-md bg-white/90">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 py-3.5 flex items-center justify-between">
           <div className="flex items-center gap-3">
+            <Link
+              href="/home"
+              className="w-9 h-9 rounded-xl bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-600 transition-colors cursor-pointer"
+              title="Kembali ke Beranda"
+            >
+              <Home className="w-4 h-4" />
+            </Link>
             <div className="w-10 h-10 bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl flex items-center justify-center shadow-md shadow-orange-500/20 text-white">
               <ShieldAlert className="w-5 h-5" />
             </div>
@@ -818,9 +825,17 @@ function HeightWorkFormPageInner() {
               </div>
             </div>
           </div>
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-orange-50 border border-orange-200 rounded-full text-xs font-bold text-orange-700">
-            <HardHat className="w-3.5 h-3.5" /> Height Work
-          </span>
+          <div className="flex items-center gap-2 sm:gap-3">
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-orange-50 border border-orange-200 rounded-full text-xs font-bold text-orange-700">
+              <HardHat className="w-3.5 h-3.5" /> Height Work
+            </span>
+            <Link
+              href="/my-forms"
+              className="text-xs font-semibold text-orange-600 hover:text-orange-700 bg-orange-50 hover:bg-orange-100/80 px-3 py-1.5 rounded-lg border border-orange-200 transition-colors cursor-pointer"
+            >
+              Lihat Riwayat &rarr;
+            </Link>
+          </div>
         </div>
       </header>
 
