@@ -23,17 +23,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (!safetyInduction || typeof safetyInduction !== "object") {
     return NextResponse.json({ error: "Data Safety Induction wajib diisi." }, { status: 400 });
   }
-  if (
-    !String(safetyInduction.namaSubcont || "").trim() ||
-    !String(safetyInduction.aktivitasPekerjaan || "").trim() ||
-    !Array.isArray(safetyInduction.namaPekerja) ||
-    !safetyInduction.namaPekerja.some((n: unknown) => typeof n === "string" && n.trim())
-  ) {
-    return NextResponse.json({ error: "Nama Subcont, Aktivitas Pekerjaan, dan minimal satu pekerja wajib diisi." }, { status: 400 });
-  }
-
   const existing = await queryOne<any>(
-    `SELECT id_form, status, current_stage, security_approved, user_id, nama_kontraktor_pekerja, tanggal
+    `SELECT id_form, status, current_stage, security_approved, user_id, nama_kontraktor_pekerja, deskripsi_pekerjaan, nama_pengawas_pic_subkont, tanggal
        FROM form_ijin_kerja WHERE id_form = $1`,
     [id]
   );
@@ -41,12 +32,28 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (existing.status !== "submitted") {
     return NextResponse.json({ error: `Form berstatus "${existing.status}".` }, { status: 409 });
   }
-  if (existing.current_stage !== 4 || existing.security_approved) {
+  if (existing.current_stage !== 5 || existing.security_approved) {
     return NextResponse.json({ error: "Belum giliran Security, atau Safety Induction sudah disetujui." }, { status: 409 });
+  }
+
+  const namaSubcont = String(safetyInduction.namaSubcont || existing.nama_kontraktor_pekerja || "").trim();
+  const aktivitasPekerjaan = String(safetyInduction.aktivitasPekerjaan || existing.deskripsi_pekerjaan || "").trim();
+  const koordinatNoHp = String(safetyInduction.koordinatNoHp || existing.nama_pengawas_pic_subkont || "").trim();
+
+  if (
+    !namaSubcont ||
+    !aktivitasPekerjaan ||
+    !Array.isArray(safetyInduction.namaPekerja) ||
+    !safetyInduction.namaPekerja.some((n: unknown) => typeof n === "string" && n.trim())
+  ) {
+    return NextResponse.json({ error: "Nama Subcont, Aktivitas Pekerjaan, dan minimal satu nama pekerja pada Daftar Nama Pekerja wajib diisi." }, { status: 400 });
   }
 
   const finalData = {
     ...safetyInduction,
+    namaSubcont,
+    aktivitasPekerjaan,
+    koordinatNoHp,
     signatureUrl,
     status: "approved",
     approvedBy: user.nama || user.username,
@@ -63,7 +70,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
             status = 'approved',
             approved_by = $2,
             approved_at = NOW(),
-            current_stage = 4,
+            current_stage = 5,
             updated_at = NOW()
       WHERE id_form = $4`,
     [JSON.stringify(finalData), user.nama || user.username, signatureUrl, id]

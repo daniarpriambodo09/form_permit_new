@@ -83,6 +83,7 @@ export type VerificationResult =
         role: string;
         role_label: string;
         approved_at: string | null;
+        signature_url?: string | null;
       };
     }
   | { success: false; error: string; status: number };
@@ -225,11 +226,13 @@ export async function getApprovalVerification(
       const row = await queryOne<any>(
         `SELECT
            id_form, status, lokasi_pekerjaan, tanggal, nama_kontraktor_pekerja,
-           kontraktor_pj,
+           kontraktor_pj, kontraktor_signature_url,
            spv_approved, spv_approved_by, spv_approved_at, spv_nik,
+           admin_k3_approved, admin_k3_approved_by, admin_k3_approved_at, admin_k3_nik,
            sfo_approved, sfo_approved_by, sfo_approved_at, sfo_nik,
            pga_approved, pga_approved_by, pga_approved_at, pga_nik,
-           security_approved, security_approved_by, security_approved_at, security_nik
+           security_approved, security_approved_by, security_approved_at, security_nik,
+           security_signature_url
          FROM form_ijin_kerja
         WHERE id_form = $1`,
         [id]
@@ -241,12 +244,18 @@ export async function getApprovalVerification(
       let appBy: string | null = null;
       let appNik: string | null = null;
       let appAt: string | null = null;
+      let signatureUrl: string | null = null;
 
       if (roleKey === "spv") {
         isApproved = isTruthy(row.spv_approved);
         appBy = row.spv_approved_by;
         appNik = row.spv_nik;
         appAt = row.spv_approved_at;
+      } else if (roleKey === "admin_k3") {
+        isApproved = isTruthy(row.admin_k3_approved);
+        appBy = row.admin_k3_approved_by;
+        appNik = row.admin_k3_nik;
+        appAt = row.admin_k3_approved_at;
       } else if (roleKey === "sfo") {
         isApproved = isTruthy(row.sfo_approved);
         appBy = row.sfo_approved_by;
@@ -262,10 +271,12 @@ export async function getApprovalVerification(
         appBy = row.security_approved_by;
         appNik = row.security_nik;
         appAt = row.security_approved_at;
+        signatureUrl = row.security_signature_url || null;
       } else if (roleKey === "kontraktor") {
-        isApproved = Boolean(row.kontraktor_pj);
-        appBy = row.kontraktor_pj;
+        isApproved = Boolean(row.kontraktor_pj || row.kontraktor_signature_url);
+        appBy = row.kontraktor_pj || row.nama_kontraktor_pekerja || "Kontraktor / Pemohon";
         appAt = row.tanggal;
+        signatureUrl = row.kontraktor_signature_url || null;
       }
 
       if (!isApproved) {
@@ -290,6 +301,7 @@ export async function getApprovalVerification(
           role: roleKey,
           role_label: ROLE_LABEL[roleKey] || roleKey,
           approved_at: appAt,
+          signature_url: signatureUrl,
         },
       };
     }
@@ -310,7 +322,7 @@ export async function getApprovalVerification(
     };
 
     const roleCols = roleColMap[roleKey];
-    if (!roleCols) {
+    if (!roleCols && roleKey !== "security") {
       return { success: false, error: "Role tidak valid", status: 400 };
     }
 
@@ -320,11 +332,13 @@ export async function getApprovalVerification(
          status,
          tanggal_pelaksanaan,
          tipe_perusahaan,
+         id_ijin_kerja,
+         kontraktor_signature_url,
          ${tableInfo.lokCol}        AS lokasi,
-         ${roleCols.approved}       AS is_approved,
-         ${roleCols.approved_by}    AS approved_by,
-         ${roleCols.approved_at}    AS approved_at,
-         ${roleCols.nik}            AS approver_nik
+         ${roleCols ? roleCols.approved : "FALSE"}       AS is_approved,
+         ${roleCols ? roleCols.approved_by : "NULL"}    AS approved_by,
+         ${roleCols ? roleCols.approved_at : "NULL"}    AS approved_at,
+         ${roleCols ? roleCols.nik : "NULL"}            AS approver_nik
        FROM ${tableInfo.table}
        WHERE id_form = $1`,
       [id]
@@ -334,7 +348,38 @@ export async function getApprovalVerification(
       return { success: false, error: "Form tidak ditemukan", status: 404 };
     }
 
-    if (!isTruthy(row.is_approved)) {
+    let isApproved = isTruthy(row.is_approved);
+    let signatureUrl: string | null = null;
+
+    if (roleKey === "kontraktor") {
+      isApproved = isTruthy(row.is_approved) || Boolean(row.kontraktor_signature_url);
+      signatureUrl = row.kontraktor_signature_url || null;
+      if (!signatureUrl && row.id_ijin_kerja) {
+        const parentRow = await queryOne<{ kontraktor_signature_url: string | null }>(
+          `SELECT kontraktor_signature_url FROM form_ijin_kerja WHERE id_form = $1 LIMIT 1`,
+          [row.id_ijin_kerja]
+        );
+        signatureUrl = parentRow?.kontraktor_signature_url || null;
+        if (signatureUrl) isApproved = true;
+      }
+    } else if (roleKey === "security") {
+      if (row.id_ijin_kerja) {
+        const parentRow = await queryOne<any>(
+          `SELECT security_approved, security_approved_by, security_approved_at, security_nik, security_signature_url
+             FROM form_ijin_kerja WHERE id_form = $1 LIMIT 1`,
+          [row.id_ijin_kerja]
+        );
+        if (parentRow && isTruthy(parentRow.security_approved)) {
+          isApproved = true;
+          row.approved_by = parentRow.security_approved_by;
+          row.approver_nik = parentRow.security_nik;
+          row.approved_at = parentRow.security_approved_at;
+          signatureUrl = parentRow.security_signature_url;
+        }
+      }
+    }
+
+    if (!isApproved) {
       return { success: false, error: `Approval untuk role ${ROLE_LABEL[roleKey] || role} belum dilakukan`, status: 404 };
     }
 
@@ -359,12 +404,13 @@ export async function getApprovalVerification(
         tipe_perusahaan:    row.tipe_perusahaan,
       },
       approver: {
-        nama:        row.approved_by,
+        nama:        row.approved_by || (roleKey === "kontraktor" ? row.tipe_perusahaan : null),
         nik:         row.approver_nik,
-        jabatan:     jabatan,
+        jabatan:     jabatan || ROLE_LABEL[roleKey] || roleKey,
         role:        roleKey,
         role_label:  ROLE_LABEL[roleKey] ?? roleKey,
-        approved_at: row.approved_at,
+        approved_at: row.approved_at || row.tanggal_pelaksanaan,
+        signature_url: signatureUrl,
       },
     };
   } catch (err: any) {

@@ -437,9 +437,10 @@ export async function notifyExternalPermit(params: {
 
 const GP_STAGE_ROLE: Partial<Record<number, UserRole>> = {
   1: 'spv',
-  2: 'sfo',
-  3: 'smr',
-  4: 'security',
+  2: 'admin_k3',
+  3: 'sfo',
+  4: 'smr',
+  5: 'security',
 };
 
 export async function notifyGeneralPermitNextApprover(params: {

@@ -32,7 +32,7 @@ export async function PATCH(
 
   const existing = await queryOne<any>(
     `SELECT id_form, status, current_stage, kontraktor_signature_url,
-            user_id, nama_kontraktor_pekerja, tanggal
+            user_id, nama_kontraktor_pekerja, tanggal, safety_induction
        FROM form_ijin_kerja WHERE id_form = $1`,
     [id]
   );
@@ -52,14 +52,36 @@ export async function PATCH(
     );
   }
 
+  // Sinkronkan ke safety_induction JSON
+  let si = existing.safety_induction;
+  if (typeof si === "string") {
+    try { si = JSON.parse(si); } catch { si = {}; }
+  } else if (!si || typeof si !== "object") {
+    si = {};
+  }
+  si.kontraktorSignatureUrl = signatureUrl;
+
   // Kontraktor tanda tangan bebas kapan saja, tidak mengubah current_stage
   await query(
     `UPDATE form_ijin_kerja
         SET kontraktor_signature_url = $1,
+            safety_induction = $2,
             updated_at = NOW()
-      WHERE id_form = $2`,
-    [signatureUrl, id]
+      WHERE id_form = $3`,
+    [signatureUrl, JSON.stringify(si), id]
   );
 
-  return NextResponse.json({ success: true });
+  // Sync juga ke form lampiran yang terikat (hot-work, workshop, height-work)
+  for (const tbl of ["form_kerja_panas", "form_kerja_workshop", "form_kerja_ketinggian"]) {
+    await query(
+      `UPDATE ${tbl}
+          SET kontraktor_signature_url = COALESCE(kontraktor_signature_url, $1),
+              kontraktor_approved = TRUE,
+              updated_at = NOW()
+        WHERE id_ijin_kerja = $2`,
+      [signatureUrl, id]
+    );
+  }
+
+  return NextResponse.json({ success: true, signatureUrl });
 }

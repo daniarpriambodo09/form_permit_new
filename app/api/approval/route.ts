@@ -65,7 +65,9 @@ function buildSelectQuery(
         `SELECT
            f.id_form, f.tanggal, f.tanggal_pelaksanaan, f.status, f.current_stage,
            NULL AS no_registrasi,
-           NULL AS nama_kontraktor_nik,
+           COALESCE(f.petugas_ketinggian, f.nama_kontraktor, '') AS nama_kontraktor_nik,
+           COALESCE(f.petugas_ketinggian, f.nama_kontraktor, '') AS pemohon,
+           f.deskripsi_pekerjaan,
            f.lokasi AS lokasi_pekerjaan,
            f.waktu_mulai AS waktu_pukul,
            f.catatan_reject, f.approved_by, f.approved_at,
@@ -81,6 +83,7 @@ function buildSelectQuery(
          FROM ${table} f
          JOIN users creator ON creator.id = f.user_id
          WHERE (${whereClause})
+           AND (f.id_ijin_kerja IS NULL OR TRIM(f.id_ijin_kerja) = '')
            AND creator.departmen = ${deptParam}
          ORDER BY f.tanggal ASC`,
         newParams,
@@ -90,7 +93,11 @@ function buildSelectQuery(
     return [
       `SELECT
          f.id_form, f.tanggal, f.tanggal_pelaksanaan, f.status, f.current_stage,
-         f.no_registrasi, f.nama_kontraktor_nik, f.lokasi_pekerjaan, f.waktu_pukul,
+         f.no_registrasi,
+         COALESCE(f.nama_kontraktor_nik, f.nama_pekerja_nik, '') AS nama_kontraktor_nik,
+         COALESCE(f.nama_kontraktor_nik, f.nama_pekerja_nik, '') AS pemohon,
+         CONCAT_WS(' ', f.detail_cutting, f.detail_grinding, f.detail_welding, f.detail_painting, f.jenis_kerjaan_lainnya) AS deskripsi_pekerjaan,
+         f.lokasi_pekerjaan, f.waktu_pukul,
          f.catatan_reject, f.approved_by, f.approved_at,
          f.nama_fire_watch, f.nik_fire_watch,
          f.spv_approved, f.spv_approved_by,
@@ -105,6 +112,7 @@ function buildSelectQuery(
        FROM ${table} f
        JOIN users creator ON creator.id = f.user_id
        WHERE (${whereClause})
+         AND (f.id_ijin_kerja IS NULL OR TRIM(f.id_ijin_kerja) = '')
          AND creator.departmen = ${deptParam}
        ORDER BY f.tanggal ASC`,
       newParams,
@@ -116,7 +124,9 @@ function buildSelectQuery(
       `SELECT
          id_form, tanggal, tanggal_pelaksanaan, status, current_stage,
          NULL AS no_registrasi,
-         NULL AS nama_kontraktor_nik,
+         COALESCE(petugas_ketinggian, nama_kontraktor, '') AS nama_kontraktor_nik,
+         COALESCE(petugas_ketinggian, nama_kontraktor, '') AS pemohon,
+         deskripsi_pekerjaan,
          lokasi AS lokasi_pekerjaan,
          waktu_mulai AS waktu_pukul,
          catatan_reject, approved_by, approved_at,
@@ -130,7 +140,8 @@ function buildSelectQuery(
          (${TIPE_EXPR}) AS tipe_perusahaan,
          '${formType}' AS jenis_form
        FROM ${table}
-       WHERE ${whereClause}
+       WHERE (${whereClause})
+         AND (id_ijin_kerja IS NULL OR TRIM(id_ijin_kerja) = '')
        ORDER BY tanggal ASC`,
       params,
     ];
@@ -139,7 +150,11 @@ function buildSelectQuery(
   return [
     `SELECT
        id_form, tanggal, tanggal_pelaksanaan, status, current_stage,
-       no_registrasi, nama_kontraktor_nik, lokasi_pekerjaan, waktu_pukul,
+       no_registrasi,
+       COALESCE(nama_kontraktor_nik, nama_pekerja_nik, '') AS nama_kontraktor_nik,
+       COALESCE(nama_kontraktor_nik, nama_pekerja_nik, '') AS pemohon,
+       CONCAT_WS(' ', detail_cutting, detail_grinding, detail_welding, detail_painting, jenis_kerjaan_lainnya) AS deskripsi_pekerjaan,
+       lokasi_pekerjaan, waktu_pukul,
        catatan_reject, approved_by, approved_at,
        nama_fire_watch, nik_fire_watch,
        spv_approved, spv_approved_by,
@@ -152,7 +167,8 @@ function buildSelectQuery(
        (${TIPE_EXPR_FW}) AS tipe_perusahaan,
        '${formType}' AS jenis_form
      FROM ${table}
-     WHERE ${whereClause}
+     WHERE (${whereClause})
+       AND (id_ijin_kerja IS NULL OR TRIM(id_ijin_kerja) = '')
      ORDER BY tanggal ASC`,
     params,
   ];
@@ -174,6 +190,7 @@ async function countByQuery(
        FROM ${table} f
        JOIN users creator ON creator.id = f.user_id
        WHERE (${whereClause})
+         AND (f.id_ijin_kerja IS NULL OR TRIM(f.id_ijin_kerja) = '')
          AND creator.departmen = ${deptParam}`,
       [...params, spvDepartmen]
     );
@@ -181,7 +198,7 @@ async function countByQuery(
   }
 
   const res = await query(
-    `SELECT COUNT(*) as count FROM ${table} WHERE ${whereClause}`,
+    `SELECT COUNT(*) as count FROM ${table} WHERE (${whereClause}) AND (id_ijin_kerja IS NULL OR TRIM(id_ijin_kerja) = '')`,
     params
   );
   return parseInt(res[0].count);
@@ -204,12 +221,15 @@ async function queryGeneralPermitByStage(
     return query(
       `SELECT gp.id_form, gp.tanggal, gp.tanggal_pelaksanaan, gp.status, gp.current_stage,
               gp.nama_kontraktor_pekerja AS nama_kontraktor_nik,
+              COALESCE(gp.nama_kontraktor_pekerja, '') AS pemohon,
+              gp.deskripsi_pekerjaan, gp.tgl_mulai_kerja,
               gp.lokasi_pekerjaan, gp.catatan_reject, gp.approved_by, gp.approved_at,
               gp.spv_approved, gp.spv_approved_by,
+              gp.admin_k3_approved, gp.admin_k3_approved_by,
               gp.security_approved, gp.security_approved_by,
               gp.sfo_approved, gp.sfo_approved_by,
               gp.pga_approved AS mr_pga_approved, gp.pga_approved_by AS mr_pga_approved_by,
-              NULL::boolean AS kontraktor_approved, NULL::boolean AS admin_k3_approved,
+              NULL::boolean AS kontraktor_approved,
               NULL::text AS tipe_perusahaan, NULL::text AS id_ijin_kerja,
               'general-permit' AS jenis_form
          FROM form_ijin_kerja gp
@@ -239,12 +259,15 @@ async function queryGeneralPermitByStage(
   return query(
     `SELECT id_form, tanggal, tanggal_pelaksanaan, status, current_stage,
             nama_kontraktor_pekerja AS nama_kontraktor_nik,
+            COALESCE(nama_kontraktor_pekerja, '') AS pemohon,
+            deskripsi_pekerjaan, tgl_mulai_kerja,
             lokasi_pekerjaan, catatan_reject, approved_by, approved_at,
             spv_approved, spv_approved_by,
+            admin_k3_approved, admin_k3_approved_by,
             security_approved, security_approved_by,
             sfo_approved, sfo_approved_by,
             pga_approved AS mr_pga_approved, pga_approved_by AS mr_pga_approved_by,
-            NULL::boolean AS kontraktor_approved, NULL::boolean AS admin_k3_approved,
+            NULL::boolean AS kontraktor_approved,
             NULL::text AS tipe_perusahaan, NULL::text AS id_ijin_kerja,
             'general-permit' AS jenis_form,
             spv_terkait_pj, nik_spv_terkait_pj
@@ -253,8 +276,10 @@ async function queryGeneralPermitByStage(
         AND (
           current_stage = $1
           OR ($1 = 1 AND spv_approved = FALSE)
-          OR ($1 = 3 AND security_approved = TRUE AND sfo_approved = FALSE)
+          OR ($1 = 2 AND spv_approved = TRUE AND admin_k3_approved = FALSE)
+          OR ($1 = 3 AND admin_k3_approved = TRUE AND sfo_approved = FALSE)
           OR ($1 = 4 AND sfo_approved = TRUE AND pga_approved = FALSE)
+          OR ($1 = 5 AND pga_approved = TRUE AND security_approved = FALSE)
         )
       ORDER BY tanggal ASC`,
     [stage]
@@ -262,7 +287,7 @@ async function queryGeneralPermitByStage(
 }
 
 async function queryGeneralPermitApproved(
-  col: 'spv_approved' | 'sfo_approved' | 'pga_approved',
+  col: 'spv_approved' | 'admin_k3_approved' | 'sfo_approved' | 'pga_approved',
   spvDepartmen?: string | null,
   spvNama?: string | null,
   spvNik?: string | null,
@@ -272,14 +297,18 @@ async function queryGeneralPermitApproved(
     if (col === 'spv_approved') {
       return query(
         `SELECT gp.id_form, gp.tanggal, gp.tanggal_pelaksanaan, gp.status, gp.current_stage,
-                gp.nama_kontraktor_pekerja AS nama_kontraktor_nik, gp.lokasi_pekerjaan,
+                gp.nama_kontraktor_pekerja AS nama_kontraktor_nik,
+                COALESCE(gp.nama_kontraktor_pekerja, '') AS pemohon,
+                gp.deskripsi_pekerjaan, gp.tgl_mulai_kerja,
+                gp.lokasi_pekerjaan,
                 gp.catatan_reject, gp.approved_by, gp.approved_at,
                 gp.spv_approved, gp.spv_approved_by, gp.spv_nik,
+                gp.admin_k3_approved, gp.admin_k3_approved_by, gp.admin_k3_nik,
                 gp.spv_terkait_pj, gp.nik_spv_terkait_pj,
                 gp.security_approved, gp.security_approved_by,
                 gp.sfo_approved, gp.sfo_approved_by,
                 gp.pga_approved AS mr_pga_approved, gp.pga_approved_by AS mr_pga_approved_by,
-                NULL::boolean AS kontraktor_approved, NULL::boolean AS admin_k3_approved,
+                NULL::boolean AS kontraktor_approved,
                 NULL::text AS tipe_perusahaan, NULL::text AS id_ijin_kerja,
                 'general-permit' AS jenis_form
            FROM form_ijin_kerja gp
@@ -315,14 +344,18 @@ async function queryGeneralPermitApproved(
     }
     return query(
       `SELECT gp.id_form, gp.tanggal, gp.tanggal_pelaksanaan, gp.status, gp.current_stage,
-              gp.nama_kontraktor_pekerja AS nama_kontraktor_nik, gp.lokasi_pekerjaan,
+              gp.nama_kontraktor_pekerja AS nama_kontraktor_nik,
+              COALESCE(gp.nama_kontraktor_pekerja, '') AS pemohon,
+              gp.deskripsi_pekerjaan, gp.tgl_mulai_kerja,
+              gp.lokasi_pekerjaan,
               gp.catatan_reject, gp.approved_by, gp.approved_at,
               gp.spv_approved, gp.spv_approved_by, gp.spv_nik,
+              gp.admin_k3_approved, gp.admin_k3_approved_by, gp.admin_k3_nik,
               gp.spv_terkait_pj, gp.nik_spv_terkait_pj,
               gp.security_approved, gp.security_approved_by,
               gp.sfo_approved, gp.sfo_approved_by,
               gp.pga_approved AS mr_pga_approved, gp.pga_approved_by AS mr_pga_approved_by,
-              NULL::boolean AS kontraktor_approved, NULL::boolean AS admin_k3_approved,
+              NULL::boolean AS kontraktor_approved,
               NULL::text AS tipe_perusahaan, NULL::text AS id_ijin_kerja,
               'general-permit' AS jenis_form
          FROM form_ijin_kerja gp
@@ -334,14 +367,18 @@ async function queryGeneralPermitApproved(
   }
   return query(
     `SELECT id_form, tanggal, tanggal_pelaksanaan, status, current_stage,
-            nama_kontraktor_pekerja AS nama_kontraktor_nik, lokasi_pekerjaan,
+            nama_kontraktor_pekerja AS nama_kontraktor_nik,
+            COALESCE(nama_kontraktor_pekerja, '') AS pemohon,
+            deskripsi_pekerjaan, tgl_mulai_kerja,
+            lokasi_pekerjaan,
             catatan_reject, approved_by, approved_at,
             spv_approved, spv_approved_by, spv_nik,
+            admin_k3_approved, admin_k3_approved_by, admin_k3_nik,
             spv_terkait_pj, nik_spv_terkait_pj,
             security_approved, security_approved_by,
             sfo_approved, sfo_approved_by,
             pga_approved AS mr_pga_approved, pga_approved_by AS mr_pga_approved_by,
-            NULL::boolean AS kontraktor_approved, NULL::boolean AS admin_k3_approved,
+            NULL::boolean AS kontraktor_approved,
             NULL::text AS tipe_perusahaan, NULL::text AS id_ijin_kerja,
             'general-permit' AS jenis_form
        FROM form_ijin_kerja
@@ -392,8 +429,10 @@ async function countGeneralPermitByStage(
         AND (
           current_stage = $1
           OR ($1 = 1 AND spv_approved = FALSE)
-          OR ($1 = 3 AND security_approved = TRUE AND sfo_approved = FALSE)
+          OR ($1 = 2 AND spv_approved = TRUE AND admin_k3_approved = FALSE)
+          OR ($1 = 3 AND admin_k3_approved = TRUE AND sfo_approved = FALSE)
           OR ($1 = 4 AND sfo_approved = TRUE AND pga_approved = FALSE)
+          OR ($1 = 5 AND pga_approved = TRUE AND security_approved = FALSE)
         )`,
     [stage]
   );
@@ -401,7 +440,7 @@ async function countGeneralPermitByStage(
 }
 
 async function countGeneralPermitApproved(
-  col: 'spv_approved' | 'sfo_approved' | 'pga_approved',
+  col: 'spv_approved' | 'admin_k3_approved' | 'sfo_approved' | 'pga_approved',
   spvDepartmen?: string | null,
   spvNama?: string | null,
   spvNik?: string | null,
@@ -499,11 +538,11 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ data: [], total: 0, message: 'Fire Watch tidak memiliki antrian approval.' });
     }
 
-    // ── SECURITY: mengisi dan menyetujui Safety Induction (stage 4) ──
+    // ── SECURITY: mengisi dan menyetujui Safety Induction (stage 5) ──
     if (userRole === 'security') {
       if (countOnly) {
         const [subm, appr] = await Promise.all([
-          query(`SELECT COUNT(*) FROM form_ijin_kerja WHERE status = 'submitted' AND current_stage = 4`),
+          query(`SELECT COUNT(*) FROM form_ijin_kerja WHERE status = 'submitted' AND current_stage = 5`),
           query(`SELECT COUNT(*) FROM form_ijin_kerja WHERE security_approved = TRUE`),
         ]);
         return NextResponse.json({ counts: { submitted: Number(subm[0].count), approved: Number(appr[0].count), rejected: 0 } });
@@ -514,16 +553,16 @@ export async function GET(req: NextRequest) {
                   nama_kontraktor_pekerja AS nama_kontraktor_nik,
                   lokasi_pekerjaan, current_stage,
                   security_approved,
-                  NULL::boolean AS spv_approved,
+                  spv_approved,
+                  admin_k3_approved,
+                  sfo_approved,
+                  pga_approved AS mr_pga_approved,
                   NULL::boolean AS kontraktor_approved,
-                  NULL::boolean AS admin_k3_approved,
-                  NULL::boolean AS sfo_approved,
-                  NULL::boolean AS mr_pga_approved,
                   NULL::text AS tipe_perusahaan,
                   NULL::text AS id_ijin_kerja,
                   'external-permit' AS jenis_form
              FROM form_ijin_kerja
-            WHERE status = 'submitted' AND current_stage = 4
+            WHERE status = 'submitted' AND current_stage = 5
             ORDER BY tanggal ASC`);
         return NextResponse.json({ data: rows, total: rows.length });
       }
@@ -533,11 +572,11 @@ export async function GET(req: NextRequest) {
                   nama_kontraktor_pekerja AS nama_kontraktor_nik,
                   lokasi_pekerjaan, current_stage,
                   security_approved,
-                  NULL::boolean AS spv_approved,
+                  spv_approved,
+                  admin_k3_approved,
+                  sfo_approved,
+                  pga_approved AS mr_pga_approved,
                   NULL::boolean AS kontraktor_approved,
-                  NULL::boolean AS admin_k3_approved,
-                  NULL::boolean AS sfo_approved,
-                  NULL::boolean AS mr_pga_approved,
                   NULL::text AS tipe_perusahaan,
                   NULL::text AS id_ijin_kerja,
                   'external-permit' AS jenis_form
@@ -654,8 +693,12 @@ export async function GET(req: NextRequest) {
             ...FW_FORMS.map(f => countByQuery(f, `status = $1 AND current_stage = $2 AND (${TIPE_EXPR_FW}) = $3`, ['submitted', 3, 'eksternal'])),
             countByQuery('height-work', `status = $1 AND current_stage = $2 AND (${TIPE_EXPR}) = $3`, ['submitted', 2, 'internal']),
             countByQuery('height-work', `status = $1 AND current_stage = $2 AND (${TIPE_EXPR}) = $3`, ['submitted', 3, 'eksternal']),
+            countGeneralPermitByStage(2),
           ]),
-          Promise.all(allFormTypes.map(f => countByQuery(f, `admin_k3_approved = TRUE`))),
+          Promise.all([
+            ...allFormTypes.map(f => countByQuery(f, `admin_k3_approved = TRUE`)),
+            countGeneralPermitApproved('admin_k3_approved'),
+          ]),
           Promise.all(allFormTypes.map(f => countByQuery(f, `status = $1`, ['rejected']))),
         ]);
         return NextResponse.json({ counts: { submitted: sum(subm), approved: sum(appr), rejected: sum(rej) } });
@@ -666,11 +709,15 @@ export async function GET(req: NextRequest) {
           ...FW_FORMS.map(f => query(...buildSelectQuery(f, `status = $1 AND current_stage = $2 AND (${TIPE_EXPR_FW}) = $3`, ['submitted', 3, 'eksternal']))),
           query(...buildSelectQuery('height-work', `status = $1 AND current_stage = $2 AND (${TIPE_EXPR}) = $3`, ['submitted', 2, 'internal'])),
           query(...buildSelectQuery('height-work', `status = $1 AND current_stage = $2 AND (${TIPE_EXPR}) = $3`, ['submitted', 3, 'eksternal'])),
+          queryGeneralPermitByStage(2),
         ]);
         return NextResponse.json({ data: results.flat(), total: results.flat().length });
       }
       if (statusFilter === 'approved') {
-        const results = await Promise.all(allFormTypes.map(f => query(...buildSelectQuery(f, `admin_k3_approved = TRUE`))));
+        const results = await Promise.all([
+          ...allFormTypes.map(f => query(...buildSelectQuery(f, `admin_k3_approved = TRUE`))),
+          queryGeneralPermitApproved('admin_k3_approved'),
+        ]);
         return NextResponse.json({ data: results.flat(), total: results.flat().length });
       }
       if (statusFilter === 'rejected') {
@@ -689,7 +736,7 @@ export async function GET(req: NextRequest) {
             ...FW_FORMS.map(f => countByQuery(f, `status = $1 AND current_stage = $2 AND (${TIPE_EXPR_FW}) = $3`, ['submitted', 4, 'eksternal'])),
             countByQuery('height-work', `status = $1 AND current_stage = $2 AND (${TIPE_EXPR}) = $3`, ['submitted', 3, 'internal']),
             countByQuery('height-work', `status = $1 AND current_stage = $2 AND (${TIPE_EXPR}) = $3`, ['submitted', 4, 'eksternal']),
-            countGeneralPermitByStage(2),
+            countGeneralPermitByStage(3),
           ]),
           Promise.all([
             ...allFormTypes.map(f => countByQuery(f, `sfo_approved = TRUE`)),
@@ -705,7 +752,7 @@ export async function GET(req: NextRequest) {
           ...FW_FORMS.map(f => query(...buildSelectQuery(f, `status = $1 AND current_stage = $2 AND (${TIPE_EXPR_FW}) = $3`, ['submitted', 4, 'eksternal']))),
           query(...buildSelectQuery('height-work', `status = $1 AND current_stage = $2 AND (${TIPE_EXPR}) = $3`, ['submitted', 3, 'internal'])),
           query(...buildSelectQuery('height-work', `status = $1 AND current_stage = $2 AND (${TIPE_EXPR}) = $3`, ['submitted', 4, 'eksternal'])),
-          queryGeneralPermitByStage(2),
+          queryGeneralPermitByStage(3),
         ]);
         return NextResponse.json({ data: results.flat(), total: results.flat().length });
       }
@@ -732,7 +779,7 @@ export async function GET(req: NextRequest) {
             ...FW_FORMS.map(f => countByQuery(f, `status = $1 AND current_stage = $2 AND (${TIPE_EXPR_FW}) = $3`, ['submitted', 5, 'eksternal'])),
             countByQuery('height-work', `status = $1 AND current_stage = $2 AND (${TIPE_EXPR}) = $3`, ['submitted', 4, 'internal']),
             countByQuery('height-work', `status = $1 AND current_stage = $2 AND (${TIPE_EXPR}) = $3`, ['submitted', 5, 'eksternal']),
-            countGeneralPermitByStage(3),
+            countGeneralPermitByStage(4),
           ]),
           Promise.all([
             ...FW_FORMS.map(f => countByQuery(f, `mr_pga_approved = TRUE`)),
@@ -749,7 +796,7 @@ export async function GET(req: NextRequest) {
           ...FW_FORMS.map(f => query(...buildSelectQuery(f, `status = $1 AND current_stage = $2 AND (${TIPE_EXPR_FW}) = $3`, ['submitted', 5, 'eksternal']))),
           query(...buildSelectQuery('height-work', `status = $1 AND current_stage = $2 AND (${TIPE_EXPR}) = $3`, ['submitted', 4, 'internal'])),
           query(...buildSelectQuery('height-work', `status = $1 AND current_stage = $2 AND (${TIPE_EXPR}) = $3`, ['submitted', 5, 'eksternal'])),
-          queryGeneralPermitByStage(3),
+          queryGeneralPermitByStage(4),
         ]);
         return NextResponse.json({ data: results.flat(), total: results.flat().length });
       }

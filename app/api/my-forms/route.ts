@@ -52,6 +52,8 @@ export async function GET(req: NextRequest) {
         `SELECT
           id_form, tanggal, tanggal_pelaksanaan, status,
           lokasi_pekerjaan AS lokasi,
+          COALESCE(nama_kontraktor_nik, nama_pekerja_nik, '') AS pemohon,
+          CONCAT_WS(' ', detail_cutting, detail_grinding, detail_welding, detail_painting, jenis_kerjaan_lainnya) AS deskripsi_pekerjaan,
           catatan_reject, approved_by, approved_at,
           fw_approved, spv_approved, kontraktor_approved,
           admin_k3_approved, sfo_approved, pga_approved, mr_pga_approved,
@@ -68,6 +70,8 @@ export async function GET(req: NextRequest) {
         `SELECT
           id_form, tanggal, tanggal_pelaksanaan, status,
           lokasi_pekerjaan AS lokasi,
+          COALESCE(nama_kontraktor_nik, nama_pekerja_nik, '') AS pemohon,
+          CONCAT_WS(' ', detail_cutting, detail_grinding, detail_welding, detail_painting, jenis_kerjaan_lainnya) AS deskripsi_pekerjaan,
           catatan_reject, approved_by, approved_at,
           fw_approved, spv_approved, kontraktor_approved,
           admin_k3_approved, sfo_approved, pga_approved, mr_pga_approved,
@@ -84,6 +88,8 @@ export async function GET(req: NextRequest) {
         `SELECT
           id_form, tanggal, tanggal_pelaksanaan, status,
           lokasi,
+          COALESCE(petugas_ketinggian, nama_kontraktor, '') AS pemohon,
+          deskripsi_pekerjaan,
           catatan_reject, approved_by, approved_at,
           NULL::boolean AS fw_approved,
           spv_approved, kontraktor_approved, admin_k3_approved,
@@ -105,8 +111,11 @@ export async function GET(req: NextRequest) {
         `SELECT
           gp.id_form, gp.tanggal, gp.tanggal_pelaksanaan, gp.status,
           gp.lokasi_pekerjaan AS lokasi,
+          COALESCE(gp.nama_kontraktor_pekerja, '') AS pemohon,
+          gp.deskripsi_pekerjaan,
+          gp.tgl_mulai_kerja,
           gp.catatan_reject, gp.approved_by, gp.approved_at,
-          gp.spv_approved, gp.security_approved, gp.sfo_approved, gp.pga_approved,
+          gp.spv_approved, gp.admin_k3_approved, gp.security_approved, gp.sfo_approved, gp.pga_approved,
           gp.nama_kontraktor_pekerja,
           gp.actual_tanggal_kerja,
           gp.kontraktor_signature_url,

@@ -1,0 +1,158 @@
+id: integer
+id_form: character varying
+tanggal: timestamp with time zone
+tanggal_pelaksanaan: timestamp with time zone
+status: character varying
+nama_kontraktor_pekerja: character varying
+nama_pengawas_pic_subkont: character varying
+jumlah_tenaga_kerja: numeric
+tgl_mulai_kerja: timestamp with time zone
+tgl_akhir_kerja_rencana: timestamp with time zone
+waktu_kerja: time without time zone
+actual_tanggal_kerja: timestamp with time zone
+spek_area_workshop: boolean
+spek_ruang_tertutup: boolean
+spek_ketinggian: boolean
+spek_tegangan_tinggi: boolean
+spek_pemakaian_loto: boolean
+spek_forklift: boolean
+spek_temperatur_tinggi: boolean
+deskripsi_pekerjaan: text
+spesifikasi_lainnya: text
+alat_mesin_potong: boolean
+alat_mesin_potong_kondisi: character varying
+alat_mesin_las_gerinda: boolean
+alat_mesin_las_gerinda_kondisi: character varying
+alat_genset: boolean
+alat_genset_kondisi: character varying
+alat_tabung_gas: boolean
+alat_tabung_gas_kondisi: character varying
+alat_tangga_listrik_awp: boolean
+alat_tangga_listrik_awp_kondisi: character varying
+alat_forklift: boolean
+alat_forklift_kondisi: character varying
+alat_lift_barang: boolean
+alat_lift_barang_kondisi: character varying
+alat_lainnya: text
+alat_lainnya_kondisi: character varying
+lokasi_pekerjaan: text
+lokasi_dalam_gedung: boolean
+lokasi_luar_gedung: boolean
+lokasi_luar_pagar_gedung: boolean
+lokasi_di_atas_gedung: boolean
+lokasi_lainnya: text
+pengawas_bagian: character varying
+pic_loto_station_loto: character varying
+bahan_mudah_terbakar: boolean
+bahan_mudah_meledak: boolean
+bahan_kimia_beracun_iritan: boolean
+bahan_lainnya: text
+dampak_ledakan_kebakaran: boolean
+dampak_jatuh_ketinggian: boolean
+dampak_kepala_tertimpa: boolean
+dampak_kaki_tertimpa: boolean
+dampak_tumpahan_oli_bbm_b3: boolean
+dampak_tersengat_listrik: boolean
+dampak_terjepit_mesin: boolean
+dampak_tersayat_tertusuk: boolean
+dampak_infeksi_pernafasan: boolean
+dampak_iritasi_mata: boolean
+dampak_radiasi_sinar_las: boolean
+dampak_iritasi_kulit: boolean
+dampak_kebisingan: boolean
+dampak_keracunan_zat_kimia: boolean
+dampak_lainnya: text
+apd_masker: boolean
+apd_masker_kimia: boolean
+apd_kacamata_biasa: boolean
+apd_kacamata_las: boolean
+apd_ear_plug: boolean
+apd_gloves: boolean
+apd_full_body_harness: boolean
+apd_sarung_tangan_bintil: boolean
+apd_sarung_tangan_listrik: boolean
+apd_sarung_tangan_kulit: boolean
+apd_helm: boolean
+apd_safety_shoes: boolean
+apd_sepatu_karet: boolean
+apd_topi_kerja: boolean
+apd_lainnya: text
+license_sertifikasi: text
+apar_dry_powder: boolean
+apar_gas_cair: boolean
+apar_tidak_perlu: boolean
+apar_lainnya: text
+limbah_kontraktor: boolean
+limbah_pt_jai: boolean
+limbah_lokasi_pt: character varying
+limbah_luar_jai: boolean
+izin_kerja_dari: time without time zone
+izin_kerja_sampai: time without time zone
+kontraktor_pj: character varying
+spv_terkait_pj: character varying
+current_stage: integer
+security_approved: boolean
+security_approved_by: character varying
+security_approved_at: timestamp with time zone
+security_nik: character varying
+sfo_approved: boolean
+sfo_approved_by: character varying
+sfo_approved_at: timestamp with time zone
+sfo_nik: character varying
+pga_approved: boolean
+pga_approved_by: character varying
+pga_approved_at: timestamp with time zone
+pga_nik: character varying
+handover_pengawas_lama: character varying
+handover_pengawas_baru: character varying
+handover_tanggal: timestamp with time zone
+handover_jam: character varying
+pernyataan_diperiksa: boolean
+pengawas_pekerjaan_user: character varying
+eval_area_bersih_rapi: boolean
+eval_limbah_ditangani_baik: boolean
+eval_instalasi_listrik_aman: boolean
+eval_tdk_ada_kerusakan_property: boolean
+eval_ada_tumpahan_kimia_bbm: boolean
+eval_tdk_ada_kehilangan_property: boolean
+evaluasi_status: character varying
+evaluasi_submitted_by: character varying
+evaluasi_submitted_at: timestamp with time zone
+pengesahan_current_stage: integer
+pengesahan_pengawas_approved: boolean
+pengesahan_pengawas_approved_by: character varying
+pengesahan_pengawas_approved_at: timestamp with time zone
+pengesahan_security_approved: boolean
+pengesahan_security_approved_by: character varying
+pengesahan_security_approved_at: timestamp with time zone
+pengesahan_sfo_approved: boolean
+pengesahan_sfo_approved_by: character varying
+pengesahan_sfo_approved_at: timestamp with time zone
+pengesahan_status: character varying
+created_at: timestamp with time zone
+updated_at: timestamp with time zone
+edit_token: character varying
+catatan_reject: text
+approved_by: character varying
+approved_at: timestamp with time zone
+user_id: integer
+perlu_jsa: boolean
+jsa_file_url: text
+license_files: jsonb
+jsa_data: jsonb
+izin_kerja_tanggal_dari: date
+izin_kerja_tanggal_sampai: date
+safety_induction: jsonb
+kontraktor_signature_url: text
+security_signature_url: text
+spv_approved: boolean
+spv_approved_by: character varying
+spv_approved_at: timestamp with time zone
+spv_nik: character varying
+penilaian_subkontraktor: jsonb
+nik_spv_terkait_pj: character varying
+waktu_selesai: time without time zone
+admin_k3_approved: boolean
+admin_k3_approved_by: character varying
+admin_k3_approved_at: timestamp with time zone
+admin_k3_nik: character varying

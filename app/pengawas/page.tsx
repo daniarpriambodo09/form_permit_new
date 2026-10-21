@@ -33,6 +33,8 @@ import {
   FileText,
   ShieldCheck,
   Check,
+  Lock,
+  AlertTriangle,
 } from "lucide-react";
 
 interface FormItem {
@@ -50,6 +52,26 @@ interface FormItem {
     pengawas: boolean;
     purchasing: boolean;
     sfo: boolean;
+  };
+  evaluasi_akhir?: {
+    area_bersih_rapi: boolean;
+    limbah_ditangani_baik: boolean;
+    instalasi_listrik_aman: boolean;
+    tdk_ada_kerusakan_property: boolean;
+    ada_tumpahan_kimia_bbm: boolean;
+    tdk_ada_kehilangan_property: boolean;
+    status: string;
+    submitted_by?: string;
+    submitted_at?: string;
+    pengawas_approved: boolean;
+    pengawas_approved_by?: string;
+    pengawas_approved_at?: string;
+    security_approved: boolean;
+    security_approved_by?: string;
+    security_approved_at?: string;
+    sfo_approved: boolean;
+    sfo_approved_by?: string;
+    sfo_approved_at?: string;
   };
   created_at: string;
   updated_at: string;
@@ -78,6 +100,19 @@ export default function PengawasDashboardPage() {
   const [savingDraft, setSavingDraft] = useState(false);
   const [approving, setApproving] = useState(false);
   const [actionMessage, setActionMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
+  // State modal Evaluasi Akhir
+  const [selectedEvalForm, setSelectedEvalForm] = useState<FormItem | null>(null);
+  const [evalChecklist, setEvalChecklist] = useState<Record<string, boolean>>({
+    eval_area_bersih_rapi: false,
+    eval_limbah_ditangani_baik: false,
+    eval_instalasi_listrik_aman: false,
+    eval_tdk_ada_kerusakan_property: false,
+    eval_ada_tumpahan_kimia_bbm: false,
+    eval_tdk_ada_kehilangan_property: false,
+  });
+  const [submittingEval, setSubmittingEval] = useState(false);
+  const [evalActionMsg, setEvalActionMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   useEffect(() => {
     fetch("/api/auth/me", { credentials: "include" })
@@ -128,6 +163,82 @@ export default function PengawasDashboardPage() {
   const handleCloseModal = () => {
     setSelectedForm(null);
     setActionMessage(null);
+  };
+
+  const handleOpenEvaluasi = (form: FormItem) => {
+    setSelectedEvalForm(form);
+    setEvalActionMsg(null);
+    const ex = form.evaluasi_akhir;
+    setEvalChecklist({
+      eval_area_bersih_rapi: Boolean(ex?.area_bersih_rapi),
+      eval_limbah_ditangani_baik: Boolean(ex?.limbah_ditangani_baik),
+      eval_instalasi_listrik_aman: Boolean(ex?.instalasi_listrik_aman),
+      eval_tdk_ada_kerusakan_property: Boolean(ex?.tdk_ada_kerusakan_property),
+      eval_ada_tumpahan_kimia_bbm: Boolean(ex?.ada_tumpahan_kimia_bbm),
+      eval_tdk_ada_kehilangan_property: Boolean(ex?.tdk_ada_kehilangan_property),
+    });
+  };
+
+  const handleCloseEvaluasiModal = () => {
+    setSelectedEvalForm(null);
+    setEvalActionMsg(null);
+  };
+
+  const handleSubmitEvaluasiPengawas = async () => {
+    if (!selectedEvalForm) return;
+
+    const isPenilaianComplete = Boolean(
+      selectedEvalForm.approval_status?.pengawas &&
+      selectedEvalForm.approval_status?.purchasing &&
+      selectedEvalForm.approval_status?.sfo
+    );
+
+    if (!isPenilaianComplete) {
+      setEvalActionMsg({
+        type: "error",
+        text: "Evaluasi Akhir belum dapat disetujui. Penilaian Sub Kontraktor harus disetujui lengkap terlebih dahulu oleh Pengawas Dept, Purchasing, dan SFO.",
+      });
+      return;
+    }
+
+    if (
+      !confirm(
+        "Konfirmasi persetujuan Evaluasi Akhir oleh Pengawas Dept? Data checklist akan dikirim dan diteruskan ke Security untuk verifikasi lapangan."
+      )
+    ) {
+      return;
+    }
+
+    setSubmittingEval(true);
+    setEvalActionMsg(null);
+    try {
+      const res = await fetch(`/api/evaluasi-akhir/${selectedEvalForm.id_form}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "submit_pengawas",
+          checklist: evalChecklist,
+          nama: currentUser?.nama || currentUser?.username,
+          nik: currentUser?.nik,
+        }),
+      });
+
+      const json = await res.json();
+      if (!res.ok) {
+        throw new Error(json.error || "Gagal menyetujui evaluasi akhir.");
+      }
+
+      setEvalActionMsg({
+        type: "success",
+        text: "Berhasil disetujui! Data otomatis diteruskan ke Security untuk verifikasi lapangan.",
+      });
+
+      await loadForms();
+    } catch (err: any) {
+      setEvalActionMsg({ type: "error", text: err.message || "Gagal menyetujui evaluasi akhir." });
+    } finally {
+      setSubmittingEval(false);
+    }
   };
 
   const handleSaveDraft = async (dataToSave?: PenilaianSubkontraktorData) => {
@@ -396,6 +507,11 @@ export default function PengawasDashboardPage() {
                 const daysCount = days.length > 0 ? days.length : 1;
                 const entriesCount = item.penilaian_subkontraktor?.entries?.length || 0;
                 const isApproved = item.approval_status.pengawas;
+                const isPenilaianComplete = Boolean(
+                  item.approval_status.pengawas &&
+                  item.approval_status.purchasing &&
+                  item.approval_status.sfo
+                );
 
                 return (
                   <div
@@ -474,20 +590,68 @@ export default function PengawasDashboardPage() {
                           </p>
                         </div>
                       </div>
+                      {/* Mini status Evaluasi Akhir */}
+                      <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between text-[11px]">
+                        <span className="text-slate-400 font-medium">Evaluasi Akhir:</span>
+                        {item.evaluasi_akhir?.sfo_approved ? (
+                          <span className="text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full font-bold border border-emerald-200">
+                            ✓ Selesai SFO
+                          </span>
+                        ) : item.evaluasi_akhir?.security_approved ? (
+                          <span className="text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full font-bold border border-blue-200">
+                            ✓ Menunggu SFO
+                          </span>
+                        ) : item.evaluasi_akhir?.pengawas_approved ? (
+                          <span className="text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-full font-bold border border-indigo-200">
+                            ✓ Menunggu Security
+                          </span>
+                        ) : !isPenilaianComplete ? (
+                          <span className="text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full font-semibold border border-amber-200 flex items-center gap-1">
+                            <Lock className="w-2.5 h-2.5 text-amber-600" /> Terkunci
+                          </span>
+                        ) : (
+                          <span className="text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full font-medium">
+                            Belum Diisi
+                          </span>
+                        )}
+                      </div>
                     </div>
 
-                    <button
-                      type="button"
-                      onClick={() => handleOpenForm(item)}
-                      className={`w-full mt-4 py-2.5 px-4 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer shadow-xs ${
-                        isApproved
-                          ? "bg-slate-100 hover:bg-slate-200 text-slate-700"
-                          : "bg-orange-600 hover:bg-orange-700 text-white"
-                      }`}
-                    >
-                      <span>{isApproved ? "Lihat Penilaian" : "Isi & Setujui Penilaian"}</span>
-                      <ArrowRight className="w-3.5 h-3.5" />
-                    </button>
+                    {/* Dual Action Buttons */}
+                    <div className="grid grid-cols-2 gap-2 mt-4">
+                      <button
+                        type="button"
+                        onClick={() => handleOpenForm(item)}
+                        className={`py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-xs ${
+                          isApproved
+                            ? "bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200"
+                            : "bg-orange-600 hover:bg-orange-700 text-white"
+                        }`}
+                      >
+                        <FileText className="w-3.5 h-3.5" />
+                        <span className="truncate">{isApproved ? "Lihat Penilaian" : "Nilai Subcont"}</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => handleOpenEvaluasi(item)}
+                        className={`py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-xs ${
+                          item.evaluasi_akhir?.pengawas_approved
+                            ? "bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200"
+                            : !isPenilaianComplete
+                            ? "bg-slate-100 hover:bg-slate-200 text-slate-600 border border-slate-200"
+                            : "bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white"
+                        }`}
+                      >
+                        {!isPenilaianComplete && !item.evaluasi_akhir?.pengawas_approved ? (
+                          <Lock className="w-3.5 h-3.5 text-slate-400" />
+                        ) : (
+                          <ClipboardCheck className="w-3.5 h-3.5" />
+                        )}
+                        <span className="truncate">Evaluasi Akhir</span>
+                        {item.evaluasi_akhir?.pengawas_approved && <span className="text-[10px]">✓</span>}
+                      </button>
+                    </div>
                   </div>
                 );
               })}
@@ -608,6 +772,277 @@ export default function PengawasDashboardPage() {
           </div>
         </div>
       )}
+
+      {/* ══════════════════════════════════════════════════════════
+          Modal Evaluasi Akhir (Pengawas Dept)
+      ══════════════════════════════════════════════════════════ */}
+      {selectedEvalForm && (() => {
+        const isPenilaianComplete = Boolean(
+          selectedEvalForm.approval_status?.pengawas &&
+          selectedEvalForm.approval_status?.purchasing &&
+          selectedEvalForm.approval_status?.sfo
+        );
+        const isLocked = !isPenilaianComplete;
+        const isReadOnly = Boolean(selectedEvalForm.evaluasi_akhir?.pengawas_approved) || isLocked;
+
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 overflow-y-auto">
+            <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[92vh] flex flex-col shadow-2xl border border-slate-200 overflow-hidden my-4">
+              {/* Modal Header */}
+              <div className="px-6 py-4 bg-slate-900 text-white flex items-center justify-between shrink-0">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-purple-500/20 rounded-xl border border-purple-500/30">
+                    <ClipboardCheck className="w-5 h-5 text-purple-400" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-base font-bold text-white">
+                        Evaluasi Akhir — {selectedEvalForm.id_form}
+                      </h3>
+                      <span className="text-[10px] font-bold px-2 py-0.5 bg-purple-500/20 text-purple-300 border border-purple-500/30 rounded-md">
+                        Pengawas Dept
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-300 mt-0.5">
+                      Kontraktor: {selectedEvalForm.nama_kontraktor_pekerja} • Lokasi: {selectedEvalForm.lokasi_pekerjaan}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleCloseEvaluasiModal}
+                  className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Notification message */}
+              {evalActionMsg && (
+                <div
+                  className={`px-6 py-3 text-xs font-semibold flex items-center gap-2 ${
+                    evalActionMsg.type === "success"
+                      ? "bg-emerald-50 text-emerald-800 border-b border-emerald-200"
+                      : "bg-red-50 text-red-800 border-b border-red-200"
+                  }`}
+                >
+                  {evalActionMsg.type === "success" ? (
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                  ) : (
+                    <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
+                  )}
+                  <span>{evalActionMsg.text}</span>
+                </div>
+              )}
+
+              {/* Modal Body */}
+              <div className="flex-1 overflow-y-auto p-6 space-y-5">
+                {/* Warning if Penilaian Sub Kontraktor is not fully approved */}
+                {isLocked && (
+                  <div className="bg-amber-50 border border-amber-300 rounded-xl p-4 flex items-start gap-3">
+                    <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                    <div>
+                      <h4 className="text-xs font-bold text-amber-950 uppercase tracking-wider flex items-center gap-1.5">
+                        <Lock className="w-3.5 h-3.5 text-amber-600" />
+                        Evaluasi Akhir Terkunci
+                      </h4>
+                      <p className="text-xs text-amber-800 mt-1 leading-relaxed">
+                        Evaluasi Akhir baru dapat diisi dan disetujui setelah <strong>Penilaian Sub Kontraktor</strong> telah disetujui lengkap oleh <strong>Pengawas Dept</strong>, <strong>Purchasing</strong>, dan <strong>SFO</strong>.
+                      </p>
+                      <div className="mt-3 flex items-center gap-2 text-[11px] font-semibold flex-wrap">
+                        <span className={`px-2.5 py-1 rounded-md border ${selectedEvalForm.approval_status.pengawas ? "bg-emerald-50 text-emerald-800 border-emerald-200" : "bg-amber-100 text-amber-900 border-amber-300"}`}>
+                          {selectedEvalForm.approval_status.pengawas ? "✓ Pengawas Dept" : "○ Pengawas (Belum)"}
+                        </span>
+                        <span className="text-slate-300">→</span>
+                        <span className={`px-2.5 py-1 rounded-md border ${selectedEvalForm.approval_status.purchasing ? "bg-emerald-50 text-emerald-800 border-emerald-200" : "bg-amber-100 text-amber-900 border-amber-300"}`}>
+                          {selectedEvalForm.approval_status.purchasing ? "✓ Purchasing" : "○ Purchasing (Belum)"}
+                        </span>
+                        <span className="text-slate-300">→</span>
+                        <span className={`px-2.5 py-1 rounded-md border ${selectedEvalForm.approval_status.sfo ? "bg-emerald-50 text-emerald-800 border-emerald-200" : "bg-amber-100 text-amber-900 border-amber-300"}`}>
+                          {selectedEvalForm.approval_status.sfo ? "✓ SFO" : "○ SFO (Belum)"}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Info banner */}
+                <div className="bg-purple-50/70 border border-purple-200 rounded-xl p-4">
+                  <h4 className="text-xs font-bold text-purple-950 uppercase tracking-wider mb-1">
+                    Checklist Evaluasi Selesai Pekerjaan
+                  </h4>
+                  <p className="text-xs text-purple-800 leading-relaxed">
+                    Diisi dan disetujui oleh Pengawas Dept setelah pekerjaan selesai. Setelah disetujui, evaluasi ini akan otomatis diteruskan ke <strong>Security</strong> untuk verifikasi fisik lapangan, lalu ke <strong>SFO</strong> untuk persetujuan akhir.
+                  </p>
+                </div>
+
+                {/* Checklist Items */}
+                <div className="space-y-2.5">
+                  {[
+                    { key: "eval_area_bersih_rapi", num: 1, title: "Area bersih & rapih", desc: "Area kerja telah dibersihkan dan dirapikan kembali seperti kondisi semula." },
+                    { key: "eval_limbah_ditangani_baik", num: 2, title: "Limbah ditangani dengan baik", desc: "Seluruh limbah, sisa material, dan sampah kerja telah dibuang sesuai prosedur K3." },
+                    { key: "eval_instalasi_listrik_aman", num: 3, title: "Instalasi listrik aman", desc: "Semua kabel sementara, sambungan daya, dan panel telah diamankan/dicabut." },
+                    { key: "eval_tdk_ada_kerusakan_property", num: 4, title: "Tidak ada kerusakan property", desc: "Tidak terdapat kerusakan fasilitas, mesin, atau gedung milik PT. JAI." },
+                    { key: "eval_ada_tumpahan_kimia_bbm", num: 5, title: "Ada tumpahan bahan kimia/BBM", desc: "Pemeriksaan ada/tidaknya ceceran oli, bahan bakar, atau zat kimia di lokasi." },
+                    { key: "eval_tdk_ada_kehilangan_property", num: 6, title: "Tidak ada kehilangan property", desc: "Tidak ada barang, perkakas, atau inventaris milik perusahaan yang hilang." },
+                  ].map((item) => {
+                    const isChecked = Boolean(evalChecklist[item.key]);
+
+                    return (
+                      <button
+                        key={item.key}
+                        type="button"
+                        disabled={isReadOnly}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          if (!isReadOnly) {
+                            setEvalChecklist((prev) => ({ ...prev, [item.key]: !prev[item.key] }));
+                          }
+                        }}
+                        className={`w-full text-left p-3.5 rounded-xl border transition-all flex items-start justify-between gap-3 ${
+                          isChecked
+                            ? "bg-purple-50/80 border-purple-300 ring-1 ring-purple-200"
+                            : isLocked
+                            ? "bg-slate-50/60 border-slate-200 opacity-60"
+                            : "bg-white border-slate-200 hover:border-slate-300"
+                        } ${isReadOnly ? "cursor-not-allowed" : "cursor-pointer"}`}
+                      >
+                        <div className="flex items-start gap-3">
+                          <div
+                            className={`w-5 h-5 rounded-md flex items-center justify-center shrink-0 mt-0.5 border transition-all ${
+                              isChecked
+                                ? "bg-purple-600 border-purple-600 text-white"
+                                : isLocked
+                                ? "bg-slate-200 border-slate-300 text-slate-400"
+                                : "bg-white border-slate-300 text-transparent"
+                            }`}
+                          >
+                            {isChecked ? (
+                              <Check className="w-3.5 h-3.5 stroke-[3]" />
+                            ) : isLocked ? (
+                              <Lock className="w-2.5 h-2.5" />
+                            ) : null}
+                          </div>
+                          <div>
+                            <p className={`text-xs font-bold ${isChecked ? "text-purple-950" : isLocked ? "text-slate-500" : "text-slate-800"}`}>
+                              {item.num}. {item.title}
+                            </p>
+                            <p className="text-[11px] text-slate-400 mt-0.5">{item.desc}</p>
+                          </div>
+                        </div>
+                        <span
+                          className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ${
+                            isChecked
+                              ? "bg-purple-100 text-purple-700"
+                              : isLocked
+                              ? "bg-slate-100 text-slate-400"
+                              : "bg-slate-100 text-slate-500"
+                          }`}
+                        >
+                          {isChecked ? "✓ Ya" : isLocked ? "Terkunci" : "Belum"}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Workflow status timeline */}
+                <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-2">
+                  <p className="text-[11px] font-bold text-slate-700 uppercase tracking-wide">
+                    Alur Persetujuan Evaluasi Akhir
+                  </p>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1 text-xs">
+                    {/* Step 1: Pengawas */}
+                    <div className={`p-2.5 rounded-lg border ${selectedEvalForm.evaluasi_akhir?.pengawas_approved ? "bg-emerald-50 border-emerald-200 text-emerald-800" : "bg-white border-slate-200 text-slate-600"}`}>
+                      <p className="font-bold text-[11px]">1. Pengawas Dept</p>
+                      <p className="text-[10px] mt-0.5">
+                        {selectedEvalForm.evaluasi_akhir?.pengawas_approved
+                          ? `✓ Disetujui (${selectedEvalForm.evaluasi_akhir.pengawas_approved_by || "Pengawas"})`
+                          : isLocked
+                          ? "🔒 Terkunci (Perlu Penilaian)"
+                          : "⏳ Menunggu Checklist"}
+                      </p>
+                    </div>
+                    {/* Step 2: Security */}
+                    <div className={`p-2.5 rounded-lg border ${selectedEvalForm.evaluasi_akhir?.security_approved ? "bg-emerald-50 border-emerald-200 text-emerald-800" : selectedEvalForm.evaluasi_akhir?.pengawas_approved ? "bg-blue-50 border-blue-200 text-blue-800" : "bg-white border-slate-200 text-slate-400"}`}>
+                      <p className="font-bold text-[11px]">2. Security</p>
+                      <p className="text-[10px] mt-0.5">
+                        {selectedEvalForm.evaluasi_akhir?.security_approved
+                          ? `✓ Diverifikasi (${selectedEvalForm.evaluasi_akhir.security_approved_by || "Security"})`
+                          : selectedEvalForm.evaluasi_akhir?.pengawas_approved
+                          ? "⏳ Menunggu Verifikasi"
+                          : "○ Menunggu Pengawas"}
+                      </p>
+                    </div>
+                    {/* Step 3: SFO */}
+                    <div className={`p-2.5 rounded-lg border ${selectedEvalForm.evaluasi_akhir?.sfo_approved ? "bg-emerald-50 border-emerald-200 text-emerald-800" : selectedEvalForm.evaluasi_akhir?.security_approved ? "bg-purple-50 border-purple-200 text-purple-800" : "bg-white border-slate-200 text-slate-400"}`}>
+                      <p className="font-bold text-[11px]">3. SFO</p>
+                      <p className="text-[10px] mt-0.5">
+                        {selectedEvalForm.evaluasi_akhir?.sfo_approved
+                          ? `✓ Disetujui (${selectedEvalForm.evaluasi_akhir.sfo_approved_by || "SFO"})`
+                          : selectedEvalForm.evaluasi_akhir?.security_approved
+                          ? "⏳ Menunggu Approval"
+                          : "○ Menunggu Security"}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Modal Footer */}
+              <div className="px-6 py-4 bg-slate-50 border-t border-slate-200 flex items-center justify-between gap-3 shrink-0">
+                <div className="text-xs text-slate-500">
+                  {isLocked ? (
+                    <span className="text-amber-700 font-semibold flex items-center gap-1.5">
+                      <Lock className="w-4 h-4 text-amber-600 shrink-0" />
+                      Penilaian Sub Kontraktor belum disetujui lengkap
+                    </span>
+                  ) : selectedEvalForm.evaluasi_akhir?.pengawas_approved ? (
+                    <span className="text-emerald-700 font-semibold flex items-center gap-1.5">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                      Telah disetujui Pengawas Dept
+                    </span>
+                  ) : (
+                    <span>Lengkapi checklist di atas lalu klik setujui.</span>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handleCloseEvaluasiModal}
+                    className="px-4 py-2 border border-slate-200 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
+                  >
+                    Tutup
+                  </button>
+
+                  {!selectedEvalForm.evaluasi_akhir?.pengawas_approved && (
+                    <button
+                      type="button"
+                      onClick={handleSubmitEvaluasiPengawas}
+                      disabled={submittingEval || isLocked}
+                      className={`px-5 py-2 rounded-xl text-xs font-bold transition-all shadow-sm flex items-center gap-1.5 ${
+                        isLocked
+                          ? "bg-slate-200 text-slate-400 cursor-not-allowed border border-slate-300 shadow-none"
+                          : "bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white cursor-pointer"
+                      }`}
+                    >
+                      {isLocked ? (
+                        <Lock className="w-3.5 h-3.5" />
+                      ) : submittingEval ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        <Check className="w-3.5 h-3.5" />
+                      )}
+                      {isLocked ? "Terkunci" : "Setujui & Teruskan ke Security"}
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }

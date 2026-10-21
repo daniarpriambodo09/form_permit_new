@@ -44,12 +44,13 @@ const C: Record<string, RGB> = {
   purple:   [126, 34,  206],
 };
 
-type FormType = "hot-work" | "workshop" | "height-work";
+type FormType = "hot-work" | "workshop" | "height-work" | "general-permit";
 
 const JENIS_LABEL: Record<FormType, string> = {
-  "hot-work":    "HOT WORK PERMIT",
-  "workshop":    "WORKSHOP PERMIT",
-  "height-work": "HEIGHT WORK PERMIT",
+  "hot-work":       "HOT WORK PERMIT",
+  "workshop":       "WORKSHOP PERMIT",
+  "height-work":    "HEIGHT WORK PERMIT",
+  "general-permit": "FORM IJIN KERJA EKSTERNAL",
 };
 
 const STATUS_CFG: Record<string, { label: string; bg: RGB }> = {
@@ -320,9 +321,9 @@ function sec(doc: Doc, title: string, x = ML, w = CW) {
 
 interface IRow { lbl: string; val: string | null | undefined }
 
-function infoTable(doc: Doc, rows: IRow[], x = ML, w = CW) {
+function infoTable(doc: Doc, rows: IRow[], x = ML, w = CW, customLw?: number) {
   const d    = doc.d;
-  const LW   = 42;
+  const LW   = customLw ?? (w < 100 ? 34 : 42);
   const RW   = w - LW;
   const RH   = 5.2;
   doc.need(rows.length * RH + 2);
@@ -558,40 +559,80 @@ function drawBadge(
 async function jsaSection(doc: Doc, perluJsa: boolean, url?: string | null, jsaData?: any, x = ML, w = CW) {
   const d = doc.d;
 
-  // ── Tidak perlu JSA ────────────────────────────────────
-  if (!perluJsa) {
-    const H = 7;
+  // Cek apakah ada file URL JSA (bisa dari prop url atau jsaData.fileUrl)
+  const effectiveUrl = url || jsaData?.fileUrl;
+
+  // Cek apakah ada konten terstruktur yang benar-benar diisi (bukan sekadar empty string)
+  const hasStructuredContent = Boolean(
+    jsaData && (
+      (typeof jsaData.area === "string" && jsaData.area.trim()) ||
+      (typeof jsaData.jenisPekerjaan === "string" && jsaData.jenisPekerjaan.trim()) ||
+      (Array.isArray(jsaData.petugas) && jsaData.petugas.some((p: any) => p && String(p).trim())) ||
+      (Array.isArray(jsaData.rows) && jsaData.rows.length > 0)
+    )
+  );
+
+  // 1. Ada file JSA terlampir -> QR card rapi
+  if (effectiveUrl) {
+    const QR_SIZE = 19;
+    const H       = QR_SIZE + 4; // 23mm
     doc.need(H + 2);
     const y = doc.y;
-    d.setFillColor(...C.s100);
-    d.setDrawColor(...C.s300);
-    d.setLineWidth(0.2);
-    d.roundedRect(x, y, w, H, 1, 1, "FD");
+
+    d.setFillColor(...C.g100);
+    d.setDrawColor(...C.g600);
+    d.setLineWidth(0.25);
+    d.roundedRect(x, y, w, H, 1.5, 1.5, "FD");
+
+    try {
+      const fullUrl = effectiveUrl.startsWith("http")
+        ? effectiveUrl
+        : (typeof window !== "undefined" ? window.location.origin : "") + effectiveUrl;
+      const qrImg = await makeQR(fullUrl, 300);
+      d.addImage(qrImg, "PNG", x + 2, y + 2, QR_SIZE, QR_SIZE);
+    } catch { /* skip QR */ }
+
+    const textX = x + QR_SIZE + 5;
+    const textW = w - QR_SIZE - 8;
+
+    d.setFont(FF, "bold");
+    d.setFontSize(7.5);
+    d.setTextColor(...C.g700);
+    d.text("Dokumen Job Safety Analysis (JSA) Terlampir", textX, y + 6.5);
+
+    const fn = cleanFile(effectiveUrl);
     d.setFont(FF, "normal");
-    d.setFontSize(7);
+    d.setFontSize(6.5);
+    d.setTextColor(...C.navy);
+    const fnLines = d.splitTextToSize(fn, textW - 24);
+    d.text(fnLines[0] ?? fn, textX, y + 11.5);
+
+    d.setFont(FF, "normal");
+    d.setFontSize(5.5);
     d.setTextColor(...C.s500);
-    d.text("JSA: Tidak diperlukan untuk pekerjaan ini", x + 4, y + 4.8);
+    d.text("Scan QR Code di samping untuk membuka dokumen JSA.", textX, y + 16.5);
+
+    drawBadge(d, "TERLAMPIR", x + w - 3, y + 5, C.navyDark, C.white, 5.5, 4.0);
     doc.y = y + H + 2;
     return;
   }
 
-  // JSA dibuat langsung pada form, bukan berupa file upload.
-  if (jsaData) {
+  // 2. Ada konten terstruktur yang benar-benar diisi
+  if (hasStructuredContent) {
     const rows = [
-      { lbl: "Area", val: jsaData.area },
-      { lbl: "Jenis Pekerjaan", val: jsaData.jenisPekerjaan },
-      { lbl: "Sect/Dept", val: jsaData.sectDept },
-      { lbl: "PIC", val: jsaData.pic },
-      { lbl: "Petugas", val: (jsaData.petugas || []).filter(Boolean).join(", ") },
+      { lbl: "Area Kerja", val: jsaData.area || "-" },
+      { lbl: "Jenis Pekerjaan", val: jsaData.jenisPekerjaan || "-" },
+      { lbl: "Sect/Dept & PIC", val: `${jsaData.sectDept || "-"} / ${jsaData.pic || "-"}` },
+      { lbl: "Daftar Petugas", val: (jsaData.petugas || []).filter(Boolean).join(", ") || "-" },
     ];
-    sec(doc, "JSA Terstruktur", x, w);
+    sec(doc, "Dokumen JSA Terstruktur", x, w);
     infoTable(doc, rows, x, w);
     return;
   }
 
-  // ── JSA diperlukan tapi belum diupload ─────────────────
-  if (!url) {
-    const H = 7;
+  // 3. JSA diperlukan tapi belum diupload
+  if (perluJsa) {
+    const H = 6.5;
     doc.need(H + 2);
     const y = doc.y;
     d.setFillColor(...C.a100);
@@ -599,70 +640,25 @@ async function jsaSection(doc: Doc, perluJsa: boolean, url?: string | null, jsaD
     d.setLineWidth(0.25);
     d.roundedRect(x, y, w, H, 1, 1, "FD");
     d.setFont(FF, "bold");
-    d.setFontSize(7);
+    d.setFontSize(6.5);
     d.setTextColor(...C.a700);
-    d.text("! JSA diperlukan - file belum diupload", x + 4, y + 4.8);
+    d.text("! FORMULIR JSA DIPERLUKAN — Dokumen belum dilampirkan", x + 4, y + 4.5);
     doc.y = y + H + 2;
     return;
   }
 
-  // ── Ada file JSA → QR Code ─────────────────────────────
-  const QR_SIZE = 22;        // mm — cukup besar untuk dipindai dari HP
-  const H       = QR_SIZE + 4; // 26mm total (2mm padding atas + bawah)
+  // 4. JSA tidak diperlukan
+  const H = 6;
   doc.need(H + 2);
   const y = doc.y;
-
-  // Card background
-  d.setFillColor(...C.g100);
-  d.setDrawColor(...C.g600);
-  d.setLineWidth(0.25);
-  d.roundedRect(x, y, w, H, 1.5, 1.5, "FD");
-
-  // QR Code di sisi kiri — mengarah ke URL file JSA langsung
-  try {
-    const fullUrl = url.startsWith("http")
-      ? url
-      : (typeof window !== "undefined" ? window.location.origin : "") + url;
-    const qrImg = await makeQR(fullUrl, 300); // 300px untuk kualitas scan optimal
-    d.addImage(qrImg, "PNG", x + 2, y + 1, QR_SIZE, QR_SIZE);
-  } catch { /* skip QR jika gagal generate */ }
-
-  // Area teks di sebelah kanan QR
-  const textX = x + QR_SIZE + 5;
-  const textW = w - QR_SIZE - 8;
-
-  // Label utama
-  d.setFont(FF, "bold");
-  d.setFontSize(7.5);
-  d.setTextColor(...C.g700);
-  d.text("File JSA Terlampir", textX, y + 7);
-
-  // Nama file — truncate jika terlalu panjang
-  const fn = cleanFile(url);
-  d.setFont(FF, "normal");
-  d.setFontSize(6.5);
-  d.setTextColor(...C.navy);
-  const fnLines = d.splitTextToSize(fn, textW - 22); // 22mm = ruang badge
-  d.text(fnLines[0] ?? fn, textX, y + 12.5);
-
-  // Instruksi scan
+  d.setFillColor(...C.s100);
+  d.setDrawColor(...C.s300);
+  d.setLineWidth(0.2);
+  d.roundedRect(x, y, w, H, 1, 1, "FD");
   d.setFont(FF, "normal");
   d.setFontSize(6);
   d.setTextColor(...C.s500);
-  d.text("Scan QR untuk membuka file JSA", textX, y + 18);
-
-  // Badge TERLAMPIR di kanan atas
-  drawBadge(
-    d,
-    "TERLAMPIR",
-    x + w - 3,   // rightEdge
-    y + 5,       // midY: area atas card
-    C.g600,
-    C.white,
-    5.5,
-    4.2,
-  );
-
+  d.text("Job Safety Analysis (JSA): Tidak Diperlukan / Mengikuti Instruksi Standar K3 PT JAI", x + 4, y + 4.2);
   doc.y = y + H + 2;
 }
 
@@ -675,7 +671,7 @@ interface Approver {
   role: string;
   approved:    any;
   approvedBy:  string | null | undefined;
-  approvedNik: string | null | undefined;
+  approvedNik?: string | null | undefined;
   approvedAt:  string | null | undefined;
 }
 
@@ -687,20 +683,24 @@ async function approvalGrid(
   x = ML,
   w = CW,
 ) {
-  const d       = doc.d;
-  const cols    = 2;
-  const cW      = (w - (cols - 1) * 2) / cols;
-  const cH      = 28;   // tinggi card approved — cukup untuk 4 baris inline + QR
-  const cHwait  = 13;   // tinggi card pending
-  const QR      = 17;   // ukuran QR code
+  const d    = doc.d;
+  const isGP = formType === "general-permit";
+  const cols = (isGP || approvers.length >= 5) ? 3 : 2;
+  const gap  = cols === 3 ? 2.5 : 2;
+  const cW   = (w - (cols - 1) * gap) / cols;
+  const cH   = cols === 3 ? 25 : 28;    // tinggi card approved
+  const cHwait = cols === 3 ? 14 : 13; // tinggi card pending
+  const QR   = cols === 3 ? 13.5 : 17; // ukuran QR code
+  const hdrH = cols === 3 ? 5.8 : 6.5;
 
-  // Header strip height — dipakai konsisten di semua kalkulasi
-  const hdrH = 6.5;
+  // Untuk general-permit dengan 5 approver, tambahkan kartu ke-6 sebagai status pengesahan sistem
+  const allCards: Array<Approver | { isSystemCard: true }> = [...approvers];
+  if (isGP && approvers.length === 5) {
+    allCards.push({ isSystemCard: true });
+  }
 
-  // Estimasi worst-case semua approved untuk doc.need()
-  const rows = Math.ceil(approvers.length / cols);
+  const rows = Math.ceil(allCards.length / cols);
   doc.need(rows * (cH + 2) + 4);
-
   const baseY = doc.y;
 
   // Hitung Y awal tiap baris
@@ -712,26 +712,89 @@ async function approvalGrid(
       let prevRowH = 0;
       for (let c = 0; c < cols; c++) {
         const idx = (r - 1) * cols + c;
-        if (idx < approvers.length) {
-          const h = bool(approvers[idx].approved) ? cH : cHwait;
+        if (idx < allCards.length) {
+          const item = allCards[idx];
+          const h = ("isSystemCard" in item) ? cH : (bool(item.approved) ? cH : cHwait);
           prevRowH = Math.max(prevRowH, h);
         }
       }
-      rowStartY[r] = rowStartY[r - 1] + prevRowH + 2;
+      rowStartY[r] = rowStartY[r - 1] + prevRowH + 2.5;
     }
   }
 
-  for (let i = 0; i < approvers.length; i++) {
-    const ap    = approvers[i];
+  for (let i = 0; i < allCards.length; i++) {
+    const item  = allCards[i];
     const col   = i % cols;
     const row   = Math.floor(i / cols);
-    const isOk  = bool(ap.approved);
-    const thisH = isOk ? cH : cHwait;
-    const cx    = x + col * (cW + 2);
+    const cx    = x + col * (cW + gap);
     const cy    = rowStartY[row];
 
+    // ── KARTU KHUSUS KE-6: STATUS & VALIDASI SISTEM ──────
+    if ("isSystemCard" in item) {
+      const allApproved = approvers.every(a => bool(a.approved));
+      const approvedCount = approvers.filter(a => bool(a.approved)).length;
+      const thisH = cH;
+
+      d.setFillColor(...(allApproved ? C.g100 : C.s50));
+      d.setDrawColor(...(allApproved ? C.g600 : C.s300));
+      d.setLineWidth(0.3);
+      d.roundedRect(cx, cy, cW, thisH, 1.5, 1.5, "FD");
+
+      // Header strip
+      d.setFillColor(...(allApproved ? C.g600 : C.navy));
+      d.roundedRect(cx, cy, cW, hdrH, 1.5, 1.5, "F");
+      d.rect(cx, cy + hdrH - 3, cW, 3, "F");
+
+      d.setFont(FF, "bold");
+      d.setFontSize(6);
+      d.setTextColor(...C.white);
+      d.text("PENGESAHAN SISTEM", cx + 3, cy + 4.2);
+
+      drawBadge(
+        d,
+        allApproved ? "DISETUJUI" : "MENUNGGU",
+        cx + cW - 3.5,
+        cy + hdrH / 2,
+        allApproved ? C.navyDark : [30, 41, 59],
+        C.white,
+        5.2,
+        3.8,
+      );
+
+      // Info teks
+      d.setFont(FF, "bold");
+      d.setFontSize(6);
+      d.setTextColor(...(allApproved ? C.g700 : C.navy));
+      d.text(allApproved ? "DOKUMEN RESMI SAH" : "PROSES APPROVAL", cx + 3, cy + hdrH + 4.5);
+
+      d.setFont(FF, "normal");
+      d.setFontSize(5);
+      d.setTextColor(...C.s500);
+      d.text(`${approvedCount} dari ${approvers.length} Verifikasi Selesai`, cx + 3, cy + hdrH + 8.5);
+      d.text(`ID Form: ${formId}`, cx + 3, cy + hdrH + 12.5);
+
+      // QR Code Verifikasi Dokumen
+      try {
+        const origin = typeof window !== "undefined" ? window.location.origin : "";
+        const url    = `${origin}/approval-verification/${formType}/${formId}/system`;
+        const qrImg  = await makeQR(url, 200);
+        const qrX    = cx + cW - QR - 2.5;
+        const qrY    = cy + hdrH + 1;
+        d.addImage(qrImg, "PNG", qrX, qrY, QR, QR);
+        d.setFont(FF, "normal");
+        d.setFontSize(4);
+        d.setTextColor(...C.s500);
+        d.text("Verifikasi", qrX + QR / 2, qrY + QR + 2.5, { align: "center" });
+      } catch { /* skip */ }
+      continue;
+    }
+
+    const ap    = item as Approver;
+    const isOk  = bool(ap.approved);
+    const thisH = isOk ? cH : cHwait;
+
     // ── Card background + border ──────────────────────────
-    d.setFillColor(...(isOk ? C.g100 : C.s100));
+    d.setFillColor(...(isOk ? C.g100 : C.s50));
     d.setDrawColor(...(isOk ? C.g600 : C.s300));
     d.setLineWidth(0.3);
     d.roundedRect(cx, cy, cW, thisH, 1.5, 1.5, "FD");
@@ -739,18 +802,15 @@ async function approvalGrid(
     // ── Header strip ──────────────────────────────────────
     d.setFillColor(...(isOk ? C.g600 : C.s500));
     d.roundedRect(cx, cy, cW, hdrH, 1.5, 1.5, "F");
-    d.rect(cx, cy + hdrH - 3, cW, 3, "F"); // flatten bottom corners of rounded rect
+    d.rect(cx, cy + hdrH - 3, cW, 3, "F");
 
     // Label kiri header
     d.setFont(FF, "bold");
-    d.setFontSize(6.5);
+    d.setFontSize(cols === 3 ? 6 : 6.5);
     d.setTextColor(...C.white);
-    d.text(ap.lbl.toUpperCase(), cx + 3, cy + 4.8);
+    d.text(ap.lbl.toUpperCase(), cx + 3, cy + 4.2);
 
-    // ── Badge status — menggunakan drawBadge ──────────────
-    // rightEdge = cx + cW - 3.5  →  margin 3.5mm dari border kanan card
-    // midY      = cy + hdrH/2    →  center vertikal header strip
-    // bg kontras dengan warna header agar badge terlihat jelas
+    // ── Badge status ──────────────────────────────────────
     drawBadge(
       d,
       isOk ? "DISETUJUI" : "MENUNGGU",
@@ -758,27 +818,26 @@ async function approvalGrid(
       cy + hdrH / 2,
       isOk ? C.navyDark : [30, 41, 59],
       C.white,
-      5.5,
-      4.0,
+      cols === 3 ? 5.2 : 5.5,
+      cols === 3 ? 3.8 : 4.0,
     );
 
     // ── Card pending: hanya teks "Belum Disetujui" ────────
     if (!isOk) {
       d.setFont(FF, "normal");
-      d.setFontSize(7);
+      d.setFontSize(6.5);
       d.setTextColor(...C.s500);
-      d.text("Belum Disetujui", cx + 4, cy + 10.5);
+      d.text("Belum Disetujui", cx + 3, cy + hdrH + 5);
       continue;
     }
 
     // ── Card approved: info inline satu baris per field ──
-    // Format: [LABEL bold]  [value normal]  — satu baris, tidak ada dua baris terpisah
     const { date: aDate, time: aTime } = fmtDT(ap.approvedAt);
-    const infoX  = cx + 3;
-    const infoY  = cy + hdrH + 3;   // mulai 3mm di bawah header
-    const infoW  = cW - QR - 8;     // lebar area teks, batas sebelum QR
-    const lblW   = 8;                // lebar kolom label (NAMA/NIK/TGL/JAM)
-    const lineH  = 4.0;             // jarak antar baris
+    const infoX  = cx + 2.5;
+    const infoY  = cy + hdrH + 2.5;
+    const infoW  = cW - QR - 5.5;
+    const lblW   = cols === 3 ? 7 : 8;
+    const lineH  = cols === 3 ? 3.6 : 4.0;
 
     const infoRows: Array<[string, string]> = [
       ["NAMA", dash(ap.approvedBy)],
@@ -790,24 +849,21 @@ async function approvalGrid(
     infoRows.forEach(([lbl, val], ri) => {
       const ry = infoY + ri * lineH;
 
-      // Label bold abu-abu
       d.setFont(FF, "bold");
-      d.setFontSize(5.5);
+      d.setFontSize(cols === 3 ? 5 : 5.5);
       d.setTextColor(...C.s500);
-      d.text(lbl, infoX, ry);
+      d.text(lbl, infoX, ry + 2);
 
-      // Separator titik dua
       d.setFont(FF, "normal");
-      d.setFontSize(5.5);
+      d.setFontSize(cols === 3 ? 5 : 5.5);
       d.setTextColor(...C.s500);
-      d.text(":", infoX + lblW, ry);
+      d.text(":", infoX + lblW, ry + 2);
 
-      // Value — bold navy, satu baris
       d.setFont(FF, "bold");
-      d.setFontSize(6);
+      d.setFontSize(cols === 3 ? 5.2 : 6);
       d.setTextColor(...C.navy);
-      const ls = d.splitTextToSize(val, infoW - lblW - 2);
-      d.text(ls[0] ?? val, infoX + lblW + 2.5, ry);
+      const ls = d.splitTextToSize(val, infoW - lblW - 1.5);
+      d.text(ls[0] ?? val, infoX + lblW + 1.5, ry + 2);
     });
 
     // ── QR Code ───────────────────────────────────────────
@@ -815,13 +871,13 @@ async function approvalGrid(
       const origin = typeof window !== "undefined" ? window.location.origin : "";
       const url    = `${origin}/approval-verification/${formType}/${formId}/${ap.role}`;
       const qrImg  = await makeQR(url, 200);
-      const qrX    = cx + cW - QR - 3;
-      const qrY    = cy + 6.5;
+      const qrX    = cx + cW - QR - 2.5;
+      const qrY    = cy + hdrH + 1;
       d.addImage(qrImg, "PNG", qrX, qrY, QR, QR);
       d.setFont(FF, "normal");
-      d.setFontSize(4.5);
+      d.setFontSize(4);
       d.setTextColor(...C.s500);
-      d.text("Scan verifikasi", qrX + QR / 2, qrY + QR + 2, { align: "center" });
+      d.text("Scan verifikasi", qrX + QR / 2, qrY + QR + 2.5, { align: "center" });
     } catch { /* skip */ }
   }
 
@@ -831,12 +887,13 @@ async function approvalGrid(
     let rowH = 0;
     for (let c = 0; c < cols; c++) {
       const idx = r * cols + c;
-      if (idx < approvers.length) {
-        const h = bool(approvers[idx].approved) ? cH : cHwait;
+      if (idx < allCards.length) {
+        const item = allCards[idx];
+        const h = ("isSystemCard" in item) ? cH : (bool(item.approved) ? cH : cHwait);
         rowH = Math.max(rowH, h);
       }
     }
-    totalH += rowH + 2;
+    totalH += rowH + 2.5;
   }
   doc.y = baseY + totalH + 2;
 }
@@ -860,6 +917,142 @@ function drawFooters(d: jsPDFType, total: number, generatedAt: string) {
     d.setTextColor(...C.s500);
     d.text(`Sistem Izin Kerja Digital — PT Jatim Autocomp Indonesia  |  Generated: ${generatedAt}`, ML, fy + 1);
     d.text(`Hal. ${p} / ${total}`, ML + CW, fy + 1, { align: "right" });
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// CONTENT — GENERAL PERMIT / IJIN KERJA EKSTERNAL (2 kolom)
+// ═══════════════════════════════════════════════════════════════════════════
+
+function buildGeneralPermit(doc: Doc, data: any) {
+  const d      = doc.d;
+  const startY = doc.y;
+
+  // ── KOLOM KIRI ─────────────────────────────────────────
+  const lx = ML;
+  const lw = COL;
+
+  // 1. Informasi Kontraktor / Pemohon
+  sec(doc, "Informasi Kontraktor / Pemohon", lx, lw);
+  infoTable(doc, [
+    { lbl: "Nama Kontraktor", val: data.nama_kontraktor_pekerja },
+    { lbl: "Pengawas / PIC",  val: data.nama_pengawas_pic_subkont },
+    { lbl: "Jumlah Pekerja",  val: data.jumlah_tenaga_kerja ? `${data.jumlah_tenaga_kerja} Orang` : "-" },
+    { lbl: "Lokasi Kerja",    val: data.lokasi_pekerjaan },
+    { lbl: "SPV Penanggung Jwb", val: data.spv_terkait_pj ? `${data.spv_terkait_pj}${data.nik_spv_terkait_pj ? ` (${data.nik_spv_terkait_pj})` : ""}` : "-" },
+  ], lx, lw);
+
+  // 2. Periode & Waktu Kerja
+  sec(doc, "Periode & Waktu Kerja", lx, lw);
+  infoTable(doc, [
+    { lbl: "Tgl Rencana",     val: `${fmtD(data.tgl_mulai_kerja)} s/d ${fmtD(data.tgl_akhir_kerja_rencana)}` },
+    { lbl: "Jam Kerja Rencana", val: `${fmtT(data.waktu_kerja)} - ${fmtT(data.waktu_selesai || data.izin_kerja_sampai)}` },
+    { lbl: "Izin Berlaku",    val: `${fmtD(data.izin_kerja_tanggal_dari || data.tgl_mulai_kerja)} s/d ${fmtD(data.izin_kerja_tanggal_sampai || data.tgl_akhir_kerja_rencana)}` },
+    { lbl: "Jam Izin",        val: `${fmtT(data.izin_kerja_dari || data.waktu_kerja)} - ${fmtT(data.izin_kerja_sampai || data.waktu_selesai)}` },
+    { lbl: "Aktual Selesai",  val: fmtD(data.actual_tanggal_kerja) },
+  ], lx, lw);
+
+  // 3. APAR, Limbah & Peralatan
+  sec(doc, "APAR, Limbah & Peralatan", lx, lw);
+  const aparVal = bool(data.apar_dry_powder) ? "Dry Powder" : bool(data.apar_gas_cair) ? "Gas/Cair" : bool(data.apar_tidak_perlu) ? "Tidak Perlu" : data.apar_lainnya || "-";
+  const limbahVal = bool(data.limbah_kontraktor) ? "Dibawa Kontraktor" : bool(data.limbah_pt_jai) ? "Dibuang di PT.JAI" : bool(data.limbah_luar_jai) ? "Dibuang Luar PT.JAI" : "-";
+  
+  const alatList = [
+    bool(data.alat_mesin_potong) && "Mesin Potong",
+    bool(data.alat_mesin_las_gerinda) && "Mesin Las/Gerinda",
+    bool(data.alat_genset) && "Genset",
+    bool(data.alat_tabung_gas) && "Tabung Gas",
+    bool(data.alat_tangga_listrik_awp) && "Tangga Listrik/AWP",
+    bool(data.alat_forklift) && "Forklift",
+    bool(data.alat_lift_barang) && "Lift Barang",
+    data.alat_lainnya,
+  ].filter(Boolean) as string[];
+
+  infoTable(doc, [
+    { lbl: "APAR", val: aparVal },
+    { lbl: "Limbah", val: limbahVal },
+    { lbl: "Peralatan", val: alatList.length > 0 ? alatList.join(", ") : "Standar / Tidak Ada" },
+  ], lx, lw);
+
+  const leftEndY = doc.y;
+
+  // ── KOLOM KANAN ────────────────────────────────────────
+  doc.y = startY;
+  const rx = ML + COL + 3;
+  const rw = COL;
+
+  // 4. Spesifikasi Pekerjaan (Checklist 2-kolom: 8 item)
+  sec(doc, "Spesifikasi Pekerjaan", rx, rw);
+  const spekItems: CItem[] = [
+    { lbl: "Area Workshop",      val: data.spek_area_workshop },
+    { lbl: "Ruang Tertutup",     val: data.spek_ruang_tertutup },
+    { lbl: "Ketinggian",         val: data.spek_ketinggian },
+    { lbl: "Tegangan Tinggi",    val: data.spek_tegangan_tinggi },
+    { lbl: "Pemakaian LOTO",     val: data.spek_pemakaian_loto },
+    { lbl: "Forklift",           val: data.spek_forklift },
+    { lbl: "Temperatur Tinggi",  val: data.spek_temperatur_tinggi },
+    { lbl: "Spesifikasi Lain",   val: data.spesifikasi_lainnya },
+  ];
+  checkGrid(doc, spekItems, rx, rw);
+
+  // 5. Potensi Bahaya & Dampak (Checklist 2-kolom: 8 item)
+  sec(doc, "Potensi Bahaya / Dampak K3", rx, rw);
+  const bahayaItems: CItem[] = [
+    { lbl: "Ledakan / Kebakaran",   val: data.dampak_ledakan_kebakaran },
+    { lbl: "Jatuh dari Ketinggian", val: data.dampak_jatuh_ketinggian },
+    { lbl: "Kepala / Kaki Tertimpa",val: bool(data.dampak_kepala_tertimpa) || bool(data.dampak_kaki_tertimpa) },
+    { lbl: "Tersengat Listrik",     val: data.dampak_tersengat_listrik },
+    { lbl: "Terjepit Mesin",        val: data.dampak_terjepit_mesin },
+    { lbl: "Tumpahan B3 / Oli",     val: data.dampak_tumpahan_oli_bbm_b3 },
+    { lbl: "Iritasi / Radiasi Las", val: bool(data.dampak_iritasi_mata) || bool(data.dampak_radiasi_sinar_las) },
+    { lbl: "Bahaya Lainnya",        val: bool(data.dampak_kebisingan) || bool(data.dampak_keracunan_zat_kimia) || bool(data.dampak_lainnya) },
+  ];
+  checkGrid(doc, bahayaItems, rx, rw);
+
+  // 6. APD (Alat Pelindung Diri) (Checklist 2-kolom: 6 item)
+  sec(doc, "Alat Pelindung Diri (APD)", rx, rw);
+  const apdItems: CItem[] = [
+    { lbl: "Helm & Safety Shoes",   val: bool(data.apd_helm) && bool(data.apd_safety_shoes) },
+    { lbl: "Masker / Masker Kimia", val: bool(data.apd_masker) || bool(data.apd_masker_kimia) },
+    { lbl: "Kacamata (Safety/Las)", val: bool(data.apd_kacamata_biasa) || bool(data.apd_kacamata_las) },
+    { lbl: "Sarung Tangan",         val: bool(data.apd_gloves) || bool(data.apd_sarung_tangan_bintil) || bool(data.apd_sarung_tangan_kulit) },
+    { lbl: "Full Body Harness",     val: data.apd_full_body_harness },
+    { lbl: "Ear Plug",              val: data.apd_ear_plug },
+  ];
+  checkGrid(doc, apdItems, rx, rw);
+
+  const rightEndY = doc.y;
+  doc.y = Math.max(leftEndY, rightEndY) + 2;
+
+  // ── FULL WIDTH: Rincian Deskripsi Pekerjaan (jika ada) ──
+  if (data.deskripsi_pekerjaan && String(data.deskripsi_pekerjaan).trim()) {
+    doc.need(13);
+    const by = doc.y;
+    d.setFillColor(...C.s50);
+    d.setDrawColor(...C.s300);
+    d.setLineWidth(0.25);
+    d.roundedRect(ML, by, CW, 11, 1, 1, "FD");
+
+    // Gold accent bar on left
+    d.setFillColor(...C.gold);
+    d.rect(ML, by, 2.5, 11, "F");
+
+    d.setFont(FF, "bold");
+    d.setFontSize(6.5);
+    d.setTextColor(...C.navy);
+    d.text("DESKRIPSI PEKERJAAN:", ML + 5, by + 4);
+
+    d.setFont(FF, "normal");
+    d.setFontSize(6.5);
+    d.setTextColor(...C.s700);
+    const descLines = d.splitTextToSize(String(data.deskripsi_pekerjaan).trim(), CW - 10);
+    d.text(descLines[0] ?? "-", ML + 5, by + 8);
+    if (descLines[1]) {
+      d.text(descLines[1], ML + 5, by + 11.5);
+      doc.y = by + 14.5;
+    } else {
+      doc.y = by + 13;
+    }
   }
 }
 
@@ -1237,7 +1430,8 @@ export async function generatePermitPdf(data: any, formType: FormType): Promise<
   const { jsPDF } = await import("jspdf");
 
   const jenisPermit = JENIS_LABEL[formType] ?? formType.toUpperCase();
-  const isEksternal = data.tipe_perusahaan === "eksternal";
+  const isEksternal = formType === "general-permit" ? true : data.tipe_perusahaan === "eksternal";
+  const tipePermit  = formType === "general-permit" ? "eksternal" : (data.tipe_perusahaan ?? "internal");
   const generatedAt = new Date().toLocaleString("id-ID", {
     day: "2-digit", month: "short", year: "numeric",
     hour: "2-digit", minute: "2-digit", second: "2-digit",
@@ -1249,10 +1443,12 @@ export async function generatePermitPdf(data: any, formType: FormType): Promise<
   // ── Halaman 1: Header ──────────────────────────────────
   drawWatermark(doc.d);
   await drawHeader(doc, jenisPermit, data.id_form ?? "-", data.status ?? "submitted",
-    data.tanggal ?? null, data.tanggal_pelaksanaan ?? null, data.tipe_perusahaan ?? "internal");
+    data.tanggal ?? null, data.tanggal_pelaksanaan ?? null, tipePermit);
 
   // ── Konten form ────────────────────────────────────────
-  if (formType === "hot-work" || formType === "workshop") {
+  if (formType === "general-permit") {
+    buildGeneralPermit(doc, data);
+  } else if (formType === "hot-work" || formType === "workshop") {
     buildHotWorkWorkshop(doc, data, formType);
   } else {
     buildHeightWork(doc, data);
@@ -1287,19 +1483,66 @@ export async function generatePermitPdf(data: any, formType: FormType): Promise<
   sec(doc, "Persetujuan & Verifikasi QR");
 
   const approvers: Approver[] = [];
-  if (isEksternal) {
-    approvers.push({
-      lbl: "Kontraktor", role: "kontraktor",
-      approved: data.kontraktor_approved, approvedBy: data.kontraktor_approved_by,
-      approvedNik: data.kontraktor_nik, approvedAt: data.kontraktor_approved_at,
-    });
+  if (formType === "general-permit") {
+    approvers.push(
+      {
+        lbl: "Kontraktor", role: "kontraktor",
+        approved: Boolean(data.kontraktor_signature_url || data.kontraktor_pj),
+        approvedBy: data.kontraktor_pj || data.nama_kontraktor_pekerja,
+        approvedNik: null,
+        approvedAt: data.tanggal,
+      },
+      {
+        lbl: "SPV Terkait", role: "spv",
+        approved: data.spv_approved,
+        approvedBy: data.spv_approved_by ?? data.spv_terkait_pj,
+        approvedNik: data.spv_nik ?? data.nik_spv_terkait_pj,
+        approvedAt: data.spv_approved_at,
+      },
+      {
+        lbl: "Admin K3", role: "admin_k3",
+        approved: data.admin_k3_approved,
+        approvedBy: data.admin_k3_approved_by,
+        approvedNik: data.admin_k3_nik,
+        approvedAt: data.admin_k3_approved_at,
+      },
+      {
+        lbl: "SFO", role: "sfo",
+        approved: data.sfo_approved,
+        approvedBy: data.sfo_approved_by,
+        approvedNik: data.sfo_nik,
+        approvedAt: data.sfo_approved_at,
+      },
+      {
+        lbl: "SMR / PGA Mgr", role: "pga",
+        approved: data.pga_approved,
+        approvedBy: data.pga_approved_by,
+        approvedNik: data.pga_nik,
+        approvedAt: data.pga_approved_at,
+      },
+      {
+        lbl: "Security", role: "security",
+        approved: data.security_approved,
+        approvedBy: data.security_approved_by,
+        approvedNik: data.security_nik,
+        approvedAt: data.security_approved_at,
+      },
+    );
+  } else {
+    if (isEksternal) {
+      approvers.push({
+        lbl: "Kontraktor", role: "kontraktor",
+        approved: data.kontraktor_approved, approvedBy: data.kontraktor_approved_by,
+        approvedNik: data.kontraktor_nik, approvedAt: data.kontraktor_approved_at,
+      });
+    }
+    approvers.push(
+      { lbl: "SPV Terkait",  role: "spv",      approved: data.spv_approved,      approvedBy: data.spv_approved_by ?? data.spv_terkait,      approvedNik: data.spv_nik,      approvedAt: data.spv_approved_at },
+      { lbl: "Admin K3",     role: "admin_k3", approved: data.admin_k3_approved,  approvedBy: data.admin_k3_approved_by,                     approvedNik: data.admin_k3_nik, approvedAt: data.admin_k3_approved_at },
+      { lbl: "SFO",          role: "sfo",      approved: data.sfo_approved,       approvedBy: data.sfo_approved_by ?? data.sfo,               approvedNik: data.sfo_nik,      approvedAt: data.sfo_approved_at },
+      { lbl: "MR / PGA Mgr", role: "mr_pga",   approved: data.mr_pga_approved,    approvedBy: data.mr_pga_approved_by ?? data.mr_pga_mgr,     approvedNik: data.mr_pga_nik,   approvedAt: data.mr_pga_approved_at },
+    );
   }
-  approvers.push(
-    { lbl: "SPV Terkait",  role: "spv",      approved: data.spv_approved,      approvedBy: data.spv_approved_by ?? data.spv_terkait,      approvedNik: data.spv_nik,      approvedAt: data.spv_approved_at },
-    { lbl: "Admin K3",     role: "admin_k3", approved: data.admin_k3_approved,  approvedBy: data.admin_k3_approved_by,                     approvedNik: data.admin_k3_nik, approvedAt: data.admin_k3_approved_at },
-    { lbl: "SFO",          role: "sfo",      approved: data.sfo_approved,       approvedBy: data.sfo_approved_by ?? data.sfo,               approvedNik: data.sfo_nik,      approvedAt: data.sfo_approved_at },
-    { lbl: "MR / PGA Mgr", role: "mr_pga",   approved: data.mr_pga_approved,    approvedBy: data.mr_pga_approved_by ?? data.mr_pga_mgr,     approvedNik: data.mr_pga_nik,   approvedAt: data.mr_pga_approved_at },
-  );
 
   await approvalGrid(doc, approvers, data.id_form ?? "", formType);
 
@@ -1327,7 +1570,8 @@ export async function generatePermitPdfBlob(data: any, formType: FormType): Prom
   const { jsPDF } = await import("jspdf");
  
   const jenisPermit = JENIS_LABEL[formType] ?? formType.toUpperCase();
-  const isEksternal = data.tipe_perusahaan === "eksternal";
+  const isEksternal = formType === "general-permit" ? true : data.tipe_perusahaan === "eksternal";
+  const tipePermit  = formType === "general-permit" ? "eksternal" : (data.tipe_perusahaan ?? "internal");
   const generatedAt = new Date().toLocaleString("id-ID", {
     day: "2-digit", month: "short", year: "numeric",
     hour: "2-digit", minute: "2-digit", second: "2-digit",
@@ -1339,19 +1583,21 @@ export async function generatePermitPdfBlob(data: any, formType: FormType): Prom
   // ── Halaman 1: Header ──────────────────────────────────
   drawWatermark(doc.d);
   await drawHeader(doc, jenisPermit, data.id_form ?? "-", data.status ?? "submitted",
-    data.tanggal ?? null, data.tanggal_pelaksanaan ?? null, data.tipe_perusahaan ?? "internal");
+    data.tanggal ?? null, data.tanggal_pelaksanaan ?? null, tipePermit);
  
   // ── Konten form ────────────────────────────────────────
-  if (formType === "hot-work" || formType === "workshop") {
+  if (formType === "general-permit") {
+    buildGeneralPermit(doc, data);
+  } else if (formType === "hot-work" || formType === "workshop") {
     buildHotWorkWorkshop(doc, data, formType);
   } else {
     buildHeightWork(doc, data);
   }
- 
+
   // ── JSA ────────────────────────────────────────────────
   sec(doc, "Dokumen JSA");
   await jsaSection(doc, bool(data.perlu_jsa), data.jsa_file_url, data.jsa_data);
- 
+
   // ── Catatan Reject ─────────────────────────────────────
   if (data.catatan_reject) {
     doc.need(14);
@@ -1372,24 +1618,71 @@ export async function generatePermitPdfBlob(data: any, formType: FormType): Prom
     d.text(ls[0] ?? "-", ML + 3, ry + 9.5);
     doc.y = ry + 15;
   }
- 
+
   // ── Approval Grid ──────────────────────────────────────
   sec(doc, "Persetujuan & Verifikasi QR");
- 
+
   const approvers: Approver[] = [];
-  if (isEksternal) {
-    approvers.push({
-      lbl: "Kontraktor", role: "kontraktor",
-      approved: data.kontraktor_approved, approvedBy: data.kontraktor_approved_by,
-      approvedNik: data.kontraktor_nik, approvedAt: data.kontraktor_approved_at,
-    });
+  if (formType === "general-permit") {
+    approvers.push(
+      {
+        lbl: "Kontraktor", role: "kontraktor",
+        approved: Boolean(data.kontraktor_signature_url || data.kontraktor_pj),
+        approvedBy: data.kontraktor_pj || data.nama_kontraktor_pekerja,
+        approvedNik: null,
+        approvedAt: data.tanggal,
+      },
+      {
+        lbl: "SPV Terkait", role: "spv",
+        approved: data.spv_approved,
+        approvedBy: data.spv_approved_by ?? data.spv_terkait_pj,
+        approvedNik: data.spv_nik ?? data.nik_spv_terkait_pj,
+        approvedAt: data.spv_approved_at,
+      },
+      {
+        lbl: "Admin K3", role: "admin_k3",
+        approved: data.admin_k3_approved,
+        approvedBy: data.admin_k3_approved_by,
+        approvedNik: data.admin_k3_nik,
+        approvedAt: data.admin_k3_approved_at,
+      },
+      {
+        lbl: "SFO", role: "sfo",
+        approved: data.sfo_approved,
+        approvedBy: data.sfo_approved_by,
+        approvedNik: data.sfo_nik,
+        approvedAt: data.sfo_approved_at,
+      },
+      {
+        lbl: "SMR / PGA Mgr", role: "pga",
+        approved: data.pga_approved,
+        approvedBy: data.pga_approved_by,
+        approvedNik: data.pga_nik,
+        approvedAt: data.pga_approved_at,
+      },
+      {
+        lbl: "Security", role: "security",
+        approved: data.security_approved,
+        approvedBy: data.security_approved_by,
+        approvedNik: data.security_nik,
+        approvedAt: data.security_approved_at,
+      },
+    );
+  } else {
+    if (isEksternal) {
+      approvers.push({
+        lbl: "Kontraktor", role: "kontraktor",
+        approved: data.kontraktor_approved, approvedBy: data.kontraktor_approved_by,
+        approvedNik: data.kontraktor_nik, approvedAt: data.kontraktor_approved_at,
+      });
+    }
+    approvers.push(
+      { lbl: "SPV Terkait",  role: "spv",      approved: data.spv_approved,      approvedBy: data.spv_approved_by ?? data.spv_terkait,      approvedNik: data.spv_nik,      approvedAt: data.spv_approved_at },
+      { lbl: "Admin K3",     role: "admin_k3", approved: data.admin_k3_approved,  approvedBy: data.admin_k3_approved_by,                     approvedNik: data.admin_k3_nik, approvedAt: data.admin_k3_approved_at },
+      { lbl: "SFO",          role: "sfo",      approved: data.sfo_approved,       approvedBy: data.sfo_approved_by ?? data.sfo,               approvedNik: data.sfo_nik,      approvedAt: data.sfo_approved_at },
+      { lbl: "MR / PGA Mgr", role: "mr_pga",   approved: data.mr_pga_approved,    approvedBy: data.mr_pga_approved_by ?? data.mr_pga_mgr,     approvedNik: data.mr_pga_nik,   approvedAt: data.mr_pga_approved_at },
+    );
   }
-  approvers.push(
-    { lbl: "SPV Terkait",  role: "spv",      approved: data.spv_approved,      approvedBy: data.spv_approved_by ?? data.spv_terkait,      approvedNik: data.spv_nik,      approvedAt: data.spv_approved_at },
-    { lbl: "Admin K3",     role: "admin_k3", approved: data.admin_k3_approved,  approvedBy: data.admin_k3_approved_by,                     approvedNik: data.admin_k3_nik, approvedAt: data.admin_k3_approved_at },
-    { lbl: "SFO",          role: "sfo",      approved: data.sfo_approved,       approvedBy: data.sfo_approved_by ?? data.sfo,               approvedNik: data.sfo_nik,      approvedAt: data.sfo_approved_at },
-    { lbl: "MR / PGA Mgr", role: "mr_pga",   approved: data.mr_pga_approved,    approvedBy: data.mr_pga_approved_by ?? data.mr_pga_mgr,     approvedNik: data.mr_pga_nik,   approvedAt: data.mr_pga_approved_at },
-  );
  
   await approvalGrid(doc, approvers, data.id_form ?? "", formType);
  

@@ -64,7 +64,7 @@ export async function syncCascadeApproval(params: SyncCascadeParams): Promise<vo
   try {
     const general = await queryOne<any>(
       `SELECT id_form, status, current_stage,
-              spv_approved, sfo_approved, pga_approved, security_approved,
+              spv_approved, admin_k3_approved, sfo_approved, pga_approved, security_approved,
               spv_terkait_pj, nik_spv_terkait_pj,
               jsa_data, penilaian_subkontraktor, safety_induction,
               user_id, nama_kontraktor_pekerja, tanggal
@@ -153,7 +153,7 @@ export async function syncCascadeApproval(params: SyncCascadeParams): Promise<vo
     // ─────────────────────────────────────────────────────────────
     else if (role === "sfo") {
       // A. Update form_ijin_kerja
-      const nextStage = general.current_stage === 2 ? 3 : general.current_stage;
+      const nextStage = general.current_stage === 3 ? 4 : general.current_stage;
       await query(
         `UPDATE form_ijin_kerja
             SET sfo_approved = TRUE,
@@ -163,14 +163,14 @@ export async function syncCascadeApproval(params: SyncCascadeParams): Promise<vo
                 current_stage = $4,
                 updated_at = $2
           WHERE id_form = $5
-            AND (sfo_approved IS NOT TRUE OR current_stage = 2)`,
+            AND (sfo_approved IS NOT TRUE OR current_stage = 3)`,
         [approverName, now, approverNik, nextStage, idIjinKerja]
       );
 
-      if (general.current_stage === 2) {
+      if (general.current_stage === 3) {
         notifyGeneralPermitNextApprover({
           idForm: idIjinKerja,
-          nextStage: 3,
+          nextStage: 4,
           userId: general.user_id,
           namaPemohon: general.nama_kontraktor_pekerja || "-",
           tanggal: general.tanggal,
@@ -237,7 +237,7 @@ export async function syncCascadeApproval(params: SyncCascadeParams): Promise<vo
     // ─────────────────────────────────────────────────────────────
     else if (role === "smr") {
       // A. Update form_ijin_kerja
-      const nextStage = general.current_stage === 3 ? 4 : general.current_stage;
+      const nextStage = general.current_stage === 4 ? 5 : general.current_stage;
       await query(
         `UPDATE form_ijin_kerja
             SET pga_approved = TRUE,
@@ -247,14 +247,14 @@ export async function syncCascadeApproval(params: SyncCascadeParams): Promise<vo
                 current_stage = $4,
                 updated_at = $2
           WHERE id_form = $5
-            AND (pga_approved IS NOT TRUE OR current_stage = 3)`,
+            AND (pga_approved IS NOT TRUE OR current_stage = 4)`,
         [approverName, now, approverNik, nextStage, idIjinKerja]
       );
 
-      if (general.current_stage === 3) {
+      if (general.current_stage === 4) {
         notifyGeneralPermitNextApprover({
           idForm: idIjinKerja,
-          nextStage: 4,
+          nextStage: 5,
           userId: general.user_id,
           namaPemohon: general.nama_kontraktor_pekerja || "-",
           tanggal: general.tanggal,
@@ -321,7 +321,7 @@ export async function syncCascadeApproval(params: SyncCascadeParams): Promise<vo
                 status = 'approved',
                 approved_by = $2,
                 approved_at = $3,
-                current_stage = 4,
+                current_stage = 5,
                 updated_at = $3
           WHERE id_form = $6`,
         [JSON.stringify(si), approverName, now, approverNik, signatureUrl, idIjinKerja]
@@ -332,6 +332,31 @@ export async function syncCascadeApproval(params: SyncCascadeParams): Promise<vo
     // 5. ROLE ADMIN K3
     // ─────────────────────────────────────────────────────────────
     else if (role === "admin_k3") {
+      // A. Update form_ijin_kerja
+      const nextStage = general.current_stage === 2 ? 3 : general.current_stage;
+      await query(
+        `UPDATE form_ijin_kerja
+            SET admin_k3_approved = TRUE,
+                admin_k3_approved_by = $1,
+                admin_k3_approved_at = $2,
+                admin_k3_nik = $3,
+                current_stage = $4,
+                updated_at = $2
+          WHERE id_form = $5
+            AND (admin_k3_approved IS NOT TRUE OR current_stage = 2)`,
+        [approverName, now, approverNik, nextStage, idIjinKerja]
+      );
+
+      if (general.current_stage === 2) {
+        notifyGeneralPermitNextApprover({
+          idForm: idIjinKerja,
+          nextStage: 3,
+          userId: general.user_id,
+          namaPemohon: general.nama_kontraktor_pekerja || "-",
+          tanggal: general.tanggal,
+        }).catch((err) => console.error("[CASCADE EMAIL] error Admin K3:", err));
+      }
+
       for (const tbl of ["form_kerja_panas", "form_kerja_ketinggian", "form_kerja_workshop"]) {
         await query(
           `UPDATE ${tbl}

@@ -1,5 +1,7 @@
 // app/form-files/page.tsx
-// Halaman admin: daftar seluruh form dari 3 tabel, dengan inline PDF viewer.
+// Halaman admin: daftar seluruh form (termasuk Ijin Kerja Eksternal), dengan inline PDF viewer.
+// Form khusus (hot-work, workshop, height-work) yang terlampir pada Ijin Kerja Eksternal
+// tidak muncul sebagai item terpisah di luar, melainkan memiliki tombol lampiran di dalam kartu Ijin Kerja Eksternal.
 // Reuse generatePermitPdf dari lib/generatePermitPdf.ts (identik dengan Download PDF di DetailModal).
 "use client";
 import { useState, useEffect, useRef, useMemo } from "react";
@@ -8,12 +10,22 @@ import { useRouter } from "next/navigation";
 import {
   Home, FileText, Flame, AlertTriangle, Filter,
   Eye, Loader2, User, LogOut, RefreshCw, ChevronRight,
-  X, Download,
+  X, Download, ClipboardCheck, Paperclip,
 } from "lucide-react";
 import Sidebar from "@/components/Sidebar";
 
 // ── Types ─────────────────────────────────────────────────────
-type JenisForm = "hot-work" | "workshop" | "height-work";
+type JenisForm = "general-permit" | "hot-work" | "workshop" | "height-work";
+
+interface LinkedJobFormItem {
+  id_form: string;
+  jenis_form: "hot-work" | "workshop" | "height-work";
+  tanggal?: string;
+  tanggal_pelaksanaan?: string;
+  status: string;
+  pemohon?: string;
+  lokasi?: string;
+}
 
 interface FormRow {
   id_form: string;
@@ -21,8 +33,10 @@ interface FormRow {
   tanggal: string;
   tanggal_pelaksanaan?: string;
   status: string;
-  pemohon: string;       // nama_kontraktor_nik / nama_pekerja_nik / petugas_ketinggian
+  pemohon: string;       // nama_kontraktor_nik / nama_pekerja_nik / petugas_ketinggian / nama_kontraktor_pekerja
   lokasi?: string;
+  id_ijin_kerja?: string | null;
+  linked_job_forms?: LinkedJobFormItem[];
 }
 
 // ── Helpers ───────────────────────────────────────────────────
@@ -34,9 +48,10 @@ const fmtDate = (d?: string) => {
 };
 
 const JENIS_CFG: Record<JenisForm, { label: string; color: string; bg: string; icon: any }> = {
-  "hot-work":    { label: "Hot Work",     color: "text-orange-700", bg: "bg-orange-100", icon: Flame },
-  "workshop":    { label: "Workshop",     color: "text-blue-700",   bg: "bg-blue-100",   icon: FileText },
-  "height-work": { label: "Height Work",  color: "text-purple-700", bg: "bg-purple-100", icon: AlertTriangle },
+  "general-permit": { label: "Ijin Kerja Eksternal", color: "text-emerald-700", bg: "bg-emerald-100", icon: ClipboardCheck },
+  "hot-work":       { label: "Hot Work",            color: "text-orange-700",  bg: "bg-orange-100",  icon: Flame },
+  "workshop":       { label: "Workshop",            color: "text-blue-700",    bg: "bg-blue-100",    icon: FileText },
+  "height-work":    { label: "Height Work",         color: "text-purple-700",  bg: "bg-purple-100",  icon: AlertTriangle },
 };
 
 const STATUS_CFG: Record<string, { label: string; color: string; bg: string }> = {
@@ -50,12 +65,12 @@ const STATUS_CFG: Record<string, { label: string; color: string; bg: string }> =
 export default function FormFilesPage() {
   const router = useRouter();
 
-  const [forms, setForms]         = useState<FormRow[]>([]);
-  const [loading, setLoading]     = useState(true);
+  const [forms, setForms]              = useState<FormRow[]>([]);
+  const [loading, setLoading]          = useState(true);
   const [filterJenis, setFilter]       = useState<"all" | JenisForm>("all");
   const [filterMonth, setFilterMonth]  = useState<string>("all"); // "all" | "01".."12"
   const [filterYear,  setFilterYear]   = useState<string>("all"); // "all" | "2024" etc.
-  const [userName, setUserName]   = useState("");
+  const [userName, setUserName]        = useState("");
 
   // PDF viewer state
   const [selectedForm, setSelected]     = useState<FormRow | null>(null);
@@ -118,7 +133,6 @@ export default function FormFilesPage() {
       const json = await res.json();
 
       // 2. Generate PDF menggunakan library yang sama dengan Download PDF
-      const { jsPDF } = await import("jspdf");
       const { generatePermitPdfBlob } = await import("@/lib/generatePermitPdf");
       const blob = await generatePermitPdfBlob(json.data, form.jenis_form);
 
@@ -234,9 +248,13 @@ export default function FormFilesPage() {
             <div className="flex items-center gap-2 flex-wrap">
               <Filter className="w-4 h-4 text-slate-400 shrink-0" />
               <span className="text-xs font-semibold text-slate-500">Jenis Form:</span>
-              {(["all", "hot-work", "workshop", "height-work"] as const).map((k) => {
+              {(["all", "general-permit", "hot-work", "workshop", "height-work"] as const).map((k) => {
                 const labels: Record<string, string> = {
-                  all: "Semua", "hot-work": "Hot Work", workshop: "Workshop", "height-work": "Height Work",
+                  all: "Semua",
+                  "general-permit": "Ijin Kerja Eksternal",
+                  "hot-work": "Hot Work",
+                  workshop: "Workshop",
+                  "height-work": "Height Work",
                 };
                 return (
                   <button key={k} onClick={() => setFilter(k)}
@@ -325,6 +343,9 @@ export default function FormFilesPage() {
                       const sCfg = STATUS_CFG[form.status] ?? STATUS_CFG.submitted;
                       const Icon = jCfg.icon;
                       const isActive = selectedForm?.id_form === form.id_form;
+                      const isParentOfSelected = Boolean(
+                        form.linked_job_forms?.some((jf) => jf.id_form === selectedForm?.id_form)
+                      );
 
                       return (
                         <div key={form.id_form}
@@ -332,6 +353,8 @@ export default function FormFilesPage() {
                           className={`p-4 cursor-pointer transition-colors ${
                             isActive
                               ? "bg-orange-50 border-l-4 border-orange-500"
+                              : isParentOfSelected
+                              ? "bg-slate-50/90 border-l-4 border-emerald-500"
                               : "hover:bg-slate-50 border-l-4 border-transparent"
                           }`}>
                           <div className="flex items-start justify-between gap-2 mb-2">
@@ -357,12 +380,62 @@ export default function FormFilesPage() {
                             {form.pemohon || "-"}
                           </p>
 
-                          <div className={`flex items-center gap-1 text-xs font-semibold ${
-                            isActive ? "text-orange-600" : "text-slate-400"
+                          {/* ── Tombol Lampiran Form Terkait (khusus jika ada linked_job_forms) ── */}
+                          {form.linked_job_forms && form.linked_job_forms.length > 0 && (
+                            <div className="mt-2.5 pt-2 border-t border-slate-100">
+                              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wide flex items-center gap-1 mb-1.5">
+                                <Paperclip className="w-3 h-3 text-slate-400" />
+                                Form Lampiran ({form.linked_job_forms.length}):
+                              </p>
+                              <div className="flex flex-wrap gap-1.5">
+                                {form.linked_job_forms.map((jf) => {
+                                  const jfCfg = JENIS_CFG[jf.jenis_form] || JENIS_CFG["hot-work"];
+                                  const JfIcon = jfCfg.icon;
+                                  const isJfActive = selectedForm?.id_form === jf.id_form;
+                                  return (
+                                    <button
+                                      key={jf.id_form}
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleViewPdf({
+                                          ...jf,
+                                          id_ijin_kerja: form.id_form,
+                                        } as FormRow);
+                                      }}
+                                      className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-semibold border transition-all ${
+                                        isJfActive
+                                          ? "bg-orange-600 text-white border-orange-600 shadow-xs"
+                                          : `${jfCfg.bg} ${jfCfg.color} border-slate-200/80 hover:brightness-95 active:scale-95`
+                                      }`}
+                                      title={`Lihat PDF ${jfCfg.label} (${jf.id_form})`}
+                                    >
+                                      <JfIcon className="w-3 h-3" />
+                                      <span>{jfCfg.label}</span>
+                                      <span className={`text-[9px] px-1 py-0.2 rounded font-medium ${
+                                        isJfActive ? "bg-white/20 text-white" : "bg-white/80 text-slate-700"
+                                      }`}>
+                                        {STATUS_CFG[jf.status]?.label || jf.status}
+                                      </span>
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          )}
+
+                          <div className={`flex items-center gap-1 text-xs font-semibold mt-2.5 ${
+                            isActive ? "text-orange-600" : isParentOfSelected ? "text-emerald-700" : "text-slate-400"
                           }`}>
                             <Eye className="w-3 h-3" />
-                            <span>{isActive ? "Sedang ditampilkan" : "Klik untuk lihat PDF"}</span>
-                            {!isActive && <ChevronRight className="w-3 h-3 ml-auto" />}
+                            <span>
+                              {isActive
+                                ? "Sedang ditampilkan"
+                                : isParentOfSelected
+                                ? "Sedang menampilkan form lampiran"
+                                : "Klik untuk lihat PDF"}
+                            </span>
+                            {!isActive && !isParentOfSelected && <ChevronRight className="w-3 h-3 ml-auto" />}
                           </div>
                         </div>
                       );
@@ -389,6 +462,11 @@ export default function FormFilesPage() {
                         <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${JENIS_CFG[selectedForm.jenis_form]?.bg} ${JENIS_CFG[selectedForm.jenis_form]?.color}`}>
                           {JENIS_CFG[selectedForm.jenis_form]?.label}
                         </span>
+                        {selectedForm.id_ijin_kerja && (
+                          <span className="text-[10px] text-slate-400 font-mono hidden sm:inline">
+                            (Lampiran dari {selectedForm.id_ijin_kerja})
+                          </span>
+                        )}
                       </div>
                     ) : (
                       <span className="text-sm text-slate-400">Pilih form untuk melihat PDF</span>

@@ -37,6 +37,10 @@ const parseTime = (time: string | undefined): { hour: number; minute: number } =
   return { hour: h || 0, minute: m || 0 };
 };
 
+// ── Static Options (didefinisikan di luar komponen agar tidak dibuat ulang tiap render) ──
+const HOUR_OPTIONS = Array.from({ length: 24 }, (_, i) => i);
+const MINUTE_OPTIONS = Array.from({ length: 60 }, (_, i) => i);
+
 // ── Custom Select dengan max 5 item visible + scroll ──
 interface MiniSelectProps {
   value: number;
@@ -47,16 +51,13 @@ interface MiniSelectProps {
 
 const MiniSelect: React.FC<MiniSelectProps> = ({ value, options, onChange, label }) => {
   const [isOpen, setIsOpen] = useState(false);
-  // FIX: sebelumnya "listRef" dipakai dobel untuk wrapper luar DAN list
-  // scrollable di dalam — akibatnya listRef.current selalu menunjuk ke
-  // wrapper luar (bukan elemen yang benar-benar discroll), jadi auto-scroll
-  // ke item terpilih tidak pernah jalan dengan benar. Sekarang dipisah jadi
-  // dua ref berbeda dengan tugas masing-masing.
   const wrapperRef = useRef<HTMLDivElement>(null);
   const innerListRef = useRef<HTMLDivElement>(null);
   const itemHeight = 36;
   const visibleCount = 5;
 
+  // Auto-scroll ke item terpilih HANYA sekali saat dropdown pertama kali dibuka.
+  // Jangan listen ke options atau value agar tidak me-reset scrollbar saat user sedang scrolling!
   useEffect(() => {
     if (isOpen && innerListRef.current) {
       const selectedIndex = options.indexOf(value);
@@ -64,7 +65,8 @@ const MiniSelect: React.FC<MiniSelectProps> = ({ value, options, onChange, label
         innerListRef.current.scrollTop = Math.max(0, selectedIndex * itemHeight - itemHeight * 2);
       }
     }
-  }, [isOpen, value, options]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -88,9 +90,9 @@ const MiniSelect: React.FC<MiniSelectProps> = ({ value, options, onChange, label
         <button
           type="button"
           onClick={() => setIsOpen(!isOpen)}
-          className={`w-16 h-10 flex items-center justify-center gap-1 rounded-lg border-2 font-bold text-sm transition-all ${
+          className={`w-18 h-10 px-2 flex items-center justify-center gap-1 rounded-lg border-2 font-bold text-sm transition-all ${
             isOpen
-              ? "border-orange-500 bg-orange-50 text-orange-700"
+              ? "border-orange-500 bg-orange-50 text-orange-700 shadow-xs"
               : "border-orange-300 bg-orange-50 text-slate-900 hover:border-orange-400"
           }`}
         >
@@ -101,12 +103,20 @@ const MiniSelect: React.FC<MiniSelectProps> = ({ value, options, onChange, label
         {isOpen && (
           <div
             className="absolute left-1/2 -translate-x-1/2 top-full mt-1 z-50 bg-white border-2 border-orange-300 rounded-lg shadow-xl overflow-hidden"
-            style={{ width: "72px" }}
+            style={{ width: "76px" }}
           >
             <div
               ref={innerListRef}
-              className="overflow-y-auto scrollbar-hide"
-              style={{ maxHeight: `${itemHeight * visibleCount}px` }}
+              className="overflow-y-auto overscroll-contain select-none"
+              style={{
+                maxHeight: `${itemHeight * visibleCount}px`,
+                overscrollBehavior: "contain",
+                scrollbarWidth: "thin",
+              }}
+              onWheel={(e) => {
+                // Cegah wheel scroll bocor ke background page
+                e.stopPropagation();
+              }}
             >
               {options.map((opt) => {
                 const isSelected = opt === value;
@@ -120,8 +130,8 @@ const MiniSelect: React.FC<MiniSelectProps> = ({ value, options, onChange, label
                     }}
                     className={`w-full flex items-center justify-center text-sm font-semibold transition-colors ${
                       isSelected
-                        ? "bg-orange-500 text-white"
-                        : "text-slate-700 hover:bg-orange-50"
+                        ? "bg-orange-500 text-white font-bold"
+                        : "text-slate-700 hover:bg-orange-50 hover:text-orange-700"
                     }`}
                     style={{ height: `${itemHeight}px` }}
                   >
@@ -211,37 +221,45 @@ const TimeInput24: React.FC<TimeInput24Props> = ({
     if (isOpen) computePosition();
   }, [isOpen, computePosition]);
 
-  // FIX BUG UTAMA:
-  // Sebelumnya, SETIAP event "scroll" di window (capture: true) langsung
-  // menutup popup — termasuk saat user scroll di dalam list Jam/Menit,
-  // karena listener capture tetap kebaca meskipun target scroll ada di
-  // elemen turunan (event scroll tidak bubble, tapi capture-phase tetap
-  // jalan dari window ke bawah). Akibatnya popup langsung close begitu user
-  // coba scroll memilih waktu.
-  //
-  // Sekarang: kalau target scroll ada DI DALAM panel popup (misal list Jam
-  // atau Menit), event diabaikan (popup tetap terbuka, biarkan user scroll
-  // bebas). Popup hanya ditutup kalau scroll terjadi DI LUAR popup — misal
-  // halaman/body ikut ter-scroll, sama seperti perilaku DatePicker pada
-  // umumnya.
+  // Listener scroll & resize window:
+  // - Scroll di dalam popup / dropdown jam/menit diabaikan (bebas scroll).
+  // - Jika halaman di luar di-scroll, reposisi popup (computePosition) agar tetap menempel pada input.
+  // - Hanya tutup jika tombol input trigger sudah ter-scroll jauh keluar viewport.
   useEffect(() => {
     if (!isOpen) return;
+
     const handleScroll = (e: Event) => {
       const target = e.target as Node | null;
+      // Jangan tutup jika scroll berasal dari dalam popup atau dropdown kita
       if (target && panelRef.current && panelRef.current.contains(target)) {
-        return; // scroll terjadi di dalam popup (mis. list Jam/Menit) — jangan close
+        return;
       }
-      setIsOpen(false);
+
+      // Periksa apakah trigger masih terlihat di layar
+      const trigger = triggerRef.current;
+      if (trigger) {
+        const rect = trigger.getBoundingClientRect();
+        // Tutup hanya jika trigger keluar dari layar
+        if (rect.bottom < 0 || rect.top > window.innerHeight) {
+          setIsOpen(false);
+          return;
+        }
+      }
+
+      // Reposisi agar popup tetap menempel pada tombol input
+      computePosition();
     };
+
     const handleResize = () => computePosition();
-    // capture: true supaya scroll di container manapun (bukan cuma window)
-    // tetap terdeteksi, lalu kita filter sendiri di dalam handleScroll.
+
     window.addEventListener("scroll", handleScroll, true);
     window.addEventListener("resize", handleResize);
+
     const handleEscape = (e: KeyboardEvent) => {
       if (e.key === "Escape") setIsOpen(false);
     };
     document.addEventListener("keydown", handleEscape);
+
     return () => {
       window.removeEventListener("scroll", handleScroll, true);
       window.removeEventListener("resize", handleResize);
@@ -295,9 +313,6 @@ const TimeInput24: React.FC<TimeInput24Props> = ({
     );
   }
 
-  const hourOptions = Array.from({ length: 24 }, (_, i) => i);
-  const minuteOptions = Array.from({ length: 60 }, (_, i) => i);
-
   return (
     <div className={`space-y-1.5 ${className}`} ref={wrapperRef}>
       {label && <p className="text-xs font-medium text-slate-600">{label}</p>}
@@ -326,8 +341,7 @@ const TimeInput24: React.FC<TimeInput24Props> = ({
           - tidak pernah ke-clip oleh section/card manapun yang overflow-hidden
           - tidak menambah tinggi layout (fixed = keluar dari document flow)
           - z-index tinggi (z-[9999]) benar-benar berlaku karena jadi sibling <body>
-          Desain visual panel (kelas, spacing, warna) TIDAK diubah — hanya cara
-          panel diposisikan yang berubah. */}
+      */}
       {isOpen && mounted && createPortal(
         <div
           ref={panelRef}
@@ -336,13 +350,18 @@ const TimeInput24: React.FC<TimeInput24Props> = ({
             top: pos?.top ?? -9999,
             left: pos?.left ?? -9999,
             visibility: pos ? "visible" : "hidden",
+            overscrollBehavior: "contain",
+          }}
+          onWheel={(e) => {
+            // Cegah wheel scroll bocor ke background page saat kursor berada di area popup
+            e.stopPropagation();
           }}
           className="z-[9999] p-3 bg-white border border-slate-200 rounded-xl shadow-xl min-w-[220px]"
         >
           <div className="flex items-center justify-center gap-3">
             <MiniSelect
               value={tempHour}
-              options={hourOptions}
+              options={HOUR_OPTIONS}
               onChange={setTempHour}
               label="Jam"
             />
@@ -351,7 +370,7 @@ const TimeInput24: React.FC<TimeInput24Props> = ({
 
             <MiniSelect
               value={tempMinute}
-              options={minuteOptions}
+              options={MINUTE_OPTIONS}
               onChange={setTempMinute}
               label="Menit"
             />

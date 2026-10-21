@@ -271,3 +271,25 @@ body {
 .dark .scrollbar-hide::-webkit-scrollbar {
   display: none;
 }
+
+/* ── 8. Wadah Tanda Tangan Digital Resmi (Kebal Dark Mode - Tetap Terang/Putih Bersih) ── */
+.signature-display-box,
+.dark .signature-display-box,
+[data-theme="dark"] .signature-display-box {
+  background-color: #ffffff !important;
+  background: #ffffff !important;
+  border-color: #cbd5e1 !important;
+}
+
+.signature-outer-box,
+.dark .signature-outer-box,
+[data-theme="dark"] .signature-outer-box {
+  background-color: #f8fafc !important;
+  background: #f8fafc !important;
+  border-color: #cbd5e1 !important;
+}
+
+.signature-outer-box p,
+.dark .signature-outer-box p {
+  color: #475569 !important;
+}

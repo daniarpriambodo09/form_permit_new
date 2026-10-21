@@ -187,7 +187,13 @@ function ApprovalGrid({
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
       {isEksternal && (
-        <SignatureBox label="Kontraktor" signatureUrl={p.kontraktor_signature_url} />
+        <ApprovalQRCard {...common}
+          label="Kontraktor" role="kontraktor"
+          approved={Boolean(p.kontraktor_approved || p.kontraktor_signature_url || p.kontraktor_approved_by)}
+          approvedBy={p.kontraktor_approved_by || p.kontraktor_pj || p.nama_kontraktor_pekerja || "Kontraktor"}
+          approvedNik={p.kontraktor_nik}
+          approvedAt={p.kontraktor_approved_at || p.tanggal_pelaksanaan}
+        />
       )}
       <ApprovalQRCard {...common}
         label="SPV Terkait" role="spv"
@@ -216,28 +222,17 @@ function ApprovalGrid({
   );
 }
 
-// ── Kotak tanda tangan sederhana (tanpa QR) — dipakai untuk Kontraktor & Security ──
-function SignatureBox({ label, signatureUrl }: { label: string; signatureUrl?: string | null }) {
-  return (
-    <div className="rounded-xl border border-slate-200 p-3">
-      <p className="text-xs font-bold text-slate-500 uppercase mb-1">{label} (Tanda Tangan)</p>
-      {signatureUrl ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={signatureUrl} alt={`TTD ${label}`} className="h-16 border border-slate-100 rounded bg-white" />
-      ) : (
-        <p className="text-xs text-slate-400 italic">Belum tanda tangan</p>
-      )}
-    </div>
-  );
-}
-
-// ── Approval grid khusus general-permit (Kontraktor/SPV/Security/SFO/SMR) ──
-// Kontraktor & Security memakai tanda tangan manual (bukan QR).
+// ── Approval grid khusus general-permit (Kontraktor/SPV/SFO/SMR/Security berupa QR Barcode) ──
 function GeneralPermitApprovalGrid({ p }: { p: any }) {
   const common = { formId: p.id_form, formType: "general-permit" };
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-      <SignatureBox label="Kontraktor" signatureUrl={p.kontraktor_signature_url} />
+      <ApprovalQRCard {...common}
+        label="Kontraktor" role="kontraktor"
+        approved={Boolean(p.kontraktor_signature_url || p.kontraktor_pj)}
+        approvedBy={p.kontraktor_pj || p.nama_kontraktor_pekerja || "Kontraktor"}
+        approvedAt={p.tanggal}
+      />
       <ApprovalQRCard {...common}
         label="SPV" role="spv"
         approved={p.spv_approved} approvedBy={p.spv_approved_by}
@@ -258,7 +253,6 @@ function GeneralPermitApprovalGrid({ p }: { p: any }) {
         approved={p.security_approved} approvedBy={p.security_approved_by}
         approvedNik={p.security_nik} approvedAt={p.security_approved_at}
       />
-      <SignatureBox label="Security (TTD)" signatureUrl={p.security_signature_url} />
     </div>
   );
 }
@@ -473,16 +467,27 @@ function SafetyInductionStatusCard({ safetyInduction, parentIdForm }: { safetyIn
 // SAMA dengan tanda tangan Kontraktor yang sudah dibubuhkan di stage 1
 // (form induk) — tidak perlu tanda tangan terpisah.
 function GeneralPermitSafetyInductionCard({
-  safetyInduction, kontraktorSignatureUrl, securitySignatureUrl,
+  safetyInduction,
+  kontraktorSignatureUrl,
+  securitySignatureUrl,
+  defaultNamaSubcont,
+  defaultAktivitasPekerjaan,
+  defaultKoordinatNoHp,
 }: {
   safetyInduction: any;
   kontraktorSignatureUrl?: string | null;
   securitySignatureUrl?: string | null;
+  defaultNamaSubcont?: string | null;
+  defaultAktivitasPekerjaan?: string | null;
+  defaultKoordinatNoHp?: string | null;
 }) {
   const status = safetyInduction?.status;
   const isApproved = status === "approved";
   const isDraft = status === "draft";
-  const hasData = safetyInduction && (safetyInduction.namaSubcont || safetyInduction.aktivitasPekerjaan);
+  const namaSubcont = safetyInduction?.namaSubcont || defaultNamaSubcont || "-";
+  const aktivitasPekerjaan = safetyInduction?.aktivitasPekerjaan || defaultAktivitasPekerjaan || "-";
+  const koordinatNoHp = safetyInduction?.koordinatNoHp || defaultKoordinatNoHp || "-";
+  const hasData = (safetyInduction && (safetyInduction.namaSubcont || safetyInduction.aktivitasPekerjaan)) || defaultNamaSubcont || defaultAktivitasPekerjaan;
 
   if (!hasData) {
     return (
@@ -517,15 +522,15 @@ function GeneralPermitSafetyInductionCard({
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
         <div className="p-3 bg-slate-50 rounded-lg">
           <span className="text-xs text-slate-500">Nama Subcont</span>
-          <p className="font-semibold text-slate-800 mt-0.5">{safetyInduction.namaSubcont || "-"}</p>
+          <p className="font-semibold text-slate-800 mt-0.5">{namaSubcont}</p>
         </div>
         <div className="p-3 bg-slate-50 rounded-lg">
           <span className="text-xs text-slate-500">Aktivitas Pekerjaan</span>
-          <p className="font-semibold text-slate-800 mt-0.5">{safetyInduction.aktivitasPekerjaan || "-"}</p>
+          <p className="font-semibold text-slate-800 mt-0.5">{aktivitasPekerjaan}</p>
         </div>
         <div className="p-3 bg-slate-50 rounded-lg">
           <span className="text-xs text-slate-500">Koord. Kerja / No. HP</span>
-          <p className="font-semibold text-slate-800 mt-0.5">{safetyInduction.koordinatNoHp || "-"}</p>
+          <p className="font-semibold text-slate-800 mt-0.5">{koordinatNoHp}</p>
         </div>
       </div>
 
@@ -1514,16 +1519,19 @@ export default function DetailModal({ isOpen, onClose, formId, formType, initial
       {activeInfoModal === "safety-induction" && data && (
         <InfoModal title="Safety Induction" onClose={() => setActiveInfoModal(null)}>
           {formType === "general-permit" ? (
-            data.security_approved ? (
+            data.security_approved || data.safety_induction ? (
               <GeneralPermitSafetyInductionCard
                 safetyInduction={data.safety_induction}
                 kontraktorSignatureUrl={data.kontraktor_signature_url}
                 securitySignatureUrl={data.security_signature_url}
+                defaultNamaSubcont={data.nama_kontraktor_pekerja}
+                defaultAktivitasPekerjaan={data.deskripsi_pekerjaan}
+                defaultKoordinatNoHp={data.nama_pengawas_pic_subkont}
               />
             ) : (
               <div className="flex items-center gap-3 p-4 bg-slate-50 rounded-lg border border-slate-200">
                 <AlertCircle className="w-5 h-5 text-slate-400 shrink-0" />
-                <p className="text-sm text-slate-500">Safety Induction akan tampil setelah Security menandatangani dan menyetujui.</p>
+                <p className="text-sm text-slate-500">Safety Induction akan tampil setelah Security mengisi dan memproses formulir.</p>
               </div>
             )
           ) : (

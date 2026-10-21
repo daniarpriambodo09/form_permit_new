@@ -43,7 +43,11 @@ interface FormItem {
   status: string;
   tanggal: string;
   tanggal_pelaksanaan?: string;
+  tgl_mulai_kerja?: string;
   actual_tanggal_kerja?: string;
+  no_registrasi?: string;
+  pemohon?: string;
+  deskripsi_pekerjaan?: string;
   lokasi?: string;
   catatan_reject?: string;
   approved_by?: string;
@@ -162,6 +166,7 @@ const getApprovalStages = (form: FormItem): { key: keyof FormItem; label: string
   if (form.jenis_form === "general-permit") {
     return [
       { key: "spv_approved",      label: "SPV" },
+      { key: "admin_k3_approved", label: "Admin K3" },
       { key: "sfo_approved",      label: "SFO" },
       { key: "pga_approved",      label: "MGR" },
       { key: "security_approved", label: "Security" },
@@ -411,6 +416,7 @@ export default function MyFormsPage() {
   const [filterStatus, setFilterStatus]   = useState("all");
   const [filterJenis, setFilterJenis]     = useState("all");
   const [searchQuery, setSearchQuery]     = useState("");
+  const [filterDate, setFilterDate]       = useState("");
   const [userName, setUserName]           = useState("");
   const [showFormModal, setShowFormModal] = useState(false);
   const [detailModal, setDetailModal]     = useState({
@@ -548,6 +554,17 @@ export default function MyFormsPage() {
     return res;
   }, [forms]);
 
+  const normalizeDate = (d?: string) => {
+    if (!d) return "";
+    try {
+      const dateObj = new Date(d);
+      if (isNaN(dateObj.getTime())) return d.slice(0, 10);
+      return dateObj.toISOString().slice(0, 10);
+    } catch {
+      return String(d).slice(0, 10);
+    }
+  };
+
   // ── Filter Data ──
   const filtered = useMemo(() => {
     return forms.filter((f) => {
@@ -555,25 +572,40 @@ export default function MyFormsPage() {
       if (filterStatus !== "all" && f.status !== filterStatus) return false;
       // Filter Jenis Form
       if (filterJenis !== "all" && f.jenis_form !== filterJenis) return false;
-      // Search Query
+
+      // Filter Tanggal Kalender (Tanggal Pelaksanaan atau Mulai Kerja)
+      if (filterDate) {
+        const matchPelaksanaan = normalizeDate(f.tanggal_pelaksanaan) === filterDate;
+        const matchMulaiKerja = normalizeDate(f.tgl_mulai_kerja) === filterDate;
+        const matchTanggal = normalizeDate(f.tanggal) === filterDate;
+        if (!matchPelaksanaan && !matchMulaiKerja && !matchTanggal) return false;
+      }
+
+      // Search Query: ID form, No Registrasi, Nama pekerja / kontraktor, Deskripsi pekerjaan, Lokasi
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase().trim();
         const matchId = (f.id_form || "").toLowerCase().includes(q);
+        const matchNoReg = (f.no_registrasi || "").toLowerCase().includes(q);
+        const matchPemohon = (f.pemohon || "").toLowerCase().includes(q);
+        const matchDeskripsi = (f.deskripsi_pekerjaan || "").toLowerCase().includes(q);
         const matchLokasi = (f.lokasi || "").toLowerCase().includes(q);
         const matchJenis = (jenisLabel[f.jenis_form] || "").toLowerCase().includes(q);
         const matchCatatan = (f.catatan_reject || "").toLowerCase().includes(q);
-        if (!matchId && !matchLokasi && !matchJenis && !matchCatatan) return false;
+        if (!matchId && !matchNoReg && !matchPemohon && !matchDeskripsi && !matchLokasi && !matchJenis && !matchCatatan) {
+          return false;
+        }
       }
       return true;
     });
-  }, [forms, filterStatus, filterJenis, searchQuery]);
+  }, [forms, filterStatus, filterJenis, searchQuery, filterDate]);
 
-  const hasActiveFilters = filterStatus !== "all" || filterJenis !== "all" || searchQuery.trim() !== "";
+  const hasActiveFilters = filterStatus !== "all" || filterJenis !== "all" || searchQuery.trim() !== "" || filterDate !== "";
 
   const handleResetFilters = () => {
     setFilterStatus("all");
     setFilterJenis("all");
     setSearchQuery("");
+    setFilterDate("");
   };
 
   return (
@@ -751,7 +783,7 @@ export default function MyFormsPage() {
 
           {/* ── Search & Filter Controls Bar ── */}
           <div className="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-xs space-y-3.5">
-            <div className="flex flex-col md:flex-row gap-3 items-stretch md:items-center justify-between">
+            <div className="flex flex-col lg:flex-row gap-3 items-stretch lg:items-center justify-between">
               
               {/* Search Box */}
               <div className="relative flex-1">
@@ -760,8 +792,8 @@ export default function MyFormsPage() {
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Cari ID Form (cth: HW-001, WS-001), Lokasi, Pekerjaan..."
-                  className="w-full pl-9 pr-9 py-2 bg-slate-50/70 hover:bg-slate-50 focus:bg-white border border-slate-200 rounded-xl text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-all"
+                  placeholder="Cari nama pekerja / kontraktor, deskripsi pekerjaan, kode / no registrasi..."
+                  className="w-full pl-9 pr-9 py-2 bg-slate-50/70 hover:bg-slate-50 focus:bg-white border border-slate-200 rounded-xl text-xs sm:text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-all"
                 />
                 {searchQuery && (
                   <button
@@ -774,18 +806,40 @@ export default function MyFormsPage() {
                 )}
               </div>
 
-              {/* Filter Jenis Form Dropdown */}
-              <div className="flex items-center gap-2">
-                <div className="relative min-w-[200px]">
+              {/* Filter Tanggal Kalender (Tanggal Pelaksanaan / Mulai Kerja) */}
+              <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+                <div className="relative flex items-center bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 focus-within:ring-2 focus-within:ring-orange-500/20 focus-within:border-orange-500 shrink-0">
+                  <Calendar className="w-4 h-4 text-slate-500 mr-2 shrink-0 pointer-events-none" />
+                  <input
+                    type="date"
+                    value={filterDate}
+                    onChange={(e) => setFilterDate(e.target.value)}
+                    className="bg-transparent text-xs font-semibold text-slate-700 focus:outline-none cursor-pointer"
+                    title="Filter Tanggal Pelaksanaan atau Tanggal Mulai Kerja"
+                  />
+                  {filterDate && (
+                    <button
+                      type="button"
+                      onClick={() => setFilterDate("")}
+                      className="ml-1 text-slate-400 hover:text-slate-600 p-0.5 rounded-full"
+                      title="Hapus filter tanggal"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  )}
+                </div>
+
+                {/* Filter Jenis Form Dropdown */}
+                <div className="relative min-w-[180px] flex-1 sm:flex-initial">
                   <select
                     value={filterJenis}
                     onChange={(e) => setFilterJenis(e.target.value)}
-                    className="w-full px-3.5 py-2 bg-slate-50/70 hover:bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 cursor-pointer transition-all"
+                    className="w-full px-3 py-2 bg-slate-50/70 hover:bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 cursor-pointer transition-all"
                   >
                     <option value="all">Semua Jenis Form</option>
-                    <option value="hot-work">Hot Work Permit (Kerja Panas)</option>
+                    <option value="hot-work">Hot Work Permit</option>
                     <option value="workshop">Workshop Permit</option>
-                    <option value="height-work">Kerja Ketinggian (Height Work)</option>
+                    <option value="height-work">Kerja Ketinggian</option>
                     <option value="general-permit">Ijin Kerja Eksternal</option>
                   </select>
                 </div>
@@ -795,10 +849,10 @@ export default function MyFormsPage() {
                     type="button"
                     onClick={handleResetFilters}
                     className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-rose-600 bg-rose-50 hover:bg-rose-100 rounded-xl transition-colors shrink-0"
-                    title="Reset Filter"
+                    title="Reset Semua Filter"
                   >
                     <X className="w-3.5 h-3.5" />
-                    <span className="hidden sm:inline">Reset Filter</span>
+                    <span className="hidden sm:inline">Reset</span>
                   </button>
                 )}
               </div>
@@ -900,23 +954,29 @@ export default function MyFormsPage() {
                 return (
                   <div
                     key={form.id_form}
-                    className={`bg-white rounded-2xl border border-slate-200/90 shadow-xs hover:shadow-md transition-all duration-200 overflow-hidden ${meta.borderLeft} border-l-[5px]`}
+                    className={`bg-white rounded-2xl border border-slate-200/90 shadow-2xs hover:shadow-md transition-all duration-200 overflow-hidden ${meta.borderLeft} border-l-[5px]`}
                   >
-                    <div className="p-5 sm:p-6 space-y-4">
+                    <div className="p-4 sm:p-5 space-y-3">
                       
-                      {/* ── CARD HEADER: Informasi & EFFICIENT BUTTON PLACEMENT ── */}
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3.5 border-b border-slate-100">
+                      {/* Baris 1: Identitas Form & Tombol Aksi Ringkas */}
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                         
-                        {/* Left: ID & Badge Identitas */}
-                        <div className="flex items-center gap-2.5 flex-wrap">
+                        {/* Left: ID Form, Badge Jenis, Tipe, Status */}
+                        <div className="flex items-center gap-2 sm:gap-2.5 flex-wrap min-w-0">
                           <div className={`w-8 h-8 rounded-xl ${meta.iconBg} ${meta.iconColor} flex items-center justify-center shrink-0`}>
                             <PermitIcon className="w-4 h-4" />
                           </div>
 
                           <div className="flex items-center gap-2 flex-wrap">
-                            <span className="text-base font-extrabold text-slate-900 font-mono tracking-tight">
+                            <span className="text-sm sm:text-base font-extrabold text-slate-900 font-mono tracking-tight">
                               {form.id_form}
                             </span>
+
+                            {form.no_registrasi && (
+                              <span className="text-xs text-slate-400 font-mono hidden md:inline">
+                                ({form.no_registrasi})
+                              </span>
+                            )}
 
                             <span className={`text-xs font-bold px-2.5 py-0.5 rounded-md border ${meta.badgeBg}`}>
                               {jenisLabel[form.jenis_form] || form.jenis_form}
@@ -924,7 +984,7 @@ export default function MyFormsPage() {
 
                             {form.tipe_perusahaan && (
                               <span
-                                className={`text-xs font-semibold px-2 py-0.5 rounded-md border ${
+                                className={`text-[11px] font-semibold px-2 py-0.5 rounded-md border ${
                                   isEksternal
                                     ? "bg-purple-50 text-purple-700 border-purple-200"
                                     : "bg-blue-50 text-blue-700 border-blue-200"
@@ -944,7 +1004,7 @@ export default function MyFormsPage() {
                           </div>
                         </div>
 
-                        {/* Right: PELETAKAN TOMBOL AKSI UTAMA YANG LEBIH EFISIEN */}
+                        {/* Right: Action Buttons Ringkas */}
                         <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
                           
                           {/* Tombol Perbaiki / Edit (Jika ditolak atau draft) */}
@@ -952,32 +1012,15 @@ export default function MyFormsPage() {
                             <button
                               type="button"
                               onClick={() => setEditModal({ isOpen: true, formId: form.id_form, formType: form.jenis_form })}
-                              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-xs font-bold shadow-xs hover:shadow-sm transition-all active:scale-95"
+                              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-xs font-bold shadow-2xs transition-all active:scale-95"
                               title={form.status === "rejected" ? "Perbaiki Form yang Ditolak" : "Edit Draft"}
                             >
                               <Edit3 className="w-3.5 h-3.5 stroke-[2.5]" />
-                              <span>{form.status === "rejected" ? "Perbaiki" : "Edit"}</span>
+                              <span className="hidden sm:inline">{form.status === "rejected" ? "Perbaiki" : "Edit"}</span>
                             </button>
                           )}
 
-                          {/* Tombol Lihat Detail: Menonjol, Cepat & Mudah Diakses */}
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setDetailModal({
-                                isOpen: true,
-                                formId: form.id_form,
-                                formType: form.jenis_form,
-                                action: null,
-                              })
-                            }
-                            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-slate-100 hover:bg-orange-50 text-slate-700 hover:text-orange-600 border border-slate-200 hover:border-orange-200 rounded-xl text-xs font-bold transition-all shadow-2xs active:scale-95"
-                          >
-                            <Eye className="w-3.5 h-3.5" />
-                            <span>Lihat Detail</span>
-                          </button>
-
-                          {/* Tombol Batalkan: Rapi di pojok untuk form draft/submitted */}
+                          {/* Tombol Batalkan (Jika draft atau submitted) */}
                           {canCancel && (
                             <button
                               type="button"
@@ -996,112 +1039,87 @@ export default function MyFormsPage() {
                             </button>
                           )}
 
-                        </div>
-
-                      </div>
-
-                      {/* ── CARD BODY: Metadata Info Chips ── */}
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                        <div className="flex items-center gap-2.5 text-xs bg-slate-50/60 p-2.5 rounded-xl border border-slate-100">
-                          <Calendar className="w-4 h-4 text-slate-400 shrink-0" />
-                          <div>
-                            <span className="text-[10px] text-slate-400 font-semibold block uppercase tracking-wider">Tanggal Dibuat</span>
-                            <span className="font-bold text-slate-700">{formatDate(form.tanggal)}</span>
-                          </div>
-                        </div>
-
-                        <div className="flex items-center gap-2.5 text-xs bg-slate-50/60 p-2.5 rounded-xl border border-slate-100">
-                          <CalendarClock className="w-4 h-4 text-slate-400 shrink-0" />
-                          <div>
-                            <span className="text-[10px] text-slate-400 font-semibold block uppercase tracking-wider">Pelaksanaan</span>
-                            <span className="font-bold text-slate-700">{formatDate(form.tanggal_pelaksanaan)}</span>
-                          </div>
-                        </div>
-
-                        <div className="flex items-center gap-2.5 text-xs bg-slate-50/60 p-2.5 rounded-xl border border-slate-100">
-                          <MapPin className="w-4 h-4 text-slate-400 shrink-0" />
-                          <div className="min-w-0 flex-1">
-                            <span className="text-[10px] text-slate-400 font-semibold block uppercase tracking-wider">Lokasi Kerja</span>
-                            <span className="font-bold text-slate-700 truncate block">{form.lokasi || "-"}</span>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* ── Aktual Tanggal Selesai Kerja (Khusus Ijin Kerja Eksternal) ── */}
-                      {isGeneralPermit && (
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 bg-emerald-50/70 border border-emerald-200/80 rounded-xl">
-                          <div className="flex items-center gap-2.5">
-                            <div className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
-                              <CalendarCheck className="w-4 h-4" />
-                            </div>
-                            <div>
-                              <span className="text-[10px] font-bold text-emerald-800 uppercase tracking-wider block">
-                                Aktual Tanggal Kerja Selesai
-                              </span>
-                              <span className="text-xs font-bold text-slate-800">
-                                {form.actual_tanggal_kerja ? formatDate(form.actual_tanggal_kerja) : (
-                                  <span className="text-slate-400 font-normal italic">Belum diisi (diinput setelah pekerjaan selesai)</span>
-                                )}
-                              </span>
-                            </div>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const raw = form.actual_tanggal_kerja
-                                ? new Date(form.actual_tanggal_kerja).toISOString().split("T")[0]
-                                : "";
-                              setActualDateModal({
-                                isOpen: true,
-                                formId: form.id_form,
-                                dateValue: raw,
-                              });
-                            }}
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition-all shadow-xs active:scale-95 shrink-0 self-start sm:self-auto cursor-pointer"
+                          {/* Tombol LIHAT DETAIL (Mengarahkan ke page baru khusus untuk form tersebut) */}
+                          <Link
+                            href={`/my-forms/${form.jenis_form}/${form.id_form}`}
+                            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-orange-600 hover:bg-orange-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs hover:shadow-md hover:shadow-orange-500/20 active:scale-95"
+                            title="Buka Halaman Rincian & Approval Form Lengkap"
                           >
-                            <Calendar className="w-3.5 h-3.5" />
-                            <span>{form.actual_tanggal_kerja ? "Ubah Tanggal Selesai" : "+ Input Tanggal Selesai"}</span>
-                          </button>
-                        </div>
-                      )}
+                            <Eye className="w-3.5 h-3.5" />
+                            <span>Lihat Detail</span>
+                            <ChevronRight className="w-3.5 h-3.5" />
+                          </Link>
 
-                      {/* ── Notifikasi Alasan Ditolak ── */}
-                      {form.catatan_reject && (
-                        <div className="p-3.5 bg-rose-50 border border-rose-200/80 rounded-xl flex items-start gap-2.5">
-                          <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
-                          <div className="text-xs">
-                            <span className="font-bold text-rose-800">Catatan Penolakan:</span>
-                            <p className="text-rose-700 mt-0.5 leading-relaxed">{form.catatan_reject}</p>
+                        </div>
+
+                      </div>
+
+                      {/* Baris 2: Informasi Ringkasan Kerja (Compact Meta Row) */}
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-2 border-t border-slate-100 text-xs text-slate-600">
+                        <div className="flex items-center gap-4 flex-wrap">
+                          <div className="flex items-center gap-1.5 font-medium text-slate-700">
+                            <User className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                            <span className="font-semibold text-slate-800 truncate max-w-[200px]" title={form.pemohon || "-"}>
+                              {form.pemohon || "-"}
+                            </span>
+                          </div>
+
+                          <div className="flex items-center gap-1.5">
+                            <CalendarClock className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                            <span>
+                              Pelaksanaan: <strong className="text-slate-800">{formatDate(form.tanggal_pelaksanaan || form.tgl_mulai_kerja)}</strong>
+                            </span>
+                          </div>
+
+                          <div className="flex items-center gap-1.5">
+                            <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                            <span className="truncate max-w-[180px]" title={form.lokasi || "-"}>
+                              {form.lokasi || "-"}
+                            </span>
                           </div>
                         </div>
-                      )}
 
-                      {/* ── Notifikasi Approval Selesai ── */}
-                      {form.approved_by && form.status === "approved" && (
-                        <div className="p-2.5 bg-emerald-50 border border-emerald-200/70 rounded-xl flex items-center gap-2 text-xs text-emerald-800">
-                          <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                          <span>
-                            {checkAllApproved(form)
-                              ? "Form telah disetujui sepenuhnya oleh Seluruh Approver."
-                              : `Terakhir disetujui oleh ${form.approved_by}`}
-                            {" — "}{formatDate(form.approved_at)}
-                          </span>
+                        {/* Indikator Mini Lampiran jika ada */}
+                        <div className="flex items-center gap-1.5 self-start sm:self-auto">
+                          {form.has_jsa && (
+                            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200" title="Dilengkapi Dokumen JSA">
+                              JSA ✓
+                            </span>
+                          )}
+                          {form.has_safety_induction && (
+                            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-teal-50 text-teal-700 border border-teal-200" title="Dilengkapi Safety Induction">
+                              Induksi ✓
+                            </span>
+                          )}
+                          {form.has_penilaian_subkontraktor && (
+                            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-purple-50 text-purple-700 border border-purple-200" title="Dilengkapi Penilaian Subkontraktor">
+                              Penilaian ✓
+                            </span>
+                          )}
+                          {form.job_forms_count && form.job_forms_count > 0 ? (
+                            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-orange-50 text-orange-700 border border-orange-200" title="Memiliki Sub-Permit Lampiran">
+                              {form.job_forms_count} Sub-Permit
+                            </span>
+                          ) : null}
+                        </div>
+                      </div>
+
+                      {/* Baris 3: Cuplikan Deskripsi Pekerjaan (jika ada) */}
+                      {form.deskripsi_pekerjaan && (
+                        <div className="text-xs text-slate-500 bg-slate-50/70 px-3 py-1.5 rounded-lg border border-slate-100 flex items-baseline gap-2">
+                          <span className="text-[10px] uppercase font-bold text-slate-400 shrink-0">Pekerjaan:</span>
+                          <p className="line-clamp-1 text-slate-700 font-medium">{form.deskripsi_pekerjaan}</p>
                         </div>
                       )}
 
-                      {/* ── Stepper Alur Approval ── */}
-                      {(form.status === "submitted" || form.status === "approved") &&
-                        renderApprovalStepper(form)
-                      }
-
-                      {/* ── Bagian Lampiran Khusus Ijin Kerja Eksternal (General Permit) ── */}
-                      {isGeneralPermit &&
-                        renderLampiranButtons(
-                          form,
-                          (jenis, id) => setDetailModal({ isOpen: true, formId: id, formType: jenis, action: null }),
-                          (action) => setDetailModal({ isOpen: true, formId: form.id_form, formType: "general-permit", action })
-                        )
-                      }
+                      {/* Notifikasi Ditolak Singkat jika ada catatan reject */}
+                      {form.status === "rejected" && form.catatan_reject && (
+                        <div className="text-xs text-rose-700 bg-rose-50 px-3 py-1.5 rounded-lg border border-rose-200 flex items-center gap-1.5">
+                          <AlertCircle className="w-3.5 h-3.5 text-rose-600 shrink-0" />
+                          <span className="font-semibold">Ditolak:</span>
+                          <span className="truncate">{form.catatan_reject}</span>
+                        </div>
+                      )}
 
                     </div>
                   </div>

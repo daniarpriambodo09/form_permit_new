@@ -11,7 +11,7 @@
 //    ECONNREFUSED kalau proxy belum siap / IP berubah / port diblokir.
 
 import { Metadata } from "next";
-import { Shield, ShieldCheck, ShieldX, Building2, MapPin, Calendar, Clock, User, Hash, Briefcase, CheckCircle, AlertTriangle } from "lucide-react";
+import { Shield, ShieldCheck, ShieldX, Building2, MapPin, Calendar, Clock, User, Hash, Briefcase, CheckCircle, AlertTriangle, PenTool } from "lucide-react";
 import { getApprovalVerification } from "@/lib/approval-verification";
 
 interface PageProps {
@@ -205,6 +205,40 @@ export default async function ApprovalVerificationPage({ params }: PageProps) {
               valueClass="font-mono"
             />
           </div>
+
+          {/* ── Tanda Tangan Asli (Khususnya Kontraktor, Security, dll. berdasarkan barcode yang discan) ── */}
+          {approver.signature_url && (
+            <>
+              <div className="mx-5 my-1 border-t-2 border-dashed border-slate-100" />
+              <div className="px-5 pt-3 pb-5">
+                <p className="text-[10px] text-slate-400 uppercase font-bold tracking-widest mb-2.5 flex items-center gap-1.5">
+                  <PenTool className="w-3.5 h-3.5 text-slate-500" /> Tanda Tangan Asli ({approver.role_label})
+                </p>
+                <div
+                  className="signature-outer-box p-3.5 rounded-2xl flex flex-col items-center justify-center border border-slate-200"
+                  style={{ backgroundColor: "#f8fafc" }}
+                >
+                  <div
+                    className="signature-display-box w-full p-4 rounded-xl flex items-center justify-center min-h-[110px] border border-slate-200 shadow-inner"
+                    style={{ backgroundColor: "#ffffff" }}
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={approver.signature_url}
+                      alt={`Tanda Tangan Asli ${approver.role_label}`}
+                      className="max-h-24 max-w-full object-contain filter contrast-125"
+                    />
+                  </div>
+                  <p
+                    className="text-[11px] font-medium text-center mt-2.5"
+                    style={{ color: "#475569" }}
+                  >
+                    ✓ Tanda tangan digital resmi terverifikasi sistem
+                  </p>
+                </div>
+              </div>
+            </>
+          )}
         </div>
 
         {/* ── Status chip ── */}
