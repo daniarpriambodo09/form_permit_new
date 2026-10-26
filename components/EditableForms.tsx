@@ -833,7 +833,7 @@ export default function EditableForms({ formType, formData, onChange }: Editable
               <input type="date" value={localData.tgl_akhir_kerja_rencana ? new Date(localData.tgl_akhir_kerja_rencana).toISOString().split("T")[0] : ""} onChange={(e) => handleLocalChange("tgl_akhir_kerja_rencana", e.target.value)} onBlur={(e) => handleBlur("tgl_akhir_kerja_rencana", e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm text-black" />
             </div>
             <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">Aktual Tanggal Kerja Selesai</label>
+              <label className="block text-xs font-medium text-slate-600 mb-1">Aktual Tanggal Mulai Pekerjaan</label>
               <input type="date" value={localData.actual_tanggal_kerja ? new Date(localData.actual_tanggal_kerja).toISOString().split("T")[0] : ""} onChange={(e) => handleLocalChange("actual_tanggal_kerja", e.target.value)} onBlur={(e) => handleBlur("actual_tanggal_kerja", e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm text-black" />
             </div>
           </div>

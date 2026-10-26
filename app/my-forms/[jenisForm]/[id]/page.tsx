@@ -246,7 +246,7 @@ export default function FormDetailPage({ params }: PageProps) {
   const [cancelling, setCancelling] = useState(false);
   const [zoomImage, setZoomImage] = useState<{ src: string; title: string } | null>(null);
 
-  // Modal Aktual Tanggal Selesai Kerja (Khusus General Permit)
+  // Modal Aktual Tanggal Mulai Pekerjaan (Khusus General Permit)
   const [actualDateModal, setActualDateModal] = useState({ isOpen: false, dateValue: "", submitting: false });
 
   // Linked Job Forms (untuk General Permit)
@@ -487,10 +487,10 @@ export default function FormDetailPage({ params }: PageProps) {
     }
   };
 
-  // Submit Aktual Tanggal Selesai Kerja
+  // Submit Aktual Tanggal Mulai Pekerjaan
   const handleSaveActualDate = async () => {
     if (!actualDateModal.dateValue) {
-      alert("Pilih tanggal aktual selesai kerja terlebih dahulu");
+      alert("Pilih tanggal aktual mulai kerja terlebih dahulu");
       return;
     }
     setActualDateModal((prev) => ({ ...prev, submitting: true }));
@@ -790,7 +790,7 @@ export default function FormDetailPage({ params }: PageProps) {
               </div>
             </div>
 
-            {/* Aktual Tanggal Kerja Selesai (Khusus Ijin Kerja Eksternal) */}
+            {/* Aktual Tanggal Mulai Pekerjaan (Khusus Ijin Kerja Eksternal) */}
             {formType === "general-permit" && (
               <div className="p-3 sm:p-3.5 bg-emerald-50/60 border border-emerald-200/80 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div className="flex items-center gap-2.5">
@@ -799,13 +799,13 @@ export default function FormDetailPage({ params }: PageProps) {
                   </div>
                   <div>
                     <h4 className="text-[10px] font-bold text-emerald-900 uppercase tracking-wider">
-                      Aktual Tanggal Pekerjaan Selesai
+                      Aktual Tanggal Mulai Pekerjaan
                     </h4>
                     <p className="text-xs sm:text-sm font-bold text-slate-800">
                       {p.actual_tanggal_kerja ? (
                         formatDate(p.actual_tanggal_kerja)
                       ) : (
-                        <span className="text-slate-400 font-normal italic">Belum diisi (diinput setelah pekerjaan selesai)</span>
+                        <span className="text-slate-400 font-normal italic">Belum diisi (diinput saat pekerjaan dimulai)</span>
                       )}
                     </p>
                   </div>
@@ -822,7 +822,7 @@ export default function FormDetailPage({ params }: PageProps) {
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold transition-all shadow-xs active:scale-95 shrink-0"
                 >
                   <Calendar className="w-3.5 h-3.5" />
-                  <span>{p.actual_tanggal_kerja ? "Ubah Tanggal Selesai" : "+ Input Tanggal Selesai"}</span>
+                  <span>{p.actual_tanggal_kerja ? "Ubah Tanggal Mulai" : "+ Input Tanggal Mulai"}</span>
                 </button>
               </div>
             )}
@@ -874,7 +874,6 @@ export default function FormDetailPage({ params }: PageProps) {
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                       <Field label="No. Registrasi / ID Form" value={p.id_form} mono />
                       <Field label="Perusahaan / Kontraktor" value={p.nama_kontraktor_pekerja || p.nama_kontraktor || p.kontraktor || "-"} />
-                      <Field label="Pimpinan Kontraktor" value={p.pimpinan_kontraktor || "-"} />
                       <Field label="Pengawas / PIC Subkont" value={p.nama_pengawas_pic_subkont || "-"} />
                       <Field label="No. Telepon Kontraktor / PIC" value={p.telepon_kontraktor || "-"} />
                       <Field label="Jumlah Tenaga Kerja" value={p.jumlah_tenaga_kerja ? `${p.jumlah_tenaga_kerja} Orang` : "-"} />
@@ -883,7 +882,7 @@ export default function FormDetailPage({ params }: PageProps) {
                       <Field label="Rencana Akhir Kerja" value={formatDate(p.tgl_akhir_kerja_rencana || p.izin_kerja_tanggal_sampai)} />
                       <Field label="Jam Kerja" value={`${formatTime(p.waktu_kerja || p.izin_kerja_dari)} – ${formatTime(p.waktu_selesai || p.izin_kerja_sampai)}`} />
                       {p.actual_tanggal_kerja && (
-                        <Field label="Aktual Tanggal Selesai" value={formatDate(p.actual_tanggal_kerja)} />
+                        <Field label="Aktual Tanggal Mulai Kerja" value={formatDate(p.actual_tanggal_kerja)} />
                       )}
                       {p.id_ijin_kerja && <Field label="Izin Induk (Parent)" value={p.id_ijin_kerja} mono />}
                     </div>
@@ -2491,7 +2490,7 @@ export default function FormDetailPage({ params }: PageProps) {
         </main>
       </div>
 
-      {/* ── Modal Input Aktual Tanggal Kerja Selesai ── */}
+      {/* ── Modal Input Aktual Tanggal Mulai Pekerjaan ── */}
       {actualDateModal.isOpen && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl shadow-xl max-w-sm w-full p-6 space-y-4">
@@ -2500,13 +2499,13 @@ export default function FormDetailPage({ params }: PageProps) {
                 <CalendarCheck className="w-5 h-5" />
               </div>
               <div>
-                <h3 className="text-base font-bold text-slate-900">Aktual Tanggal Selesai</h3>
+                <h3 className="text-base font-bold text-slate-900">Aktual Tanggal Mulai Pekerjaan</h3>
                 <p className="text-xs text-slate-500">Ijin Kerja Eksternal: {p.id_form}</p>
               </div>
             </div>
 
             <div className="space-y-1">
-              <label className="text-xs font-semibold text-slate-700">Tanggal Pekerjaan Selesai</label>
+              <label className="text-xs font-semibold text-slate-700">Tanggal Mulai Pekerjaan</label>
               <input
                 type="date"
                 value={actualDateModal.dateValue}

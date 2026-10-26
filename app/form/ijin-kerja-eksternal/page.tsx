@@ -953,7 +953,7 @@ function IjinKerjaEksternalPageInner() {
 
                 <div className="pt-2">
                   <label className="block text-xs sm:text-sm font-bold text-slate-500 mb-1.5 flex items-center gap-2">
-                    <span>Aktual Tanggal Kerja Selesai</span>
+                    <span>Aktual Tanggal Mulai Pekerjaan</span>
                     <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 border border-slate-200">
                       Disabled — Input di /my-forms
                     </span>
@@ -966,7 +966,7 @@ function IjinKerjaEksternalPageInner() {
                     className={`${inputCls} bg-slate-100 cursor-not-allowed text-slate-400 border-dashed`}
                   />
                   <p className="text-[11px] text-slate-400 mt-1">
-                    Field ini dinonaktifkan pada saat pengajuan. Pengisian dilakukan di halaman <strong>/my-forms</strong> saat pekerjaan selesai.
+                    Field ini dinonaktifkan pada saat pengajuan. Pengisian dilakukan di halaman <strong>/my-forms</strong> saat pekerjaan mulai dilaksanakan.
                   </p>
                 </div>
 

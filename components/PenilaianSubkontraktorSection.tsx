@@ -203,23 +203,23 @@ function MengetahuiBarcodeCard({
       }`}
     >
       {/* Header Card */}
-      <div className="flex items-center justify-between pb-1.5 mb-1.5 border-b border-slate-100">
-        <div className="flex items-center gap-1.5">
+      <div className="flex items-center justify-between gap-1 pb-1.5 mb-1.5 border-b border-slate-100">
+        <div className="flex items-center gap-1.5 min-w-0">
           {hasApproved ? (
             <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
           ) : (
             <Clock className="w-3.5 h-3.5 text-slate-400 shrink-0" />
           )}
-          <p className="text-[11px] font-bold text-slate-700 uppercase tracking-wide">
+          <p className="text-[10px] font-bold text-slate-700 uppercase tracking-tight whitespace-nowrap">
             {label}
           </p>
         </div>
         {hasApproved ? (
-          <span className="text-[9px] font-bold px-2 py-0.2 rounded-full bg-emerald-100 text-emerald-800">
+          <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 shrink-0">
             ✓ Selesai
           </span>
         ) : (
-          <span className="text-[9px] font-semibold px-2 py-0.2 rounded-full bg-slate-200 text-slate-600">
+          <span className="text-[9px] font-semibold px-2 py-0.5 rounded-full bg-slate-200 text-slate-600 shrink-0">
             Menunggu
           </span>
         )}

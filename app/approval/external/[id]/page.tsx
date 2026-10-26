@@ -982,7 +982,6 @@ export default function ExternalApprovalPage({ params }: { params: Promise<{ id:
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                   <Field label="No. Registrasi / ID Form" value={general.id_form || general.no_registrasi} mono />
                   <Field label="Perusahaan / Kontraktor" value={general.nama_kontraktor_pekerja || general.nama_kontraktor || "-"} />
-                  <Field label="Pimpinan Kontraktor" value={general.pimpinan_kontraktor || "-"} />
                   <Field label="Pengawas / PIC Subkont" value={general.nama_pengawas_pic_subkont || "-"} />
                   <Field label="No. Telepon Kontraktor / PIC" value={general.telepon_kontraktor || general.no_hp || "-"} />
                   <Field label="Jumlah Tenaga Kerja" value={general.jumlah_tenaga_kerja ? `${general.jumlah_tenaga_kerja} Orang` : "-"} />
@@ -991,7 +990,7 @@ export default function ExternalApprovalPage({ params }: { params: Promise<{ id:
                   <Field label="Rencana Akhir Kerja" value={formatDate(general.tgl_akhir_kerja_rencana || general.izin_kerja_tanggal_sampai)} />
                   <Field label="Jam Kerja" value={`${formatTime(general.jam_mulai_kerja || general.waktu_kerja || general.izin_kerja_dari)} – ${formatTime(general.jam_akhir_kerja || general.waktu_selesai || general.izin_kerja_sampai)}`} />
                   {general.actual_tanggal_kerja && (
-                    <Field label="Aktual Tanggal Selesai" value={formatDate(general.actual_tanggal_kerja)} />
+                    <Field label="Aktual Tanggal Mulai Kerja" value={formatDate(general.actual_tanggal_kerja)} />
                   )}
                   {general.id_ijin_kerja && <Field label="Izin Induk (Parent)" value={general.id_ijin_kerja} mono />}
                 </div>
@@ -1276,7 +1275,7 @@ export default function ExternalApprovalPage({ params }: { params: Promise<{ id:
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
                     <Field label="Pengawas Pekerjaan / User PT. JAI" value={general.pengawas_pekerjaan_user || general.nama_pengawas_pic_subkont || "-"} />
-                    <Field label="Pimpinan / Pemohon Subkontraktor" value={general.pimpinan_kontraktor || general.nama_kontraktor_pekerja || "-"} />
+                    <Field label="Pemohon Subkontraktor" value={general.nama_kontraktor_pekerja || general.nama_pengawas_pic_subkont || "-"} />
                   </div>
 
                   <div className="p-3 bg-slate-50 border border-slate-200/90 rounded-xl flex items-center justify-between gap-3">
@@ -1285,7 +1284,7 @@ export default function ExternalApprovalPage({ params }: { params: Promise<{ id:
                         Tanda Tangan Pemohon / Kontraktor
                       </span>
                       <p className="text-xs font-semibold text-slate-700 mt-0.5">
-                        Disahkan secara digital oleh: {general.pimpinan_kontraktor || general.nama_pengawas_pic_subkont || general.nama_kontraktor_pekerja || "Kontraktor"}
+                        Disahkan secara digital oleh: {general.nama_pengawas_pic_subkont || general.nama_kontraktor_pekerja || "Kontraktor"}
                       </p>
                     </div>
                     {general.kontraktor_signature_url ? (

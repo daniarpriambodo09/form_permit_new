@@ -513,7 +513,7 @@ export default function MyFormsPage() {
         }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Gagal menyimpan tanggal selesai kerja");
+      if (!res.ok) throw new Error(data.error || "Gagal menyimpan tanggal mulai kerja");
 
       setForms((prev) =>
         prev.map((f) =>
@@ -1164,7 +1164,7 @@ export default function MyFormsPage() {
         cancelText="Tidak, Kembali"
       />
 
-      {/* Modal Input Aktual Tanggal Kerja Selesai */}
+      {/* Modal Input Aktual Tanggal Mulai Pekerjaan */}
       {actualDateModal.isOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs animate-in fade-in duration-150">
           <div className="bg-white rounded-2xl shadow-xl border border-slate-200 max-w-md w-full overflow-hidden p-6 space-y-4">
@@ -1174,7 +1174,7 @@ export default function MyFormsPage() {
                   <CalendarCheck className="w-4 h-4" />
                 </div>
                 <div>
-                  <h3 className="font-bold text-slate-800 text-sm">Aktual Tanggal Kerja Selesai</h3>
+                  <h3 className="font-bold text-slate-800 text-sm">Aktual Tanggal Mulai Pekerjaan</h3>
                   <p className="text-[11px] text-slate-500 font-mono">{actualDateModal.formId}</p>
                 </div>
               </div>
@@ -1189,7 +1189,7 @@ export default function MyFormsPage() {
 
             <div className="space-y-2">
               <label className="text-xs font-semibold text-slate-700 block">
-                Pilih Tanggal Selesai Aktual
+                Pilih Tanggal Mulai Aktual
               </label>
               <input
                 type="date"
@@ -1198,7 +1198,7 @@ export default function MyFormsPage() {
                 className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
               />
               <p className="text-[11px] text-slate-400">
-                Pilih tanggal saat pekerjaan di lapangan telah secara aktual selesai dilakukan.
+                Pilih tanggal saat pekerjaan di lapangan telah secara aktual mulai dilakukan.
               </p>
             </div>
 

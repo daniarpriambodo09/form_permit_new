@@ -543,9 +543,11 @@ export default function PengawasDashboardPage() {
                             <p className="text-xs font-bold text-slate-800 truncate">
                               {item.nama_kontraktor_pekerja || "-"}
                             </p>
-                            <p className="text-[11px] text-slate-400">
-                              Pimpinan: {item.pimpinan_kontraktor || "-"}
-                            </p>
+                            {item.pimpinan_kontraktor && item.pimpinan_kontraktor !== "-" && (
+                              <p className="text-[11px] text-slate-400">
+                                PIC: {item.pimpinan_kontraktor}
+                              </p>
+                            )}
                           </div>
                         </div>
 

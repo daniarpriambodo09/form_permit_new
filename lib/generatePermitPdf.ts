@@ -949,7 +949,7 @@ function buildGeneralPermit(doc: Doc, data: any) {
     { lbl: "Jam Kerja Rencana", val: `${fmtT(data.waktu_kerja)} - ${fmtT(data.waktu_selesai || data.izin_kerja_sampai)}` },
     { lbl: "Izin Berlaku",    val: `${fmtD(data.izin_kerja_tanggal_dari || data.tgl_mulai_kerja)} s/d ${fmtD(data.izin_kerja_tanggal_sampai || data.tgl_akhir_kerja_rencana)}` },
     { lbl: "Jam Izin",        val: `${fmtT(data.izin_kerja_dari || data.waktu_kerja)} - ${fmtT(data.izin_kerja_sampai || data.waktu_selesai)}` },
-    { lbl: "Aktual Selesai",  val: fmtD(data.actual_tanggal_kerja) },
+    { lbl: "Aktual Mulai",    val: fmtD(data.actual_tanggal_kerja) },
   ], lx, lw);
 
   // 3. APAR, Limbah & Peralatan

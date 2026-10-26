@@ -10,7 +10,7 @@ import {
 interface FormExportMeta {
   id_form: string;
   nama_kontraktor_pekerja: string;
-  pimpinan_kontraktor: string;
+  pimpinan_kontraktor?: string;
   lokasi_pekerjaan: string;
   izin_kerja_tanggal_dari?: string | null;
   izin_kerja_tanggal_sampai?: string | null;
@@ -52,7 +52,6 @@ export async function exportPenilaianToExcel(
   const infoRows = [
     ["No. Ijin Kerja Eksternal", `: ${meta.id_form}`],
     ["Nama Sub Kontraktor", `: ${meta.nama_kontraktor_pekerja || "-"}`],
-    ["Pimpinan Kontraktor", `: ${meta.pimpinan_kontraktor || "-"}`],
     ["Lokasi Pekerjaan", `: ${meta.lokasi_pekerjaan || "-"}`],
     [
       "Periode Pekerjaan",
@@ -292,7 +291,6 @@ export async function exportPenilaianToPdf(
   const infoList = [
     ["No. Ijin Kerja Eksternal", meta.id_form],
     ["Nama Sub Kontraktor", meta.nama_kontraktor_pekerja || "-"],
-    ["Pimpinan Kontraktor", meta.pimpinan_kontraktor || "-"],
     ["Lokasi Pekerjaan", meta.lokasi_pekerjaan || "-"],
     [
       "Periode Pelaksanaan",

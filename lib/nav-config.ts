@@ -164,21 +164,21 @@ export function getFeaturedCards(role: UserRole): FeaturedCard[] {
     return [
       {
         title: "Dashboard Analitik",
-        description: "Statistik dan visualisasi seluruh pengajuan izin kerja.",
+        description: "Statistik dan visualisasi seluruh pengajuan izin kerja secara real-time.",
         href: "/dashboard",
         icon: BarChart3,
       },
       {
         title: "Master Lisence",
-        description: "Kelola lisence Hot Work, Height Work, dan Workshop pekerja.",
+        description: "Kelola lisensi sertifikasi Hot Work, Height Work, dan Workshop pekerja.",
         href: "/master-lisence",
         icon: BadgeCheck,
       },
       {
-        title: "Pengaturan SMTP",
-        description: "Atur server email untuk notifikasi approval.",
-        href: "/smtp-settings",
-        icon: Mail,
+        title: "Kelola Pengguna",
+        description: "Manajemen hak akses, role, dan akun pengguna seluruh departemen.",
+        href: "/admin-users",
+        icon: Users,
       },
     ];
   }
@@ -186,16 +186,22 @@ export function getFeaturedCards(role: UserRole): FeaturedCard[] {
   if (role === "spv") {
     return [
       {
-        title: "Daftar Form",
-        description: "Form yang menunggu approval dari departemen Anda.",
+        title: "Form Menunggu Approval",
+        description: "Daftar pengajuan izin kerja dari staf departemen yang perlu ditinjau.",
         href: "/approval",
         icon: ClipboardList,
       },
       {
         title: "Kelola Akun Departemen",
-        description: "Tambah atau hapus akun administrator di departemen Anda.",
+        description: "Kelola dan tinjau akun pekerja di bawah departemen Anda.",
         href: "/admin-users",
         icon: Users,
+      },
+      {
+        title: "Riwayat Form Disetujui",
+        description: "Arsip seluruh izin kerja yang telah disahkan oleh supervisor.",
+        href: "/approval?status=approved",
+        icon: History,
       },
     ];
   }
@@ -203,10 +209,16 @@ export function getFeaturedCards(role: UserRole): FeaturedCard[] {
   if (role === "security") {
     return [
       {
-        title: "Daftar Form",
-        description: "Ijin Kerja Eksternal yang menunggu Safety Induction & tanda tangan Anda.",
+        title: "Menunggu Safety Induction & TTD",
+        description: "Izin kerja eksternal yang memerlukan verifikasi pos dan induksi K3.",
         href: "/approval",
         icon: ShieldCheck,
+      },
+      {
+        title: "Riwayat Verifikasi Lapangan",
+        description: "Arsip form eksternal yang telah diverifikasi oleh petugas security.",
+        href: "/approval?status=approved",
+        icon: History,
       },
     ];
   }
@@ -215,9 +227,15 @@ export function getFeaturedCards(role: UserRole): FeaturedCard[] {
     return [
       {
         title: "Penilaian Sub Kontraktor",
-        description: "Daftar form ijin kerja eksternal untuk verifikasi penilaian sub kontraktor & ekspor dokumen (Excel / PDF).",
+        description: "Verifikasi evaluasi K3 vendor dan otorisasi barcode persetujuan.",
         href: "/purchasing",
         icon: ClipboardList,
+      },
+      {
+        title: "Ekspor Dokumen Penilaian",
+        description: "Unduh rekap checklist evaluasi vendor ke format Excel atau PDF.",
+        href: "/purchasing",
+        icon: FileText,
       },
     ];
   }
@@ -225,10 +243,16 @@ export function getFeaturedCards(role: UserRole): FeaturedCard[] {
   if (role === "pengawas") {
     return [
       {
-        title: "Penilaian Sub Kontraktor",
-        description: "Input dan persetujuan checklist evaluasi harian sub kontraktor pekerjaan eksternal.",
+        title: "Checklist Pengawasan Harian",
+        description: "Input berkala evaluasi 8 item K3 selama masa pekerjaan subkontraktor.",
         href: "/pengawas",
         icon: ClipboardList,
+      },
+      {
+        title: "Evaluasi Pasca Kerja",
+        description: "Pemeriksaan housekeeping dan kebersihan area setelah pekerjaan tuntas.",
+        href: "/pengawas",
+        icon: ShieldCheck,
       },
     ];
   }
@@ -236,8 +260,8 @@ export function getFeaturedCards(role: UserRole): FeaturedCard[] {
   if (APPROVER_ROLES.includes(role)) {
     return [
       {
-        title: "Daftar Form",
-        description: "Lihat dan proses form yang memerlukan approval Anda.",
+        title: "Menunggu Tindakan Anda",
+        description: "Daftar izin kerja yang memerlukan otorisasi dan barcode Anda saat ini.",
         href: "/approval",
         icon: ClipboardList,
       },
@@ -247,8 +271,8 @@ export function getFeaturedCards(role: UserRole): FeaturedCard[] {
   // worker
   return [
     {
-      title: "Riwayat Form",
-      description: "Lihat status dan kelola seluruh pengajuan izin kerja Anda.",
+      title: "Riwayat Pengajuan Saya",
+      description: "Pantau status approval, QR digital, dan cetak dokumen izin kerja.",
       href: "/my-forms",
       icon: History,
     },

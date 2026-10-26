@@ -1177,7 +1177,7 @@ export default function DetailModal({ isOpen, onClose, formId, formType, initial
             <F label="Tanggal Akhir Kerja" value={formatDate(p.tgl_akhir_kerja_rencana)} />
             <F label="Waktu Mulai Kerja" value={formatTime(p.waktu_kerja)} />
             <F label="Waktu Selesai Kerja" value={formatTime(p.waktu_selesai || p.izin_kerja_sampai)} />
-            <F label="Actual Tanggal Kerja" value={formatDate(p.actual_tanggal_kerja)} />
+            <F label="Aktual Tanggal Mulai Pekerjaan" value={formatDate(p.actual_tanggal_kerja)} />
           </div>
         </MS>
 
