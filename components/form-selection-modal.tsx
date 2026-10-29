@@ -172,21 +172,23 @@ export default function FormSelectionModal({ isOpen, onClose }: FormSelectionMod
                       className={`absolute inset-0 opacity-0 group-hover:opacity-5 bg-gradient-to-r ${form.color} transition-opacity`}
                     />
                     <div className="relative p-5 sm:p-6 flex items-start gap-3.5">
-                      <div className="flex flex-col items-center shrink-0 w-16">
+                      <div className={`flex flex-col items-center shrink-0 ${form.id === "hot-work" ? "" : "w-16"}`}>
                         <div className={`p-3 rounded-xl bg-gradient-to-br ${form.color} shadow-sm`}>
                           <Icon className="w-6 h-6 text-white" />
                         </div>
-                        <div className="mt-1.5 text-center leading-none space-y-0.5">
-                          <p className="text-[8.5px] font-mono font-semibold text-slate-500 tracking-tighter whitespace-nowrap">
-                            {form.docNo}
-                          </p>
-                          <p className="text-[8px] font-medium text-slate-400 tracking-tight">
-                            {form.revNo}
-                          </p>
-                        </div>
+                        {form.id !== "hot-work" && (
+                          <div className="mt-1.5 text-center leading-none space-y-0.5">
+                            <p className="text-[8.5px] font-mono font-semibold text-slate-500 tracking-tighter whitespace-nowrap">
+                              {form.docNo}
+                            </p>
+                            <p className="text-[8px] font-medium text-slate-400 tracking-tight">
+                              {form.revNo}
+                            </p>
+                          </div>
+                        )}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <div className="flex flex-wrap items-center gap-2 mb-1">
+                        <div className="flex flex-wrap items-center gap-2">
                           <h3 className="text-lg font-bold text-slate-900">{form.title}</h3>
                           <span
                             className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
@@ -203,7 +205,12 @@ export default function FormSelectionModal({ isOpen, onClose }: FormSelectionMod
                             </span>
                           )}
                         </div>
-                        <p className="text-sm text-slate-600 leading-relaxed">{form.description}</p>
+                        {form.id === "hot-work" && (
+                          <p className="text-[11px] font-mono font-medium text-slate-400 mb-1">
+                            {form.docNo} {form.revNo}
+                          </p>
+                        )}
+                        <p className={`text-sm text-slate-600 leading-relaxed ${form.id === "hot-work" ? "" : "mt-1"}`}>{form.description}</p>
                       </div>
                       <div
                         className={`opacity-0 group-hover:opacity-100 transition-opacity shrink-0 ${
