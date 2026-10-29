@@ -32,14 +32,25 @@ export default function JsaMethodSection({
     <div className="space-y-4">
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         {[
-          { value: "upload" as const, label: "Upload JSA", icon: FileText, description: "Lampirkan dokumen JSA yang sudah dibuat." },
-          { value: "build" as const, label: "Buat JSA (Job Safety Analysis)", icon: PenLine, description: "Isi JSA langsung melalui formulir." },
+          { value: "upload" as const, label: "Upload JSA", icon: FileText, description: "Lampirkan dokumen JSA yang sudah dibuat.", docInfo: null },
+          { value: "build" as const, label: "Buat JSA (Job Safety Analysis)", icon: PenLine, description: "Isi JSA langsung melalui formulir.", docInfo: "JAI/F-10/P.SHE-19 Rev. 2" },
         ].map((option) => {
           const Icon = option.icon;
           return (
             <label key={option.value} className={`flex items-start gap-3 p-3 rounded-xl border-2 cursor-pointer transition-colors ${mode === option.value ? "border-orange-400 bg-orange-50" : "border-slate-200 hover:border-orange-200"}`}>
               <input type="radio" name="jsa-mode" value={option.value} checked={mode === option.value} onChange={() => setMode(option.value)} className="mt-1 text-orange-500" />
-              <span><span className="flex items-center gap-1.5 text-sm font-semibold text-slate-800"><Icon className="w-4 h-4 text-orange-600" />{option.label}</span><span className="block text-xs text-slate-500 mt-1">{option.description}</span></span>
+              <span>
+                <span className="flex items-center gap-1.5 text-sm font-semibold text-slate-800">
+                  <Icon className="w-4 h-4 text-orange-600" />
+                  {option.label}
+                </span>
+                {option.docInfo && (
+                  <span className="block text-[9px] font-mono font-semibold text-slate-400 tracking-tight mt-0.5 leading-none">
+                    {option.docInfo}
+                  </span>
+                )}
+                <span className="block text-xs text-slate-500 mt-1">{option.description}</span>
+              </span>
             </label>
           );
         })}
