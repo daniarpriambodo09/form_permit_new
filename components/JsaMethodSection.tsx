@@ -33,7 +33,7 @@ export default function JsaMethodSection({
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         {[
           { value: "upload" as const, label: "Upload JSA", icon: FileText, description: "Lampirkan dokumen JSA yang sudah dibuat." },
-          { value: "build" as const, label: "Buat JSA", icon: PenLine, description: "Isi JSA langsung melalui formulir." },
+          { value: "build" as const, label: "Buat JSA (Job Safety Analysis)", icon: PenLine, description: "Isi JSA langsung melalui formulir." },
         ].map((option) => {
           const Icon = option.icon;
           return (
