@@ -149,8 +149,8 @@ function LisensiUploadButton({ namaPetugas, index, fotoUrl, uploadStatus, upload
         type="button"
         onClick={() => setShowOptions((v) => !v)}
         className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${uploadStatus === "error"
-            ? "bg-rose-50 border-rose-300 text-rose-700 hover:bg-rose-100"
-            : "bg-orange-50 border-orange-200 text-orange-700 hover:bg-orange-100 hover:border-orange-400 shadow-2xs"
+          ? "bg-rose-50 border-rose-300 text-rose-700 hover:bg-rose-100"
+          : "bg-orange-50 border-orange-200 text-orange-700 hover:bg-orange-100 hover:border-orange-400 shadow-2xs"
           }`}
         title={uploadError || "Upload foto lisensi"}
       >
@@ -250,8 +250,8 @@ function MasterLisenceViewModal({ worker, onClose }: { worker: WorkerLisenceOpti
 const CheckItem = ({ label, checked, onChange }: { label: string; checked: boolean; onChange: (checked: boolean) => void }) => (
   <label
     className={`flex items-start gap-3 cursor-pointer p-3.5 rounded-xl border transition-all ${checked
-        ? "bg-orange-50/80 border-orange-300 text-orange-950 font-medium shadow-xs"
-        : "bg-white border-slate-200 hover:border-slate-300 text-slate-700 hover:bg-slate-50"
+      ? "bg-orange-50/80 border-orange-300 text-orange-950 font-medium shadow-xs"
+      : "bg-white border-slate-200 hover:border-slate-300 text-slate-700 hover:bg-slate-50"
       }`}
   >
     <div
@@ -1022,13 +1022,11 @@ function HeightWorkFormPageInner() {
                   ].map((opt) => (
                     <label
                       key={opt.value}
-                      className={`flex flex-col gap-1.5 p-4 rounded-xl border-2 transition-all ${
-                        opt.disabled ? "cursor-not-allowed opacity-60 bg-slate-50" : "cursor-pointer"
-                      } ${
-                        tipePerusahaan === opt.value
+                      className={`flex flex-col gap-1.5 p-4 rounded-xl border-2 transition-all ${opt.disabled ? "cursor-not-allowed opacity-60 bg-slate-50" : "cursor-pointer"
+                        } ${tipePerusahaan === opt.value
                           ? "border-sky-500 bg-sky-50/60 shadow-xs"
                           : "border-slate-200 hover:border-slate-300 bg-white"
-                      }`}
+                        }`}
                     >
                       <div className="flex items-center gap-2.5">
                         <input
@@ -1292,11 +1290,10 @@ function HeightWorkFormPageInner() {
                     <button
                       type="button"
                       onClick={() => setShowScaffoldingCard((v: boolean) => !v)}
-                      className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all shadow-xs cursor-pointer ${
-                        showScaffoldingCard
+                      className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all shadow-xs cursor-pointer ${showScaffoldingCard
                           ? "bg-slate-800 hover:bg-slate-900 text-white"
                           : "bg-orange-600 hover:bg-orange-700 text-white"
-                      }`}
+                        }`}
                     >
                       <ShieldCheck className="w-4 h-4 text-orange-300" />
                       <span>{showScaffoldingCard ? "Sembunyikan Form Inspeksi Scaffolding" : "Buat / Isi Inspeksi Scaffolding"}</span>
@@ -1356,11 +1353,10 @@ function HeightWorkFormPageInner() {
                       return (
                         <div
                           key={i}
-                          className={`p-3.5 sm:p-4 rounded-xl border transition-all ${
-                            namaFilled
+                          className={`p-3.5 sm:p-4 rounded-xl border transition-all ${namaFilled
                               ? "bg-white border-slate-200 shadow-xs"
                               : "bg-slate-50/60 border-slate-200"
-                          }`}
+                            }`}
                         >
                           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
                             <div className="flex items-center gap-2.5 flex-1 min-w-0">
@@ -1378,11 +1374,10 @@ function HeightWorkFormPageInner() {
 
                             <div className="flex items-center justify-between sm:justify-end gap-3 pl-8 sm:pl-0 shrink-0">
                               <label
-                                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border text-xs font-semibold cursor-pointer transition-colors ${
-                                  berbadanSehat[i]
+                                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border text-xs font-semibold cursor-pointer transition-colors ${berbadanSehat[i]
                                     ? "bg-emerald-50 border-emerald-300 text-emerald-800"
                                     : "bg-white border-slate-200 text-slate-500 hover:bg-slate-50"
-                                }`}
+                                  }`}
                               >
                                 <input
                                   type="checkbox"
@@ -1485,8 +1480,8 @@ function HeightWorkFormPageInner() {
                                 <div className="flex items-center justify-between sm:justify-end gap-3 pl-8 sm:pl-0 shrink-0">
                                   <label
                                     className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border text-xs font-semibold cursor-pointer transition-colors ${berbadanSehat[i]
-                                        ? "bg-emerald-50 border-emerald-300 text-emerald-800"
-                                        : "bg-white border-slate-200 text-slate-500 hover:bg-slate-50"
+                                      ? "bg-emerald-50 border-emerald-300 text-emerald-800"
+                                      : "bg-white border-slate-200 text-slate-500 hover:bg-slate-50"
                                       }`}
                                   >
                                     <input
@@ -1598,20 +1593,34 @@ function HeightWorkFormPageInner() {
             </div>
 
             {/* Keterangan / Point Penting Penggunaan APD & Tangga Listrik/AWP */}
-            <div className="mt-4 p-4 rounded-xl border border-amber-200 bg-amber-50/70 text-slate-800 space-y-2">
-              <div className="flex items-center gap-2 text-amber-900">
-                <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
-                <span className="font-extrabold text-xs sm:text-sm tracking-wide uppercase">
-                  POINT PENTING :
-                </span>
+            <div className="mt-4 p-4 rounded-xl border border-amber-200 bg-amber-50/70 text-slate-800 space-y-3">
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 text-amber-900">
+                  <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+                  <span className="font-extrabold text-xs sm:text-sm tracking-wide uppercase">
+                    POINT PENTING :
+                  </span>
+                </div>
+                <ul className="list-disc list-inside space-y-1.5 text-xs text-slate-700 pl-1 leading-relaxed">
+                  <li>Tangga Listrik / AWP tidak bisa digunakan diluar gedung saat hujan</li>
+                  <li>Setelah penggunaan tangga listrik selesai, segera mengembalikan kunci pagar tangga listrik dan APD</li>
+                  <li>Harap menjaga kebersihan tangga listrik setelah pemakaian</li>
+                  <li>Pastikan beban tidak melebihi kapasitas maksimal Safety Line = 150 kg</li>
+                  <li>Penggunaan tangga listrik / awp harus sesuai dengan Operation standar dan wajib mengenakan APD</li>
+                </ul>
               </div>
-              <ul className="list-disc list-inside space-y-1.5 text-xs text-slate-700 pl-1 leading-relaxed">
-                <li>Tangga Listrik / AWP tidak bisa digunakan diluar gedung saat hujan</li>
-                <li>Setelah penggunaan tangga listrik selesai, segera mengembalikan kunci pagar tangga listrik dan APD</li>
-                <li>Harap menjaga kebersihan tangga listrik setelah pemakaian</li>
-                <li>Pastikan beban tidak melebihi kapasitas maksimal Safety Line = 150 kg</li>
-                <li>Penggunaan tangga listrik / awp harus sesuai dengan Operation standar dan wajib mengenakan APD</li>
-              </ul>
+
+              {/* Keterangan Tambahan Terpisah */}
+              <div className="pt-2.5 border-t border-amber-200/90">
+                <div className="p-3 rounded-lg bg-amber-100/70 border border-amber-300 text-xs text-amber-950 space-y-1">
+                  <span className="font-bold uppercase tracking-wider block text-[11px] text-amber-900">
+                    Keterangan Tambahan :
+                  </span>
+                  <p className="font-medium leading-relaxed">
+                    Penggunaan tangga listrik / AWP pada malam hari, pengajuan lewat security dan memastikan area kerja intensitas cahaya cukup.
+                  </p>
+                </div>
+              </div>
             </div>
           </Section>
 
