@@ -37,6 +37,19 @@ import {
   AlertTriangle,
 } from "lucide-react";
 
+// Format tanggal ke DD/MM/YYYY berdasarkan zona waktu lokal (WIB)
+function formatTanggalDMY(value?: string | null): string {
+  if (!value) return "-";
+  // Tanggal murni "YYYY-MM-DD" → format langsung tanpa konversi zona waktu
+  const plain = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (plain) return `${plain[3]}/${plain[2]}/${plain[1]}`;
+  const d = new Date(value);
+  if (isNaN(d.getTime())) return value;
+  const dd = String(d.getDate()).padStart(2, "0");
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  return `${dd}/${mm}/${d.getFullYear()}`;
+}
+
 interface FormItem {
   id_form: string;
   status: string;
@@ -560,7 +573,7 @@ export default function PengawasDashboardPage() {
                           <Calendar className="w-4 h-4 text-slate-400 shrink-0 mt-0.5" />
                           <div>
                             <p className="text-xs text-slate-600">
-                              {item.izin_kerja_tanggal_dari || "-"} s/d {item.izin_kerja_tanggal_sampai || "-"}
+                              {formatTanggalDMY(item.izin_kerja_tanggal_dari)} s/d {formatTanggalDMY(item.izin_kerja_tanggal_sampai)}
                             </p>
                             <p className="text-[10px] text-amber-700 font-semibold">
                               Durasi: {daysCount} Hari Kerja ({entriesCount}/{daysCount} Terisi)

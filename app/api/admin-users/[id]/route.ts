@@ -207,13 +207,7 @@ export async function PATCH(
       if (!emailRegex.test(eVal)) {
         return NextResponse.json({ error: 'Format email tidak valid' }, { status: 400 });
       }
-      const existing = await queryOne<{ id: number }>(
-        `SELECT id FROM users WHERE email = $1 AND id != $2`,
-        [eVal, targetId]
-      );
-      if (existing) {
-        return NextResponse.json({ error: 'Email sudah digunakan oleh akun lain' }, { status: 409 });
-      }
+      // Catatan: Duplikat email diperbolehkan (satu email dapat digunakan untuk beberapa akun)
       finalEmail = eVal;
     }
 
