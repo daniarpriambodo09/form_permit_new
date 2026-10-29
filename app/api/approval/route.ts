@@ -85,6 +85,14 @@ function buildSelectQuery(
          WHERE (${whereClause})
            AND (f.id_ijin_kerja IS NULL OR TRIM(f.id_ijin_kerja) = '')
            AND creator.departmen = ${deptParam}
+           AND (
+             f.perlu_scaffolding IS NOT TRUE
+             OR EXISTS (
+               SELECT 1 FROM inspeksi_scaffolding sc
+               WHERE sc.id_form = f.id_form
+                 AND sc.status IN ('submitted', 'approved')
+             )
+           )
          ORDER BY f.tanggal ASC`,
         newParams,
       ];
@@ -122,27 +130,35 @@ function buildSelectQuery(
   if (formType === 'height-work') {
     return [
       `SELECT
-         id_form, tanggal, tanggal_pelaksanaan, status, current_stage,
+         f.id_form, f.tanggal, f.tanggal_pelaksanaan, f.status, f.current_stage,
          NULL AS no_registrasi,
-         COALESCE(petugas_ketinggian, nama_kontraktor, '') AS nama_kontraktor_nik,
-         COALESCE(petugas_ketinggian, nama_kontraktor, '') AS pemohon,
-         deskripsi_pekerjaan,
-         lokasi AS lokasi_pekerjaan,
-         waktu_mulai AS waktu_pukul,
-         catatan_reject, approved_by, approved_at,
-         spv_approved, spv_approved_by,
-         kontraktor_approved, kontraktor_approved_by,
-         admin_k3_approved, admin_k3_approved_by,
-         sfo_approved, sfo_approved_by,
-         ${pgaColumn} AS mr_pga_approved,
-         ${pgaColumn}_by AS mr_pga_approved_by,
-         id_ijin_kerja,
+         COALESCE(f.petugas_ketinggian, f.nama_kontraktor, '') AS nama_kontraktor_nik,
+         COALESCE(f.petugas_ketinggian, f.nama_kontraktor, '') AS pemohon,
+         f.deskripsi_pekerjaan,
+         f.lokasi AS lokasi_pekerjaan,
+         f.waktu_mulai AS waktu_pukul,
+         f.catatan_reject, f.approved_by, f.approved_at,
+         f.spv_approved, f.spv_approved_by,
+         f.kontraktor_approved, f.kontraktor_approved_by,
+         f.admin_k3_approved, f.admin_k3_approved_by,
+         f.sfo_approved, f.sfo_approved_by,
+         f.${pgaColumn} AS mr_pga_approved,
+         f.${pgaColumn}_by AS mr_pga_approved_by,
+         f.id_ijin_kerja,
          (${TIPE_EXPR}) AS tipe_perusahaan,
          '${formType}' AS jenis_form
-       FROM ${table}
+       FROM ${table} f
        WHERE (${whereClause})
-         AND (id_ijin_kerja IS NULL OR TRIM(id_ijin_kerja) = '')
-       ORDER BY tanggal ASC`,
+         AND (f.id_ijin_kerja IS NULL OR TRIM(f.id_ijin_kerja) = '')
+         AND (
+           f.perlu_scaffolding IS NOT TRUE
+           OR EXISTS (
+             SELECT 1 FROM inspeksi_scaffolding sc
+             WHERE sc.id_form = f.id_form
+               AND sc.status IN ('submitted', 'approved')
+           )
+         )
+       ORDER BY f.tanggal ASC`,
       params,
     ];
   }
@@ -182,6 +198,9 @@ async function countByQuery(
   spvDepartmen?: string | null
 ): Promise<number> {
   const { table } = FORM_CONFIG[formType];
+  const scaffoldingCheck = formType === 'height-work'
+    ? ` AND (f.perlu_scaffolding IS NOT TRUE OR EXISTS (SELECT 1 FROM inspeksi_scaffolding sc WHERE sc.id_form = f.id_form AND sc.status IN ('submitted', 'approved')))`
+    : '';
 
   if (spvDepartmen != null) {
     const deptParam = `$${params.length + 1}`;
@@ -191,14 +210,14 @@ async function countByQuery(
        JOIN users creator ON creator.id = f.user_id
        WHERE (${whereClause})
          AND (f.id_ijin_kerja IS NULL OR TRIM(f.id_ijin_kerja) = '')
-         AND creator.departmen = ${deptParam}`,
+         AND creator.departmen = ${deptParam}${scaffoldingCheck}`,
       [...params, spvDepartmen]
     );
     return parseInt(res[0].count);
   }
 
   const res = await query(
-    `SELECT COUNT(*) as count FROM ${table} WHERE (${whereClause}) AND (id_ijin_kerja IS NULL OR TRIM(id_ijin_kerja) = '')`,
+    `SELECT COUNT(*) as count FROM ${table} f WHERE (${whereClause}) AND (f.id_ijin_kerja IS NULL OR TRIM(f.id_ijin_kerja) = '')${scaffoldingCheck}`,
     params
   );
   return parseInt(res[0].count);

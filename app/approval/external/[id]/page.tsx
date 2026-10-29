@@ -540,8 +540,9 @@ export default function ExternalApprovalPage({ params }: { params: Promise<{ id:
 
   const limbahItems = [
     { label: "Dikelola Kontraktor", val: general.limbah_kontraktor },
-    { label: `Dikelola PT JAI${general.limbah_lokasi_pt ? ` (Lokasi: ${general.limbah_lokasi_pt})` : ""}`, val: general.limbah_pt_jai },
-    { label: "Dikelola Luar JAI", val: general.limbah_luar_jai },
+    { label: "Dikelola PT JAI", val: general.limbah_pt_jai },
+    { label: "Dibuang ke Luar Area JAI", val: general.limbah_luar_jai },
+    { label: general.limbah_lokasi_pt ? `Lokasi Limbah di Area JAI: ${general.limbah_lokasi_pt}` : null, val: Boolean(general.limbah_lokasi_pt) },
     { label: general.limbah_lainnya ? `Lainnya: ${general.limbah_lainnya}` : null, val: Boolean(general.limbah_lainnya) },
   ].filter((l) => l.label !== null);
 
@@ -1035,7 +1036,7 @@ export default function ExternalApprovalPage({ params }: { params: Promise<{ id:
               </SectionCard>
 
               {/* ═══ BAGIAN 3: ALAT YANG DIPAKAI ═══ */}
-              <SectionCard title="Bagian 3: Peralatan & Kondisi Mesin Kerja" icon={Wrench}>
+              <SectionCard title="Bagian 3: Peralatan yang dipakai & Kondisi alat Kerja" icon={Wrench}>
                 <div>
                   <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2">
                     Daftar Peralatan &amp; Status Kelayakan Fisik
@@ -1249,11 +1250,18 @@ export default function ExternalApprovalPage({ params }: { params: Promise<{ id:
                     <BoolBadges
                       items={[
                         { label: "Pihak Kontraktor", active: isTruthy(general.limbah_kontraktor) },
-                        { label: `Pihak PT. JAI${general.limbah_lokasi_pt ? ` (Lokasi: ${general.limbah_lokasi_pt})` : ""}`, active: isTruthy(general.limbah_pt_jai) },
+                        { label: "Pihak PT. JAI", active: isTruthy(general.limbah_pt_jai) },
                         { label: "Dibuang Keluar Area JAI", active: isTruthy(general.limbah_luar_jai) },
                       ]}
                     />
                     {general.limbah_lainnya && <p className="text-xs text-slate-500 mt-1.5 italic">Lainnya: {general.limbah_lainnya}</p>}
+                  </div>
+
+                  <div className="pt-2 border-t border-slate-100">
+                    <Field
+                      label="Lokasi Pembuangan Limbah di Area JAI"
+                      value={general.limbah_lokasi_pt || "-"}
+                    />
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-slate-100">
@@ -1274,7 +1282,17 @@ export default function ExternalApprovalPage({ params }: { params: Promise<{ id:
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-                    <Field label="Pengawas Pekerjaan / User PT. JAI" value={general.pengawas_pekerjaan_user || general.nama_pengawas_pic_subkont || "-"} />
+                    <Field
+                      label="Pengawas Pekerjaan / User PT. JAI"
+                      value={(() => {
+                        const picSubkont = (general.nama_pengawas_pic_subkont || "").trim();
+                        const pengawasBagian = (general.pengawas_bagian || "").trim();
+                        if (picSubkont && pengawasBagian) {
+                          return `${picSubkont} - ${pengawasBagian}`;
+                        }
+                        return general.pengawas_pekerjaan_user || picSubkont || pengawasBagian || "-";
+                      })()}
+                    />
                     <Field label="Pemohon Subkontraktor" value={general.nama_kontraktor_pekerja || general.nama_pengawas_pic_subkont || "-"} />
                   </div>
 

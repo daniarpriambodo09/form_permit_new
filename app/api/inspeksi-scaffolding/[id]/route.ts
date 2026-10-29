@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query, queryOne } from "@/lib/db";
 import { verifyToken, COOKIE_NAME } from "@/lib/auth";
+import { notifyFirstApprover } from "@/lib/approval-email";
 
 function getUser(req: NextRequest) {
   const token = req.cookies.get(COOKIE_NAME)?.value;
@@ -158,6 +159,20 @@ export async function PUT(
         user.nama || user.username || "Pengawas",
       ]
     );
+
+    // Trigger kirim email ke approver pertama (SPV) jika status form height-work submitted dan baru saja di-submit inspeksinya
+    if (isSubmit && form && form.status === 'submitted' && form.user_id && !form.id_ijin_kerja) {
+      notifyFirstApprover({
+        formType: 'height-work',
+        idForm: form.id_form,
+        tipePerusahaan: form.tipe_perusahaan || 'internal',
+        userId: form.user_id,
+        namaPemohon: form.nama_pengawas_departemen || form.petugas_ketinggian || form.nama_kontraktor || user.nama || 'Pengawas',
+        tanggal: new Date().toISOString(),
+      }).catch((err) => {
+        console.error(`[EMAIL] Background first-approver email error for ${form.id_form} after scaffolding submitted:`, err);
+      });
+    }
 
     return NextResponse.json({
       success: true,

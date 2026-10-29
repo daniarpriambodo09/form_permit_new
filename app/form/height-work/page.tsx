@@ -11,6 +11,7 @@ import {
   HardHat, ShieldAlert, Sparkles, Building2, UserCheck, Home, Info, ShieldCheck
 } from "lucide-react";
 import JsaMethodSection, { type JsaMode } from "@/components/JsaMethodSection";
+import ScaffoldingInspectionCard, { DEFAULT_SCAFFOLDING_ITEMS, DEFAULT_KETENTUAN_LAINNYA, type ScaffoldingItem, type KetentuanItem } from "@/components/ScaffoldingInspectionCard";
 import { type JsaFileInfo, type JsaUploadStatus as JsaStatus } from "@/components/JsaUploadSection";
 import LinkedJsaSection from "@/components/LinkedJsaSection";
 import { createEmptyJsa } from "@/components/JsaBuilderSection";
@@ -383,6 +384,13 @@ function HeightWorkFormPageInner() {
   // ── JSA state ──────────────────────────────────────────────
   const [perluJsa, setPerluJsa] = useState(false);
   const [perluScaffolding, setPerluScaffolding] = useState(false);
+  const [showScaffoldingCard, setShowScaffoldingCard] = useState(false);
+  const [scaffoldingInspector, setScaffoldingInspector] = useState("");
+  const [scaffoldingTanggal, setScaffoldingTanggal] = useState(new Date().toISOString().slice(0, 10));
+  const [scaffoldingLokasi, setScaffoldingLokasi] = useState("");
+  const [scaffoldingTipePerancah, setScaffoldingTipePerancah] = useState("Frame Scaffolding");
+  const [scaffoldingItems, setScaffoldingItems] = useState<ScaffoldingItem[]>(DEFAULT_SCAFFOLDING_ITEMS);
+  const [scaffoldingKetentuan, setScaffoldingKetentuan] = useState<KetentuanItem[]>(DEFAULT_KETENTUAN_LAINNYA);
   const [jsaFile, setJsaFile] = useState<JsaFileInfo | null>(null);
   const [jsaUploadStatus, setJsaUploadStatus] = useState<JsaStatus>("idle");
   const [jsaUploadError, setJsaUploadError] = useState("");
@@ -1256,7 +1264,10 @@ function HeightWorkFormPageInner() {
                       type="radio"
                       name="perluScaffoldingRadio"
                       checked={perluScaffolding === true}
-                      onChange={() => setPerluScaffolding(true)}
+                      onChange={() => {
+                        setPerluScaffolding(true);
+                        setShowScaffoldingCard(true);
+                      }}
                       className="w-4 h-4 text-orange-600 focus:ring-orange-500"
                     />
                     <span>Ya, Perlu Scaffolding</span>
@@ -1266,12 +1277,56 @@ function HeightWorkFormPageInner() {
                       type="radio"
                       name="perluScaffoldingRadio"
                       checked={perluScaffolding === false}
-                      onChange={() => setPerluScaffolding(false)}
+                      onChange={() => {
+                        setPerluScaffolding(false);
+                        setShowScaffoldingCard(false);
+                      }}
                       className="w-4 h-4 text-orange-600 focus:ring-orange-500"
                     />
                     <span>Tidak Perlu</span>
                   </label>
                 </div>
+
+                {perluScaffolding && (
+                  <div className="mt-3 ml-6.5 space-y-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowScaffoldingCard((v: boolean) => !v)}
+                      className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all shadow-xs cursor-pointer ${
+                        showScaffoldingCard
+                          ? "bg-slate-800 hover:bg-slate-900 text-white"
+                          : "bg-orange-600 hover:bg-orange-700 text-white"
+                      }`}
+                    >
+                      <ShieldCheck className="w-4 h-4 text-orange-300" />
+                      <span>{showScaffoldingCard ? "Sembunyikan Form Inspeksi Scaffolding" : "Buat / Isi Inspeksi Scaffolding"}</span>
+                    </button>
+                    <p className="text-[11px] text-slate-500">
+                      {showScaffoldingCard
+                        ? "Checksheet 17 komponen perancah terbuka di bawah ini. Anda dapat melengkapi checklist kelaikan sebelum mengajukan izin."
+                        : "Klik tombol di atas untuk melengkapi lembar inspeksi 17 komponen perancah secara langsung pada form ini."}
+                    </p>
+                  </div>
+                )}
+
+                {perluScaffolding && showScaffoldingCard && (
+                  <div className="mt-4 pt-4 border-t border-slate-200">
+                    <ScaffoldingInspectionCard
+                      namaInspektor={scaffoldingInspector || (tipePerusahaan === "internal" ? namaPengawasDepartemen : namaPengawasKontraktor) || user?.nama || ""}
+                      setNamaInspektor={setScaffoldingInspector}
+                      tanggalInspeksi={scaffoldingTanggal}
+                      setTanggalInspeksi={setScaffoldingTanggal}
+                      lokasi={scaffoldingLokasi || lokasi || ""}
+                      setLokasi={setScaffoldingLokasi}
+                      tipePerancah={scaffoldingTipePerancah}
+                      setTipePerancah={setScaffoldingTipePerancah}
+                      items={scaffoldingItems}
+                      setItems={setScaffoldingItems}
+                      ketentuan={scaffoldingKetentuan}
+                      setKetentuan={setScaffoldingKetentuan}
+                    />
+                  </div>
+                )}
               </div>
             </div>
           </Section>
@@ -1540,6 +1595,23 @@ function HeightWorkFormPageInner() {
                   />
                 </div>
               </div>
+            </div>
+
+            {/* Keterangan / Point Penting Penggunaan APD & Tangga Listrik/AWP */}
+            <div className="mt-4 p-4 rounded-xl border border-amber-200 bg-amber-50/70 text-slate-800 space-y-2">
+              <div className="flex items-center gap-2 text-amber-900">
+                <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+                <span className="font-extrabold text-xs sm:text-sm tracking-wide uppercase">
+                  POINT PENTING :
+                </span>
+              </div>
+              <ul className="list-disc list-inside space-y-1.5 text-xs text-slate-700 pl-1 leading-relaxed">
+                <li>Tangga Listrik / AWP tidak bisa digunakan diluar gedung saat hujan</li>
+                <li>Setelah penggunaan tangga listrik selesai, segera mengembalikan kunci pagar tangga listrik dan APD</li>
+                <li>Harap menjaga kebersihan tangga listrik setelah pemakaian</li>
+                <li>Pastikan beban tidak melebihi kapasitas maksimal Safety Line = 150 kg</li>
+                <li>Penggunaan tangga listrik / awp harus sesuai dengan Operation standar dan wajib mengenakan APD</li>
+              </ul>
             </div>
           </Section>
 

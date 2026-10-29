@@ -722,7 +722,7 @@ function IjinKerjaEksternalPageInner() {
           </div>
           <h2 className="text-2xl font-bold text-slate-900 mb-2">Ijin Kerja Eksternal Berhasil Dikirim!</h2>
           <p className="text-slate-500 text-sm mb-4">
-            Permohonan sedang menunggu alur persetujuan: <strong className="text-slate-700">SPV → Security → SFO → MGR</strong>.
+            Permohonan sedang menunggu alur persetujuan: <strong className="text-slate-700">SPV → Admin K3 → SFO → MGR → Security</strong>.
           </p>
           {successId && (
             <p className="text-xs text-slate-400 mb-6 bg-slate-50 py-2 rounded-lg border border-slate-100">
@@ -873,9 +873,9 @@ function IjinKerjaEksternalPageInner() {
               <div className="bg-white/5 rounded-xl p-2.5 border border-white/5 backdrop-blur-xs">
                 <span className="text-slate-400 block text-[10px] uppercase font-bold tracking-wider">Target Alur</span>
                 <span className="font-bold text-white block mt-0.5 text-[11px] truncate">
-                  SPV → Sec → SFO → MGR
+                  SPV → Admin K3 → SFO → MGR → Sec
                 </span>
-                <span className="text-[11px] text-emerald-400">4 Tahap Digital</span>
+                <span className="text-[11px] text-emerald-400">5 Tahap Digital</span>
               </div>
 
               <div className="bg-white/5 rounded-xl p-2.5 border border-white/5 backdrop-blur-xs">
@@ -1811,20 +1811,24 @@ function IjinKerjaEksternalPageInner() {
                   </div>
                   <input
                     type="text"
-                    value={form.namaPengawasPicSubkont || form.pengawasPekerjaanUser}
+                    value={
+                      form.namaPengawasPicSubkont && (isPengawasOther ? pengawasOtherManual : form.pengawasBagian)
+                        ? `${form.namaPengawasPicSubkont} - ${isPengawasOther ? pengawasOtherManual : form.pengawasBagian}`
+                        : form.namaPengawasPicSubkont || (isPengawasOther ? pengawasOtherManual : form.pengawasBagian) || ""
+                    }
                     disabled
-                    placeholder="Otomatis mengikuti Nama Pengawas / PIC Subkontraktor di Bagian 1"
+                    placeholder="Otomatis mengikuti (Pengawas/PIC Subkont - Pengawas Bagian PT. JAI)"
                     className={`${inputCls} bg-slate-100 text-slate-600 cursor-not-allowed border-slate-200 select-none shadow-none`}
                   />
                   <p className="text-[11px] text-slate-500 mt-1">
-                    Kolom ini dinonaktifkan (disable) dan otomatis terhubung dari <strong>Nama Pengawas / PIC Subkontraktor</strong> pada Bagian 1.
+                    Kolom ini dinonaktifkan (disable) dan otomatis terhubung dari <strong>Nama Pengawas / PIC Subkontraktor</strong> (Bagian 1) dan <strong>Pengawas Bagian PT. JAI</strong> (Bagian 5).
                   </p>
                 </div>
 
                 <div className="px-4 py-3 rounded-xl text-xs bg-blue-50/80 text-blue-800 border border-blue-200 flex items-center gap-2">
                   <Lock className="w-4 h-4 text-blue-600 shrink-0" />
                   <span>
-                    <strong>Alur Persetujuan Digital:</strong> SPV {spvPemberiIzin.nama ? `(${spvPemberiIzin.nama})` : ""} → SFO → MGR → Security.
+                    <strong>Alur Persetujuan Digital:</strong> SPV {spvPemberiIzin.nama ? `(${spvPemberiIzin.nama})` : ""} → Admin K3 → SFO → MGR → Security.
                   </span>
                 </div>
               </div>

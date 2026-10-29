@@ -293,7 +293,8 @@ export default function ApprovalDetailPage({
 
   // Tab State
   const [activeTab, setActiveTab] = useState<"detail" | "lampiran">("detail");
-  const [activeLampiranTab, setActiveLampiranTab] = useState<"jsa" | "lisensi" | "parent">("jsa");
+  const [activeLampiranTab, setActiveLampiranTab] = useState<"jsa" | "lisensi" | "parent" | "scaffolding">("jsa");
+  const [scaffoldingData, setScaffoldingData] = useState<any>(null);
 
   // Lightbox preview modal
   const [previewImage, setPreviewImage] = useState<{ src: string; label: string } | null>(null);
@@ -345,6 +346,17 @@ export default function ApprovalDetailPage({
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
       setForm(data.data);
+      if (jenisForm === "height-work" && data.data?.perlu_scaffolding) {
+        try {
+          const scRes = await fetch(`/api/inspeksi-scaffolding/${id}`);
+          if (scRes.ok) {
+            const scJson = await scRes.json();
+            if (scJson.data) setScaffoldingData(scJson.data);
+          }
+        } catch (e) {
+          console.warn("Could not load scaffolding inspection:", e);
+        }
+      }
     } catch (e: any) {
       setError(e.message);
     } finally {
@@ -1818,6 +1830,37 @@ export default function ApprovalDetailPage({
                 </button>
               )}
 
+              {isHeightWork && form.perlu_scaffolding && (
+                <button
+                  type="button"
+                  onClick={() => setActiveLampiranTab("scaffolding")}
+                  className={`w-full text-left p-4 rounded-2xl border transition-all ${
+                    activeLampiranTab === "scaffolding"
+                      ? "bg-white border-orange-500 shadow-sm ring-1 ring-orange-400"
+                      : "bg-white/80 border-slate-200 hover:bg-white"
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-xl bg-orange-100 text-orange-600 flex items-center justify-center font-bold text-xs">
+                        <ShieldCheck className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <h4 className="font-bold text-slate-800 text-xs sm:text-sm">Inspeksi Scaffolding</h4>
+                        <p className="text-[11px] text-slate-500">
+                          {scaffoldingData?.inspection_status === "approved"
+                            ? "Disetujui Penuh"
+                            : scaffoldingData?.inspection_status === "submitted"
+                            ? "Diajukan Pengawas"
+                            : "Draft / Menunggu"}
+                        </p>
+                      </div>
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-slate-400" />
+                  </div>
+                </button>
+              )}
+
               {form.id_ijin_kerja && (
                 <button
                   type="button"
@@ -1933,6 +1976,188 @@ export default function ApprovalDetailPage({
                         )}
                       </div>
                     ))}
+                  </div>
+                </div>
+              )}
+
+              {activeLampiranTab === "scaffolding" && isHeightWork && (
+                <div className="bg-white rounded-2xl border border-slate-200/90 shadow-2xs overflow-hidden">
+                  <div className="bg-slate-50/70 border-b border-slate-200/70 px-4 sm:px-5 py-3.5 flex items-center justify-between gap-3 flex-wrap">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-lg bg-orange-100 text-orange-600 flex items-center justify-center shrink-0">
+                        <ShieldCheck className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <h3 className="font-bold text-slate-800 text-xs sm:text-sm">Lembar Pemeriksaan &amp; Kelaikan Scaffolding (Perancah)</h3>
+                        <p className="text-[11px] text-slate-500">Checksheet kelaikan 17 komponen standar &amp; ketentuan keselamatan kerja perancah</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {scaffoldingData?.inspection_status === "approved" ? (
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                          <CheckCircle2 className="w-3.5 h-3.5" />
+                          Disetujui Penuh
+                        </span>
+                      ) : scaffoldingData?.inspection_status === "submitted" ? (
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-blue-100 text-blue-800 border border-blue-200">
+                          <Clock className="w-3.5 h-3.5" />
+                          Diajukan oleh Pengawas
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-800 border border-amber-200">
+                          <AlertCircle className="w-3.5 h-3.5" />
+                          Draft / Menunggu Pengawas
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="p-4 sm:p-5 space-y-6">
+                    {/* Ringkasan Header */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 bg-slate-50/80 p-4 rounded-xl border border-slate-200/80 text-xs">
+                      <div>
+                        <p className="text-slate-400 font-medium">Pengawas / Inspektor</p>
+                        <p className="font-bold text-slate-800 mt-0.5">{scaffoldingData?.nama_inspektor || scaffoldingData?.pengawas_nama || "-"}</p>
+                      </div>
+                      <div>
+                        <p className="text-slate-400 font-medium">Tanggal Inspeksi</p>
+                        <p className="font-bold text-slate-800 mt-0.5">
+                          {scaffoldingData?.tanggal_inspeksi ? formatDate(scaffoldingData.tanggal_inspeksi) : "-"}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-slate-400 font-medium">Lokasi Pemasangan</p>
+                        <p className="font-bold text-slate-800 mt-0.5">{scaffoldingData?.inspection_lokasi || scaffoldingData?.lokasi || form.lokasi || "-"}</p>
+                      </div>
+                      <div>
+                        <p className="text-slate-400 font-medium">Tipe Perancah</p>
+                        <p className="font-bold text-slate-800 mt-0.5">{scaffoldingData?.tipe_perancah || "Frame Scaffolding"}</p>
+                      </div>
+                    </div>
+
+                    {/* Tabel 17 Komponen */}
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                          <ShieldCheck className="w-4 h-4 text-orange-600" />
+                          17 Komponen Standar Perancah
+                        </h4>
+                        <span className="text-[11px] text-slate-400 font-medium">
+                          {Array.isArray(scaffoldingData?.items) && scaffoldingData.items.length > 0
+                            ? `${scaffoldingData.items.filter((i: any) => i.kondisi === "standart").length} Standar / ${scaffoldingData.items.length} Komponen`
+                            : "17 Komponen"}
+                        </span>
+                      </div>
+
+                      <div className="border border-slate-200 rounded-xl overflow-hidden shadow-2xs">
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-left text-xs border-collapse">
+                            <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 font-bold">
+                              <tr>
+                                <th className="py-2.5 px-3 w-10 text-center">No</th>
+                                <th className="py-2.5 px-3 min-w-[150px]">Bagian / Komponen</th>
+                                <th className="py-2.5 px-3 min-w-[220px]">Kondisi Standar K3</th>
+                                <th className="py-2.5 px-3 w-36 text-center">Kondisi Lapangan</th>
+                                <th className="py-2.5 px-3 min-w-[150px]">Komentar / Temuan</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100">
+                              {(() => {
+                                const itemsList = Array.isArray(scaffoldingData?.items) && scaffoldingData.items.length > 0
+                                  ? scaffoldingData.items
+                                  : [
+                                      { no: 1, bagian: "OPEN FRAME", kondisi_standar: "TIDAK BENGKOK / KEROPOS, PIN PENGUNCI ADA", kondisi: "", komentar: "" },
+                                      { no: 2, bagian: "HORIZONTAL FRAME", kondisi_standar: "TIDAK BENGKOK / KEROPOS", kondisi: "", komentar: "" },
+                                      { no: 3, bagian: "HORIZONTAL PLATE", kondisi_standar: "TERPASANG KUAT SEBAGAI PELATARAN KERJA", kondisi: "", komentar: "" },
+                                      { no: 4, bagian: "CROSS BRACE", kondisi_standar: "TERPASANG KUAT, TIDAK BENGKOK & TERKUNCI", kondisi: "", komentar: "" },
+                                      { no: 5, bagian: "JACK BASE / U-HEAD", kondisi_standar: "TERPASANG KUAT SEBAGAI LEVELING", kondisi: "", komentar: "" },
+                                      { no: 6, bagian: "JOINT PIN", kondisi_standar: "TERPASANG TIDAK KENDOR", kondisi: "", komentar: "" },
+                                      { no: 7, bagian: "STAIR FRAME", kondisi_standar: "TERPASANG KUAT DILENGKAPI HANDRAIL", kondisi: "", komentar: "" },
+                                      { no: 8, bagian: "BASE PLATE", kondisi_standar: "TERPASANG KUAT DENGAN KONDISI RATA", kondisi: "", komentar: "" },
+                                      { no: 9, bagian: "HORIZONTAL PIPE", kondisi_standar: "TERPASANG KUAT DIATAS JACK BASE", kondisi: "", komentar: "" },
+                                      { no: 10, bagian: "ANGLE PIPE SUPPORT", kondisi_standar: "TERPASANG KUAT TIDAK BENGKOK / KEROPOS", kondisi: "", komentar: "" },
+                                      { no: 11, bagian: "HANDRAIL", kondisi_standar: "TERPASANG KUAT DENGAN TINGGI Min. 90 Cm.", kondisi: "", komentar: "" },
+                                      { no: 12, bagian: "KLEM PIPA", kondisi_standar: "TERPASANG KUAT/SAMBUNGAN PIPA Min.3 KLEM", kondisi: "", komentar: "" },
+                                      { no: 13, bagian: "PELATARAN KERJA", kondisi_standar: "TERPASANG KUAT DENGAN LEBAR Min. 40 Cm.", kondisi: "", komentar: "" },
+                                      { no: 14, bagian: "KONDISI TANAH DASAR", kondisi_standar: "KONDISI TANAH RATA TIDAK MUDAH AMBLAS", kondisi: "", komentar: "" },
+                                      { no: 15, bagian: "TOE BOARD", kondisi_standar: "TERPASANG KELILING KETINGGIAN Min. 20 Cm.", kondisi: "", komentar: "" },
+                                      { no: 16, bagian: "WALL TEE", kondisi_standar: "TERPASANG 3 TRAP VERTICAL DAN HORIZONTAL", kondisi: "", komentar: "" },
+                                      { no: 17, bagian: "OPENING", kondisi_standar: "TERPASANG PIPA HORIZONTAL DAN SUDUT/SIKU, SAFETY NET", kondisi: "", komentar: "" },
+                                    ];
+
+                                return itemsList.map((item: any, idx: number) => {
+                                  const isStandar = item.kondisi === "standart";
+                                  const isTidak = item.kondisi === "tidak_standart";
+                                  return (
+                                    <tr key={idx} className="hover:bg-slate-50/60 transition-colors">
+                                      <td className="py-2.5 px-3 text-center text-slate-400 font-mono">{item.no || idx + 1}</td>
+                                      <td className="py-2.5 px-3 font-semibold text-slate-800">{item.bagian}</td>
+                                      <td className="py-2.5 px-3 text-slate-500 text-[11px] leading-relaxed">{item.kondisi_standar}</td>
+                                      <td className="py-2.5 px-3 text-center">
+                                        {isStandar ? (
+                                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-800">
+                                            <Check className="w-3 h-3 text-emerald-600" /> Standar
+                                          </span>
+                                        ) : isTidak ? (
+                                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-red-100 text-red-800">
+                                            <X className="w-3 h-3 text-red-600" /> Tidak Standar
+                                          </span>
+                                        ) : (
+                                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-slate-100 text-slate-400">
+                                            Belum Diperiksa
+                                          </span>
+                                        )}
+                                      </td>
+                                      <td className="py-2.5 px-3 text-slate-600 text-[11px]">
+                                        {item.komentar || <span className="text-slate-300 italic">-</span>}
+                                      </td>
+                                    </tr>
+                                  );
+                                });
+                              })()}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Ketentuan Lainnya */}
+                    {Array.isArray(scaffoldingData?.ketentuan_lainnya) && scaffoldingData.ketentuan_lainnya.length > 0 && (
+                      <div className="space-y-2">
+                        <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                          <HardHat className="w-4 h-4 text-orange-600" />
+                          Ketentuan Keselamatan Lainnya
+                        </h4>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                          {scaffoldingData.ketentuan_lainnya.map((kt: any, idx: number) => (
+                            <div key={idx} className="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-1.5 text-xs">
+                              <div className="flex items-center justify-between">
+                                <span className="font-bold text-slate-700">Butir #{kt.no || idx + 1}</span>
+                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${kt.prosedur === "ya" ? "bg-emerald-100 text-emerald-800" : kt.prosedur === "tidak" ? "bg-red-100 text-red-800" : "bg-slate-200 text-slate-600"}`}>
+                                  {kt.prosedur === "ya" ? "Sesuai Prosedur" : kt.prosedur === "tidak" ? "Tidak Sesuai" : "Belum Diisi"}
+                                </span>
+                              </div>
+                              <p className="text-slate-600 text-[11px]">{kt.ketentuan}</p>
+                              {kt.komentar && (
+                                <p className="text-[10px] text-slate-400 italic pt-1 border-t border-slate-200/60">Catatan: {kt.komentar}</p>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Status Pengajuan */}
+                    <div className="bg-orange-50/60 border border-orange-200/80 rounded-xl p-3.5 flex items-center justify-between flex-wrap gap-2 text-xs">
+                      <div className="flex items-center gap-2">
+                        <ShieldCheck className="w-4 h-4 text-orange-600" />
+                        <span className="text-slate-700 font-medium">
+                          {scaffoldingData?.pengawas_submitted_at
+                            ? `Inspeksi scaffolding telah diselesaikan & diajukan oleh ${scaffoldingData.pengawas_nama || "Pengawas"} pada ${formatDate(scaffoldingData.pengawas_submitted_at)}.`
+                            : "Pengawas belum melakukan submit inspeksi perancah ini."}
+                        </span>
+                      </div>
+                    </div>
                   </div>
                 </div>
               )}

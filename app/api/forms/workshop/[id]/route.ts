@@ -104,14 +104,31 @@ export async function PUT(
     } = body;
 
     // Verify form exists and can be edited
-    const existing = await queryOne(
-      `SELECT id_form, status, user_id FROM form_kerja_workshop WHERE id_form = $1`,
+    const existing = await queryOne<any>(
+      `SELECT id_form, status, user_id, current_stage, admin_k3_approved FROM form_kerja_workshop WHERE id_form = $1`,
       [id]
     );
     if (!existing) {
       return NextResponse.json({ error: 'Form tidak ditemukan' }, { status: 404 });
     }
-    if (!['rejected', 'draft'].includes(existing.status)) {
+    if (existing.status === 'approved') {
+      return NextResponse.json(
+        { error: 'Form yang sudah disetujui penuh tidak dapat diedit' },
+        { status: 403 }
+      );
+    }
+    if (existing.status === 'submitted') {
+      const hasAdminK3Touched = Boolean(
+        existing.admin_k3_approved ||
+        (existing.current_stage != null && existing.current_stage >= 2)
+      );
+      if (hasAdminK3Touched) {
+        return NextResponse.json(
+          { error: 'Form tidak dapat diedit lagi karena tahapan persetujuan telah mencapai Admin K3.' },
+          { status: 403 }
+        );
+      }
+    } else if (!['rejected', 'draft'].includes(existing.status)) {
       return NextResponse.json(
         { error: `Form dengan status "${existing.status}" tidak bisa diedit` },
         { status: 403 }

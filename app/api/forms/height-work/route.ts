@@ -284,13 +284,55 @@ export async function POST(req: NextRequest) {
       ]
     );
 
+    const sc = formData.scaffoldingInspection;
+    let scSubmitted = false;
+
     if (perluScaffolding) {
-      await query(
-        `INSERT INTO inspeksi_scaffolding (id_form, id_ijin_kerja, lokasi, status, current_stage)
-         VALUES ($1, $2, $3, 'draft', 1)
-         ON CONFLICT (id_form) DO NOTHING`,
-        [idForm, idIjinKerja, formData.lokasi || null]
-      );
+      if (sc && Array.isArray(sc.items) && sc.items.length > 0) {
+        scSubmitted = Boolean(sc.is_submitted);
+        const scStatus = scSubmitted ? 'submitted' : 'draft';
+        await query(
+          `INSERT INTO inspeksi_scaffolding (
+             id_form, id_ijin_kerja, nama_inspektor, tanggal_inspeksi, lokasi, tipe_perancah,
+             status, current_stage, items, ketentuan_lainnya, pengawas_id, pengawas_nama,
+             pengawas_submitted_at, updated_at
+           ) VALUES (
+             $1, $2, $3, $4, $5, $6, $7, 1, $8, $9, $10, $11, ${scSubmitted ? 'NOW()' : 'NULL'}, NOW()
+           )
+           ON CONFLICT (id_form) DO UPDATE SET
+             nama_inspektor = EXCLUDED.nama_inspektor,
+             tanggal_inspeksi = EXCLUDED.tanggal_inspeksi,
+             lokasi = EXCLUDED.lokasi,
+             tipe_perancah = EXCLUDED.tipe_perancah,
+             status = EXCLUDED.status,
+             items = EXCLUDED.items,
+             ketentuan_lainnya = EXCLUDED.ketentuan_lainnya,
+             pengawas_id = EXCLUDED.pengawas_id,
+             pengawas_nama = EXCLUDED.pengawas_nama,
+             pengawas_submitted_at = EXCLUDED.pengawas_submitted_at,
+             updated_at = NOW()`,
+          [
+            idForm,
+            idIjinKerja,
+            sc.nama_inspektor || namaFromToken || formData.namaPengawasDepartemen || formData.namaPengawasKontraktor || 'Pengawas',
+            sc.tanggal_inspeksi ? new Date(sc.tanggal_inspeksi).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10),
+            sc.lokasi || formData.lokasi || '-',
+            sc.tipe_perancah || 'Frame Scaffolding',
+            scStatus,
+            JSON.stringify(sc.items || []),
+            JSON.stringify(sc.ketentuan_lainnya || []),
+            userId,
+            namaFromToken || formData.namaPengawasDepartemen || formData.namaPengawasKontraktor || 'Pengawas',
+          ]
+        );
+      } else {
+        await query(
+          `INSERT INTO inspeksi_scaffolding (id_form, id_ijin_kerja, lokasi, status, current_stage)
+           VALUES ($1, $2, $3, 'draft', 1)
+           ON CONFLICT (id_form) DO NOTHING`,
+          [idForm, idIjinKerja, formData.lokasi || null]
+        );
+      }
     }
 
     if (linkedJsaData) {
@@ -369,7 +411,9 @@ export async function POST(req: NextRequest) {
     }
 
     // ── Email: kirim ke approver pertama jika status submitted (fire-and-forget) ──
-    if (status === 'submitted' && userId && !idIjinKerja) {
+    // CATATAN: Jika form memerlukan scaffolding, pengiriman email ke SPV ditahan sampai pengawas menyelesaikan inspeksi scaffolding.
+    const canSendSpvEmail = !perluScaffolding || scSubmitted;
+    if (status === 'submitted' && userId && !idIjinKerja && canSendSpvEmail) {
       notifyFirstApprover({
         formType:       'height-work',
         idForm,

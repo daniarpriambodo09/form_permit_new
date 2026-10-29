@@ -4,7 +4,7 @@
 // yang sama dengan app/form/height-work/page.tsx.
 //
 // Cakupan halaman ini: Bagian 1–11 & Bagian 14 (field yang diisi pemohon
-// saat mengajukan). Bagian 12 (Security → SFO → PGA Manager) adalah rantai
+// saat mengajukan). Bagian 12 (SPV → Admin K3 → SFO → MGR → Security) adalah rantai
 // approval yang diproses di halaman /approval, bukan di sini. Bagian 13, 15,
 // 16 (Job Hand Over & Evaluasi/Pengesahan Akhir pasca-kerja) akan dibuatkan
 // di halaman terpisah setelah form ini disetujui.
@@ -219,13 +219,17 @@ export default function GeneralPermitFormPage() {
   const setGroup = <K extends keyof FormState>(key: K, patch: Partial<FormState[K]>) =>
     setForm((prev) => ({ ...prev, [key]: { ...(prev[key] as any), ...patch } }));
 
-  const buildBody = (isSubmit: boolean) => ({
-    isSubmit,
-    ...form,
-    waktuKerja: normalizeTo24h(form.waktuKerja),
-    izinKerjaDari: normalizeTo24h(form.izinKerjaDari),
-    izinKerjaSampai: normalizeTo24h(form.izinKerjaSampai),
-  });
+  const buildBody = (isSubmit: boolean) => {
+    const combinedPengawasUser = [form.namaPengawasPicSubkont?.trim(), form.pengawasBagian?.trim()].filter(Boolean).join(" - ");
+    return {
+      isSubmit,
+      ...form,
+      pengawasPekerjaanUser: combinedPengawasUser || form.namaPengawasPicSubkont || "",
+      waktuKerja: normalizeTo24h(form.waktuKerja),
+      izinKerjaDari: normalizeTo24h(form.izinKerjaDari),
+      izinKerjaSampai: normalizeTo24h(form.izinKerjaSampai),
+    };
+  };
 
   const handleSaveDraft = async () => {
     setSaving(true);
@@ -304,7 +308,7 @@ export default function GeneralPermitFormPage() {
           </p>
           <div className="text-xs px-3 py-2 rounded-lg mb-4 bg-blue-50 text-blue-700 border border-blue-200">
             <strong>Alur Approval:</strong>
-            <p className="mt-1">SPV → Security → SFO → MGR</p>
+            <p className="mt-1">SPV → Admin K3 → SFO → MGR → Security</p>
           </div>
           {successId && (
             <p className="text-xs text-slate-400 mb-6">
@@ -608,7 +612,7 @@ export default function GeneralPermitFormPage() {
           {/* Info alur approval (Bagian 12 — diproses di halaman approval) */}
           <div className="px-4 py-3 rounded-xl text-xs bg-blue-50 text-blue-700 border border-blue-200">
             <strong>Alur approval (Bagian 12) yang akan diterapkan:</strong>
-            <span className="ml-1">SPV → Security → SFO → MGR</span>
+            <span className="ml-1">SPV → Admin K3 → SFO → MGR → Security</span>
           </div>
 
           {/* BAGIAN 14 */}
@@ -640,12 +644,18 @@ export default function GeneralPermitFormPage() {
                 </div>
                 <input
                   type="text"
-                  value={form.namaPengawasPicSubkont || form.pengawasPekerjaanUser}
+                  value={
+                    form.namaPengawasPicSubkont && form.pengawasBagian
+                      ? `${form.namaPengawasPicSubkont} - ${form.pengawasBagian}`
+                      : form.namaPengawasPicSubkont || form.pengawasBagian || ""
+                  }
                   disabled
                   className={`${inputCls} bg-slate-100 text-slate-600 cursor-not-allowed border-slate-200 select-none shadow-none`}
-                  placeholder="Terisi otomatis dari Nama Pengawas/PIC Subkont di Bagian 1"
+                  placeholder="Terisi otomatis dari (Pengawas/PIC Subkont - Pengawas Bagian PT. JAI)"
                 />
-                <p className="text-xs text-slate-400 mt-1">Kolom ini dinonaktifkan (disable) dan terhubung otomatis dengan Nama Pengawas/PIC Subkont di Bagian 1.</p>
+                <p className="text-xs text-slate-400 mt-1">
+                  Kolom ini dinonaktifkan (disable) dan otomatis terhubung dari <strong>Nama Pengawas / PIC Subkont</strong> (Bagian 1) dan <strong>Pengawas Bagian PT. JAI</strong> (Bagian 5).
+                </p>
               </div>
             </div>
           </section>

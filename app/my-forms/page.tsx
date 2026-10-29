@@ -201,7 +201,7 @@ const renderApprovalStepper = (form: FormItem) => {
         </span>
         <span className="text-[10px] text-slate-400">
           {form.jenis_form === "general-permit"
-            ? "Alur: SPV → SFO → MGR → Security"
+            ? "Alur: SPV → Admin K3 → SFO → MGR → Security"
             : "Alur: SPV → Admin K3 → SFO → SMR"}
         </span>
       </div>

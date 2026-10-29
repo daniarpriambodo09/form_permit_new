@@ -23,7 +23,7 @@ interface ApprovalStatusChainProps {
 // SignatureBox di DetailModal), bukan lagi salah satu "stage" di sini.
 // Internal & eksternal sekarang punya urutan stage yang SAMA:
 // SPV → Admin K3 → SFO → SMR, untuk hot-work, height-work, maupun workshop.
-// Untuk general-permit (ijin kerja eksternal): SPV → SFO → SMR → Security.
+// Untuk general-permit (ijin kerja eksternal): SPV → Admin K3 → SFO → MGR → Security.
 const getStages = (
   formType: string,
   tipePerusahaan?: string
@@ -31,8 +31,9 @@ const getStages = (
   if (formType === "general-permit") {
     return [
       { role: "spv",      label: "SPV",      isApproved: false },
+      { role: "admin_k3", label: "Admin K3", isApproved: false },
       { role: "sfo",      label: "SFO",      isApproved: false },
-      { role: "smr",      label: "SMR",      isApproved: false },
+      { role: "smr",      label: "MGR",      isApproved: false },
       { role: "security", label: "Security", isApproved: false },
     ];
   }

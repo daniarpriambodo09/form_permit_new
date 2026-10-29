@@ -955,7 +955,8 @@ function buildGeneralPermit(doc: Doc, data: any) {
   // 3. APAR, Limbah & Peralatan
   sec(doc, "APAR, Limbah & Peralatan", lx, lw);
   const aparVal = bool(data.apar_dry_powder) ? "Dry Powder" : bool(data.apar_gas_cair) ? "Gas/Cair" : bool(data.apar_tidak_perlu) ? "Tidak Perlu" : data.apar_lainnya || "-";
-  const limbahVal = bool(data.limbah_kontraktor) ? "Dibawa Kontraktor" : bool(data.limbah_pt_jai) ? "Dibuang di PT.JAI" : bool(data.limbah_luar_jai) ? "Dibuang Luar PT.JAI" : "-";
+  const limbahTanggungJawab = bool(data.limbah_kontraktor) ? "Dibawa Kontraktor" : bool(data.limbah_pt_jai) ? "Dibuang di PT.JAI" : bool(data.limbah_luar_jai) ? "Dibuang Luar PT.JAI" : "";
+  const limbahVal = [limbahTanggungJawab, data.limbah_lokasi_pt ? `(Lokasi Area JAI: ${data.limbah_lokasi_pt})` : ""].filter(Boolean).join(" ") || "-";
   
   const alatList = [
     bool(data.alat_mesin_potong) && "Mesin Potong",
