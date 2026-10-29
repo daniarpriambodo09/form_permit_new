@@ -1874,6 +1874,9 @@ function HeightWorkFormPageInner() {
                   <h3 className="text-sm sm:text-base font-extrabold text-slate-900">
                     Form Inspeksi &amp; Kelayakan Scaffolding
                   </h3>
+                  <p className="text-[9px] font-mono font-semibold text-slate-400 tracking-tight mb-0.5">
+                    JAI/F-14/P.SHE-19 Rev. 0
+                  </p>
                   <p className="text-[11px] sm:text-xs text-slate-500">
                     Lengkapi pemeriksaan 17 komponen standar perancah sebelum mengajukan izin kerja ketinggian
                   </p>
