@@ -903,8 +903,12 @@ function HeightWorkFormPageInner() {
             <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
               Izin Kerja Ketinggian (Height Work Permit)
             </h1>
+            <div className="mt-2 space-y-0.5 text-amber-300 text-xs sm:text-sm font-semibold max-w-2xl">
+              <p>Hanya pekerjaan yang tertera dibawah ini yang dicakup oleh Form Izin Bekerja di Ketinggian.</p>
+              <p>Perhatikan ijin kerja dibawah ini sebelum memulai pekerjaan</p>
+            </div>
             <p className="text-slate-300 text-xs sm:text-sm mt-2 max-w-2xl leading-relaxed">
-              Prosedur izin kerja aman wajib untuk seluruh pekerjaan pada elevasi di atas 1,8 meter, penggunaan tangga lipat/ekstensi, perancah (scaffolding), gondola, dan area atap.
+              Prosedur izin kerja aman wajib untuk seluruh pekerjaan pada elevasi di atas 1,8 meter, penggunaan tangga lipat/AWP, Sensor Lift, perancah (scaffolding), gondola, dan area atap.
             </p>
 
             {/* Quick Meta Chips */}
@@ -1349,8 +1353,8 @@ function HeightWorkFormPageInner() {
                         <div
                           key={i}
                           className={`p-3.5 sm:p-4 rounded-xl border transition-all ${namaFilled
-                              ? "bg-white border-slate-200 shadow-xs"
-                              : "bg-slate-50/60 border-slate-200"
+                            ? "bg-white border-slate-200 shadow-xs"
+                            : "bg-slate-50/60 border-slate-200"
                             }`}
                         >
                           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
@@ -1370,8 +1374,8 @@ function HeightWorkFormPageInner() {
                             <div className="flex items-center justify-between sm:justify-end gap-3 pl-8 sm:pl-0 shrink-0">
                               <label
                                 className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border text-xs font-semibold cursor-pointer transition-colors ${berbadanSehat[i]
-                                    ? "bg-emerald-50 border-emerald-300 text-emerald-800"
-                                    : "bg-white border-slate-200 text-slate-500 hover:bg-slate-50"
+                                  ? "bg-emerald-50 border-emerald-300 text-emerald-800"
+                                  : "bg-white border-slate-200 text-slate-500 hover:bg-slate-50"
                                   }`}
                               >
                                 <input
