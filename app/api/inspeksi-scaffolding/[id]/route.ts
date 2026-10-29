@@ -267,10 +267,25 @@ export async function PATCH(
         });
       }
 
-      // Stage 3: Kontraktor
+      // Stage 3: Kontraktor / Pelaksana Internal
       if (stage === 3) {
-        if (userRole !== "kontraktor" && userRole !== "admin") {
-          return NextResponse.json({ error: "Hanya Kontraktor atau Admin yang berhak menyetujui pada Tahap 3 (Final)" }, { status: 403 });
+        const parentKetinggian = await queryOne<{ tipe_perusahaan: string }>(
+          `SELECT tipe_perusahaan FROM form_kerja_ketinggian WHERE id_form = $1`,
+          [id]
+        );
+        const isInternal = parentKetinggian?.tipe_perusahaan === "internal";
+
+        if (isInternal) {
+          if (userRole !== "worker" && userRole !== "spv" && userRole !== "pengawas" && userRole !== "admin") {
+            return NextResponse.json(
+              { error: "Hanya Pelaksana Internal (Worker/SPV/Pengawas) atau Admin yang berhak menyetujui pada Tahap 3 (Final)" },
+              { status: 403 }
+            );
+          }
+        } else {
+          if (userRole !== "kontraktor" && userRole !== "admin") {
+            return NextResponse.json({ error: "Hanya Kontraktor atau Admin yang berhak menyetujui pada Tahap 3 (Final)" }, { status: 403 });
+          }
         }
 
         const updated = await queryOne<any>(
@@ -287,7 +302,9 @@ export async function PATCH(
         );
         return NextResponse.json({
           success: true,
-          message: "Tahap 3 disetujui (Kontraktor). Inspeksi Scaffolding telah disetujui penuh!",
+          message: isInternal
+            ? "Tahap 3 disetujui (Pelaksana Internal). Inspeksi Scaffolding telah disetujui penuh!"
+            : "Tahap 3 disetujui (Kontraktor). Inspeksi Scaffolding telah disetujui penuh!",
           data: updated,
         });
       }

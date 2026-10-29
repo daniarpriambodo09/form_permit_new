@@ -696,7 +696,7 @@ function HeightWorkFormPageInner() {
     lanyardRope,
     helmKondisiBaik,
     perluJsa,
-    perluScaffolding: tipePerusahaan === "eksternal" ? perluScaffolding : false,
+    perluScaffolding,
     jsaFileUrl: jsaFile?.url ?? null,
     ...(jsaMode === "build" && !jsaFile?.url ? { jsaData } : {}),
     idIjinKerja,
@@ -875,7 +875,7 @@ function HeightWorkFormPageInner() {
               <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-blue-500/20 text-blue-200 border border-blue-500/30">
                 Ketinggian (&gt; 1.8 Meter)
               </span>
-              {tipePerusahaan === "eksternal" && perluScaffolding && (
+              {perluScaffolding && (
                 <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-500 text-slate-950">
                   <ShieldCheck className="w-3.5 h-3.5" /> Wajib Inspeksi Scaffolding
                 </span>
@@ -1174,58 +1174,18 @@ function HeightWorkFormPageInner() {
 
               {/* Nama Pengawas Kontraktor (Eksternal) */}
               {tipePerusahaan === "eksternal" && (
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-xs sm:text-sm font-bold text-slate-800 mb-1.5">
-                      Nama Pengawas Kontraktor <span className="text-rose-500">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      value={namaPengawasKontraktor}
-                      onChange={(e) => setNamaPengawasKontraktor(e.target.value)}
-                      placeholder="Nama pengawas dari pihak kontraktor"
-                      required
-                      className={inputCls}
-                    />
-                  </div>
-
-                  {/* Pertanyaan Penggunaan Scaffolding (Khusus Eksternal) */}
-                  <div className="p-4 rounded-xl border border-amber-200 bg-amber-50/70 space-y-2.5">
-                    <div className="flex items-start gap-2.5">
-                      <ShieldCheck className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
-                      <div>
-                        <label className="block text-xs sm:text-sm font-bold text-slate-800">
-                          Apakah pekerjaan ketinggian ini memerlukan scaffolding (perancah)? <span className="text-rose-500">*</span>
-                        </label>
-                        <p className="text-[11px] text-slate-600 mt-0.5">
-                          Jika memilih <strong>Ya</strong>, maka pengawas departemen akan melakukan inspeksi checksheet scaffolding sebelum pekerjaan dapat disetujui.
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-4 pt-1 ml-6.5">
-                      <label className="inline-flex items-center gap-2 cursor-pointer text-xs sm:text-sm font-semibold text-slate-800">
-                        <input
-                          type="radio"
-                          name="perluScaffoldingRadio"
-                          checked={perluScaffolding === true}
-                          onChange={() => setPerluScaffolding(true)}
-                          className="w-4 h-4 text-orange-600 focus:ring-orange-500"
-                        />
-                        <span>Ya, Perlu Scaffolding</span>
-                      </label>
-                      <label className="inline-flex items-center gap-2 cursor-pointer text-xs sm:text-sm font-semibold text-slate-800">
-                        <input
-                          type="radio"
-                          name="perluScaffoldingRadio"
-                          checked={perluScaffolding === false}
-                          onChange={() => setPerluScaffolding(false)}
-                          className="w-4 h-4 text-orange-600 focus:ring-orange-500"
-                        />
-                        <span>Tidak Perlu</span>
-                      </label>
-                    </div>
-                  </div>
+                <div>
+                  <label className="block text-xs sm:text-sm font-bold text-slate-800 mb-1.5">
+                    Nama Pengawas Kontraktor <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={namaPengawasKontraktor}
+                    onChange={(e) => setNamaPengawasKontraktor(e.target.value)}
+                    placeholder="Nama pengawas dari pihak kontraktor"
+                    required
+                    className={inputCls}
+                  />
                 </div>
               )}
 
@@ -1275,6 +1235,44 @@ function HeightWorkFormPageInner() {
                   </div>
                 </div>
               )}
+
+              {/* Pertanyaan Penggunaan Scaffolding (Internal & Eksternal) */}
+              <div className="p-4 rounded-xl border border-amber-200 bg-amber-50/70 space-y-2.5">
+                <div className="flex items-start gap-2.5">
+                  <ShieldCheck className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
+                  <div>
+                    <label className="block text-xs sm:text-sm font-bold text-slate-800">
+                      Apakah pekerjaan ketinggian ini memerlukan scaffolding (perancah)? <span className="text-rose-500">*</span>
+                    </label>
+                    <p className="text-[11px] text-slate-600 mt-0.5">
+                      Jika memilih <strong>Ya</strong>, maka pengawas departemen akan melakukan inspeksi checksheet scaffolding sebelum pekerjaan dapat disetujui.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-4 pt-1 ml-6.5">
+                  <label className="inline-flex items-center gap-2 cursor-pointer text-xs sm:text-sm font-semibold text-slate-800">
+                    <input
+                      type="radio"
+                      name="perluScaffoldingRadio"
+                      checked={perluScaffolding === true}
+                      onChange={() => setPerluScaffolding(true)}
+                      className="w-4 h-4 text-orange-600 focus:ring-orange-500"
+                    />
+                    <span>Ya, Perlu Scaffolding</span>
+                  </label>
+                  <label className="inline-flex items-center gap-2 cursor-pointer text-xs sm:text-sm font-semibold text-slate-800">
+                    <input
+                      type="radio"
+                      name="perluScaffoldingRadio"
+                      checked={perluScaffolding === false}
+                      onChange={() => setPerluScaffolding(false)}
+                      className="w-4 h-4 text-orange-600 focus:ring-orange-500"
+                    />
+                    <span>Tidak Perlu</span>
+                  </label>
+                </div>
+              </div>
             </div>
           </Section>
 

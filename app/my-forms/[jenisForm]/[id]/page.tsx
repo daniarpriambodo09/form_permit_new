@@ -1241,18 +1241,6 @@ export default function FormDetailPage({ params }: PageProps) {
                           <Field label="Perusahaan Kontraktor" value={p.nama_kontraktor || p.kontraktor || "-"} />
                           <Field label="Pengawas Kontraktor" value={p.nama_pengawas_kontraktor || "-"} />
                           <Field label="NIK Kontraktor" value={p.kontraktor_nik || "-"} mono />
-                          <Field
-                            label="Kebutuhan Scaffolding"
-                            value={
-                              p.perlu_scaffolding ? (
-                                <span className="inline-flex items-center gap-1 font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200 text-xs">
-                                  Ya (Perlu Inspeksi Scaffolding)
-                                </span>
-                              ) : (
-                                "Tidak Perlu"
-                              )
-                            }
-                          />
                         </>
                       ) : (
                         <>
@@ -1260,6 +1248,18 @@ export default function FormDetailPage({ params }: PageProps) {
                           <Field label="Pengawas Departemen" value={p.nama_pengawas_departemen || "-"} />
                         </>
                       )}
+                      <Field
+                        label="Kebutuhan Scaffolding"
+                        value={
+                          p.perlu_scaffolding ? (
+                            <span className="inline-flex items-center gap-1 font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200 text-xs">
+                              Ya (Perlu Inspeksi Scaffolding)
+                            </span>
+                          ) : (
+                            "Tidak Perlu"
+                          )
+                        }
+                      />
                       <Field label="SPV Terkait" value={p.spv_terkait || p.spv_approved_by || "-"} />
                       <Field label="NIK SPV" value={p.spv_nik || "-"} mono />
                       {p.id_ijin_kerja && <Field label="Izin Induk (Parent)" value={p.id_ijin_kerja} mono />}

@@ -83,6 +83,9 @@ interface HeightWorkItem {
   tanggal_pelaksanaan: string;
   lokasi: string;
   deskripsi_pekerjaan: string;
+  tipe_perusahaan?: string;
+  nama_departemen?: string;
+  nama_pengawas_departemen?: string;
   nama_pengawas_kontraktor: string;
   nama_kontraktor: string;
   spv_terkait: string;
@@ -442,7 +445,7 @@ export default function InspeksiScaffoldingPage() {
                     Inspeksi & Sertifikasi Scaffolding
                   </h1>
                   <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-md bg-orange-50 text-orange-700 border border-orange-200 whitespace-nowrap">
-                    Form Ketinggian Eksternal
+                    Internal &amp; Eksternal
                   </span>
                 </div>
                 <p className="text-xs text-slate-500 hidden sm:block truncate mt-0.5">
@@ -723,12 +726,18 @@ export default function InspeksiScaffoldingPage() {
                           <div className="flex items-center gap-1.5 min-w-0">
                             <Building2 className="w-3.5 h-3.5 text-orange-600 shrink-0" />
                             <span className="text-xs font-semibold text-slate-800 truncate">
-                              {f.nama_kontraktor || f.nama_pengawas_kontraktor || "Subkontraktor"}
+                              {f.tipe_perusahaan === "internal"
+                                ? `Internal: ${f.nama_departemen || f.nama_pengawas_departemen || "Dept"}`
+                                : f.nama_kontraktor || f.nama_pengawas_kontraktor || "Subkontraktor"}
                             </span>
                           </div>
-                          {f.id_ijin_kerja && (
+                          {f.id_ijin_kerja ? (
                             <span className="text-[10px] font-mono font-medium px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 border border-slate-200/80 whitespace-nowrap shrink-0">
                               {f.id_ijin_kerja}
+                            </span>
+                          ) : (
+                            <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200/80 whitespace-nowrap shrink-0">
+                              Internal
                             </span>
                           )}
                         </div>
@@ -796,16 +805,35 @@ export default function InspeksiScaffoldingPage() {
                           {selectedForm.id_form}
                         </span>
                         <span className="text-xs text-slate-300 whitespace-nowrap">
-                          Izin Induk:{" "}
-                          <strong className="font-mono text-white">{selectedForm.id_ijin_kerja || "Eksternal"}</strong>
+                          {selectedForm.tipe_perusahaan === "internal" ? (
+                            <>
+                              Tipe: <strong className="text-emerald-300 font-semibold">Internal ({selectedForm.nama_departemen || "-"})</strong>
+                            </>
+                          ) : (
+                            <>
+                              Izin Induk:{" "}
+                              <strong className="font-mono text-white">{selectedForm.id_ijin_kerja || "Eksternal"}</strong>
+                            </>
+                          )}
                         </span>
-                        {selectedForm.nama_kontraktor && (
-                          <span className="hidden sm:inline-flex items-center gap-1.5 text-xs text-slate-300 whitespace-nowrap">
-                            <span className="text-slate-500">•</span>
-                            <span>
-                              Pelaksana: <strong className="text-white">{selectedForm.nama_kontraktor}</strong>
+                        {selectedForm.tipe_perusahaan === "internal" ? (
+                          selectedForm.nama_pengawas_departemen && (
+                            <span className="hidden sm:inline-flex items-center gap-1.5 text-xs text-slate-300 whitespace-nowrap">
+                              <span className="text-slate-500">•</span>
+                              <span>
+                                Pengawas: <strong className="text-white">{selectedForm.nama_pengawas_departemen}</strong>
+                              </span>
                             </span>
-                          </span>
+                          )
+                        ) : (
+                          selectedForm.nama_kontraktor && (
+                            <span className="hidden sm:inline-flex items-center gap-1.5 text-xs text-slate-300 whitespace-nowrap">
+                              <span className="text-slate-500">•</span>
+                              <span>
+                                Pelaksana: <strong className="text-white">{selectedForm.nama_kontraktor}</strong>
+                              </span>
+                            </span>
+                          )
                         )}
                       </div>
 
@@ -1144,9 +1172,13 @@ export default function InspeksiScaffoldingPage() {
                                   {isDone ? "Disetujui" : isWaiting ? "Menunggu" : "Pending"}
                                 </span>
                               </div>
-                              <p className="font-bold text-xs text-slate-900 truncate">Kontraktor Pelaksana</p>
+                              <p className="font-bold text-xs text-slate-900 truncate">
+                                {selectedForm.tipe_perusahaan === "internal" ? "Pelaksana Internal" : "Kontraktor Pelaksana"}
+                              </p>
                               <p className="text-[11px] text-slate-500 truncate mt-0.5">
-                                {selectedForm.kontraktor_approved_by || selectedForm.nama_kontraktor || "Vendor"}
+                                {selectedForm.tipe_perusahaan === "internal"
+                                  ? selectedForm.kontraktor_approved_by || selectedForm.nama_pengawas_departemen || selectedForm.nama_departemen || "Internal"
+                                  : selectedForm.kontraktor_approved_by || selectedForm.nama_kontraktor || "Vendor"}
                               </p>
                             </div>
                           );
