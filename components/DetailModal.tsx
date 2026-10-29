@@ -239,6 +239,11 @@ function GeneralPermitApprovalGrid({ p }: { p: any }) {
         approvedNik={p.spv_nik} approvedAt={p.spv_approved_at}
       />
       <ApprovalQRCard {...common}
+        label="Admin K3" role="admin_k3"
+        approved={p.admin_k3_approved} approvedBy={p.admin_k3_approved_by}
+        approvedNik={p.admin_k3_nik} approvedAt={p.admin_k3_approved_at}
+      />
+      <ApprovalQRCard {...common}
         label="SFO" role="sfo"
         approved={p.sfo_approved} approvedBy={p.sfo_approved_by}
         approvedNik={p.sfo_nik} approvedAt={p.sfo_approved_at}

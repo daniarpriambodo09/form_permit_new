@@ -212,11 +212,10 @@ const BoolBadges = ({ items }: { items: { label: string; active: boolean }[] }) 
     {items.map((item, idx) => (
       <span
         key={idx}
-        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[11px] font-semibold border transition-all ${
-          item.active
-            ? "bg-emerald-50 text-emerald-800 border-emerald-300 shadow-2xs"
-            : "bg-slate-50/80 text-slate-400 border-slate-200 line-through opacity-60"
-        }`}
+        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[11px] font-semibold border transition-all ${item.active
+          ? "bg-emerald-50 text-emerald-800 border-emerald-300 shadow-2xs"
+          : "bg-slate-50/80 text-slate-400 border-slate-200 line-through opacity-60"
+          }`}
       >
         {item.active ? <Check className="w-2.5 h-2.5 text-emerald-600 stroke-[2.5]" /> : <X className="w-2.5 h-2.5 text-slate-400" />}
         <span>{item.label}</span>
@@ -299,7 +298,7 @@ export default function FormDetailPage({ params }: PageProps) {
             ? JSON.parse(rawPenilaian)
             : rawPenilaian;
           setPenilaianData(parsed);
-        } catch {}
+        } catch { }
       }
 
       // Jika general-permit, muat linked job forms
@@ -310,7 +309,7 @@ export default function FormDetailPage({ params }: PageProps) {
             const jfJson = await jfRes.json();
             setLinkedJobForms(jfJson.data ?? null);
           }
-        } catch {}
+        } catch { }
       }
     } catch (err: any) {
       setError(err.message || "Gagal memuat detail form");
@@ -335,7 +334,7 @@ export default function FormDetailPage({ params }: PageProps) {
         if (Array.isArray(parsed)) {
           return parsed.filter((x: any) => x && typeof x.url === "string");
         }
-      } catch {}
+      } catch { }
     }
     if (data.license_sertifikasi) {
       return [{ name: "Berkas Lisensi / Sertifikasi K3", url: data.license_sertifikasi }];
@@ -351,7 +350,7 @@ export default function FormDetailPage({ params }: PageProps) {
         const parsed = JSON.parse(data.alat_lainnya);
         if (Array.isArray(parsed)) return parsed;
       }
-    } catch {}
+    } catch { }
     return [];
   }, [data]);
 
@@ -495,10 +494,10 @@ export default function FormDetailPage({ params }: PageProps) {
     }
     setActualDateModal((prev) => ({ ...prev, submitting: true }));
     try {
-      const res = await fetch(`/api/forms/general-permit/${formId}/actual-date`, {
+      const res = await fetch(`/api/forms/general-permit/${formId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ actual_tanggal_kerja: actualDateModal.dateValue }),
+        body: JSON.stringify({ actual_tanggal_kerja: actualDateModal.dateValue || null }),
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
@@ -567,17 +566,18 @@ export default function FormDetailPage({ params }: PageProps) {
   // Stages approval
   const stages = formType === "general-permit"
     ? [
-        { key: "spv_approved", label: "SPV", by: p.spv_approved_by, at: p.spv_approved_at },
-        { key: "sfo_approved", label: "SFO", by: p.sfo_approved_by, at: p.sfo_approved_at },
-        { key: "pga_approved", label: "MGR / PGA", by: p.pga_approved_by, at: p.pga_approved_at },
-        { key: "security_approved", label: "Security", by: p.security_approved_by, at: p.security_approved_at },
-      ]
+      { key: "spv_approved", label: "SPV", by: p.spv_approved_by, at: p.spv_approved_at },
+      { key: "admin_k3_approved", label: "Admin K3", by: p.admin_k3_approved_by, at: p.admin_k3_approved_at },
+      { key: "sfo_approved", label: "SFO", by: p.sfo_approved_by, at: p.sfo_approved_at },
+      { key: "pga_approved", label: "MGR / PGA", by: p.pga_approved_by, at: p.pga_approved_at },
+      { key: "security_approved", label: "Security", by: p.security_approved_by, at: p.security_approved_at },
+    ]
     : [
-        { key: "spv_approved", label: "SPV", by: p.spv_approved_by, at: p.spv_approved_at },
-        { key: "admin_k3_approved", label: "Admin K3", by: p.admin_k3_approved_by, at: p.admin_k3_approved_at },
-        { key: "sfo_approved", label: "SFO", by: p.sfo_approved_by, at: p.sfo_approved_at },
-        { key: "mr_pga_approved", label: "SMR / PGA", by: p.mr_pga_approved_by, at: p.mr_pga_approved_at },
-      ];
+      { key: "spv_approved", label: "SPV", by: p.spv_approved_by, at: p.spv_approved_at },
+      { key: "admin_k3_approved", label: "Admin K3", by: p.admin_k3_approved_by, at: p.admin_k3_approved_at },
+      { key: "sfo_approved", label: "SFO", by: p.sfo_approved_by, at: p.sfo_approved_at },
+      { key: "mr_pga_approved", label: "SMR / PGA", by: p.mr_pga_approved_by, at: p.mr_pga_approved_at },
+    ];
 
 
 
@@ -589,7 +589,7 @@ export default function FormDetailPage({ params }: PageProps) {
         {/* ── Sticky Top Bar ── */}
         <header className="sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-slate-200/80 shadow-2xs">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
-            
+
             {/* Left: Back button & Title */}
             <div className="flex items-center gap-3 min-w-0">
               <Link
@@ -735,15 +735,14 @@ export default function FormDetailPage({ params }: PageProps) {
                 </span>
               </div>
 
-              <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 gap-2.5">
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5">
                 {/* Kontraktor TTD (jika form eksternal) */}
                 {isEksternal && (
                   <div
-                    className={`p-2.5 sm:p-3 rounded-xl border transition-all ${
-                      p.kontraktor_approved || p.kontraktor_signature_url
-                        ? "bg-emerald-50/70 border-emerald-300 text-emerald-900"
-                        : "bg-amber-50/70 border-amber-300 text-amber-900"
-                    }`}
+                    className={`p-2.5 sm:p-3 rounded-xl border transition-all ${p.kontraktor_approved || p.kontraktor_signature_url
+                      ? "bg-emerald-50/70 border-emerald-300 text-emerald-900"
+                      : "bg-amber-50/70 border-amber-300 text-amber-900"
+                      }`}
                   >
                     <div className="flex items-center justify-between mb-1">
                       <span className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Pemohon</span>
@@ -766,11 +765,10 @@ export default function FormDetailPage({ params }: PageProps) {
                   return (
                     <div
                       key={stage.key}
-                      className={`p-2.5 sm:p-3 rounded-xl border transition-all ${
-                        isApproved
-                          ? "bg-emerald-50/70 border-emerald-300 text-emerald-900"
-                          : "bg-slate-50 border-slate-200 text-slate-600"
-                      }`}
+                      className={`p-2.5 sm:p-3 rounded-xl border transition-all ${isApproved
+                        ? "bg-emerald-50/70 border-emerald-300 text-emerald-900"
+                        : "bg-slate-50 border-slate-200 text-slate-600"
+                        }`}
                     >
                       <div className="flex items-center justify-between mb-1">
                         <span className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Approver</span>
@@ -805,7 +803,7 @@ export default function FormDetailPage({ params }: PageProps) {
                       {p.actual_tanggal_kerja ? (
                         formatDate(p.actual_tanggal_kerja)
                       ) : (
-                        <span className="text-slate-400 font-normal italic">Belum diisi (diinput saat pekerjaan dimulai)</span>
+                        <span className="text-slate-400 font-normal italic">*diisi jika tidak sesuai dengan tanggal pengajuan</span>
                       )}
                     </p>
                   </div>
@@ -843,11 +841,10 @@ export default function FormDetailPage({ params }: PageProps) {
                   key={tab.id}
                   type="button"
                   onClick={() => setActiveTab(tab.id as any)}
-                  className={`flex-1 py-2 px-3 sm:px-4 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
-                    isSelected
-                      ? "bg-slate-900 text-white shadow-sm"
-                      : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
-                  }`}
+                  className={`flex-1 py-2 px-3 sm:px-4 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${isSelected
+                    ? "bg-slate-900 text-white shadow-sm"
+                    : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
+                    }`}
                 >
                   <TabIcon className="w-3.5 h-3.5" />
                   <span className="hidden sm:inline">{tab.label}</span>
@@ -1600,11 +1597,10 @@ export default function FormDetailPage({ params }: PageProps) {
                           ].map((item) => (
                             <div
                               key={item.l}
-                              className={`p-3 rounded-xl border transition-all flex flex-col justify-between ${
-                                item.d || item.m
-                                  ? "bg-white border-slate-300 shadow-2xs"
-                                  : "bg-slate-50/50 border-slate-200/60 opacity-60"
-                              }`}
+                              className={`p-3 rounded-xl border transition-all flex flex-col justify-between ${item.d || item.m
+                                ? "bg-white border-slate-300 shadow-2xs"
+                                : "bg-slate-50/50 border-slate-200/60 opacity-60"
+                                }`}
                             >
                               <div>
                                 <div className="flex items-center justify-between mb-1">
@@ -1887,7 +1883,7 @@ export default function FormDetailPage({ params }: PageProps) {
           ══════════════════════════════════════════════════════════ */}
           {activeTab === "lampiran" && (
             <div className="flex flex-col lg:flex-row items-start gap-5 animate-in fade-in duration-200 w-full max-w-full min-w-0">
-              
+
               {/* ── Sisi Kiri: Menu Jenis Lampiran (Side Nav Compact) ── */}
               <div className="w-full lg:w-72 xl:w-80 shrink-0 space-y-3">
                 <div className="bg-white rounded-2xl border border-slate-200/90 shadow-2xs overflow-hidden">
@@ -1910,17 +1906,15 @@ export default function FormDetailPage({ params }: PageProps) {
                           key={item.id}
                           type="button"
                           onClick={() => setActiveLampiran(item.id)}
-                          className={`w-full text-left p-3.5 transition-all flex items-start gap-3 border-l-4 cursor-pointer ${
-                            isSelected
-                              ? "bg-orange-50/80 border-orange-500 text-slate-900 shadow-2xs"
-                              : "border-transparent hover:bg-slate-50 text-slate-700"
-                          }`}
+                          className={`w-full text-left p-3.5 transition-all flex items-start gap-3 border-l-4 cursor-pointer ${isSelected
+                            ? "bg-orange-50/80 border-orange-500 text-slate-900 shadow-2xs"
+                            : "border-transparent hover:bg-slate-50 text-slate-700"
+                            }`}
                         >
-                          <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 mt-0.5 ${
-                            isSelected
-                              ? "bg-orange-600 text-white shadow-xs"
-                              : "bg-slate-100 text-slate-500"
-                          }`}>
+                          <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 mt-0.5 ${isSelected
+                            ? "bg-orange-600 text-white shadow-xs"
+                            : "bg-slate-100 text-slate-500"
+                            }`}>
                             <Icon className="w-4 h-4" />
                           </div>
                           <div className="flex-1 min-w-0">
@@ -1938,9 +1932,8 @@ export default function FormDetailPage({ params }: PageProps) {
                               {item.subtitle}
                             </p>
                           </div>
-                          <ChevronRight className={`w-3.5 h-3.5 shrink-0 mt-2 transition-transform ${
-                            isSelected ? "text-orange-600 translate-x-0.5" : "text-slate-300"
-                          }`} />
+                          <ChevronRight className={`w-3.5 h-3.5 shrink-0 mt-2 transition-transform ${isSelected ? "text-orange-600 translate-x-0.5" : "text-slate-300"
+                            }`} />
                         </button>
                       );
                     })}
@@ -1954,7 +1947,7 @@ export default function FormDetailPage({ params }: PageProps) {
 
               {/* ── Sisi Kanan: Tampilan Hasil Lampiran (Jauh Lebih Lebar) ── */}
               <div className="flex-1 w-full min-w-0 max-w-full space-y-4">
-                
+
                 {/* 1. LINKED JOB PERMITS */}
                 {activeLampiran === "linked-permits" && formType === "general-permit" && (
                   <div className="bg-white rounded-2xl border border-slate-200/90 shadow-2xs overflow-hidden">
@@ -2080,11 +2073,10 @@ export default function FormDetailPage({ params }: PageProps) {
                           <p className="text-[11px] text-slate-500">Hasil pengarahan tata tertib K3 dan verifikasi kartu identitas pekerja</p>
                         </div>
                       </div>
-                      <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full ${
-                        p.security_approved || p.safety_induction?.status === "submitted" || p.safety_induction?.status === "verified"
-                          ? "bg-emerald-100 text-emerald-800 border border-emerald-200"
-                          : "bg-amber-100 text-amber-800 border border-amber-200"
-                      }`}>
+                      <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full ${p.security_approved || p.safety_induction?.status === "submitted" || p.safety_induction?.status === "verified"
+                        ? "bg-emerald-100 text-emerald-800 border border-emerald-200"
+                        : "bg-amber-100 text-amber-800 border border-amber-200"
+                        }`}>
                         {p.security_approved || p.safety_induction?.status === "submitted" || p.safety_induction?.status === "verified"
                           ? "✓ Terverifikasi Security"
                           : "Menunggu Pemeriksaan"}
@@ -2372,7 +2364,7 @@ export default function FormDetailPage({ params }: PageProps) {
           ══════════════════════════════════════════════════════════ */}
           {activeTab === "persetujuan" && (
             <div className="space-y-6 animate-in fade-in duration-200">
-              
+
               {/* Tanda Tangan Pad Kontraktor jika belum bertanda tangan */}
               {isEksternal && !p.kontraktor_signature_url && (
                 <div className="bg-white rounded-2xl border-2 border-orange-200 bg-orange-50/30 p-5 space-y-3 shadow-xs">
@@ -2442,19 +2434,17 @@ export default function FormDetailPage({ params }: PageProps) {
                     approvedAt={p.spv_approved_at}
                   />
 
-                  {/* Admin K3 (untuk Job Forms) */}
-                  {formType !== "general-permit" && (
-                    <ApprovalQRCard
-                      formId={p.id_form}
-                      formType={formType}
-                      label="Admin K3"
-                      role="admin_k3"
-                      approved={Boolean(p.admin_k3_approved)}
-                      approvedBy={p.admin_k3_approved_by}
-                      approvedNik={p.admin_k3_nik}
-                      approvedAt={p.admin_k3_approved_at}
-                    />
-                  )}
+                  {/* Admin K3 */}
+                  <ApprovalQRCard
+                    formId={p.id_form}
+                    formType={formType}
+                    label="Admin K3"
+                    role="admin_k3"
+                    approved={Boolean(p.admin_k3_approved)}
+                    approvedBy={p.admin_k3_approved_by}
+                    approvedNik={p.admin_k3_nik}
+                    approvedAt={p.admin_k3_approved_at}
+                  />
 
                   {/* SFO */}
                   <ApprovalQRCard

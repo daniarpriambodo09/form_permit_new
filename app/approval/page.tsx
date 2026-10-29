@@ -215,7 +215,7 @@ function getStageLabelForForm(form: FormItem): string {
 
   if (form.jenis_form === "general-permit") {
     const map: Record<number, string> = {
-      1: "SPV", 2: "SFO", 3: "MGR", 4: "Security",
+      1: "SPV", 2: "Admin K3", 3: "SFO", 4: "MGR", 5: "Security",
     };
     return map[stage] ?? `Tahap ${stage}`;
   }
