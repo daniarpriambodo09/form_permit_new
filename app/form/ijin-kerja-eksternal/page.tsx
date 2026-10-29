@@ -26,6 +26,7 @@ import {
   Plus,
   Trash2,
   Home,
+  Building2,
 } from "lucide-react";
 import TimeInput24, { normalizeTo24h } from "@/components/Time24Input";
 import JsaMethodSection, { type JsaMode } from "@/components/JsaMethodSection";
@@ -219,7 +220,7 @@ function SectionCard({
   children,
   id,
 }: {
-  nomor: number;
+  nomor: number | string;
   title: string;
   description?: string;
   badge?: string;
@@ -227,17 +228,20 @@ function SectionCard({
   id?: string;
 }) {
   return (
-    <section id={id} className="bg-white rounded-2xl border border-slate-200/90 shadow-xs hover:shadow-sm transition-shadow overflow-hidden mb-6">
+    <section
+      id={id}
+      className="bg-white rounded-2xl border border-slate-200/90 shadow-xs hover:shadow-sm transition-shadow overflow-hidden mb-6 scroll-mt-20"
+    >
       <div className="bg-slate-50/80 border-b border-slate-200 px-5 sm:px-7 py-4 flex items-center justify-between">
         <div className="flex items-center gap-3.5">
-          <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-orange-600 text-white flex items-center justify-center font-bold text-xs sm:text-sm shadow-md shadow-orange-600/20 shrink-0">
+          <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-bold text-xs sm:text-sm shadow-md shadow-indigo-600/20 shrink-0">
             {nomor}
           </div>
           <div>
             <div className="flex items-center gap-2">
               <h2 className="font-bold text-slate-900 text-sm sm:text-base tracking-tight">{title}</h2>
               {badge && (
-                <span className="hidden sm:inline-block text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-orange-100 text-orange-700">
+                <span className="hidden sm:inline-block text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700">
                   {badge}
                 </span>
               )}
@@ -396,6 +400,7 @@ function IjinKerjaEksternalPageInner() {
   const [pengawasOtherManual, setPengawasOtherManual] = useState("");
 
   // ── SPV Terkait (Pemberi Izin) ──────────────────────────────────────
+  const [currentUser, setCurrentUser] = useState<any>(null);
   const [userDepartment, setUserDepartment] = useState<string>("");
   const [spvOptions, setSpvOptions] = useState<
     Array<{ id: number; nama: string; nik: string | null; jabatan: string | null; departmen: string | null; username?: string }>
@@ -410,6 +415,7 @@ function IjinKerjaEksternalPageInner() {
     fetch("/api/auth/me", { credentials: "include" })
       .then((res) => (res.ok ? res.json() : null))
       .then(async (data) => {
+        setCurrentUser(data?.user ?? null);
         const departmen = data?.user?.departmen ?? "";
         setUserDepartment(departmen);
         setJsa((prev) => ({ ...prev, sectDept: departmen }));
@@ -423,12 +429,12 @@ function IjinKerjaEksternalPageInner() {
           // Opsi SPV difilter berdasarkan departemen yang mengajukan / usernya
           let filteredSpvs = allSpvs;
           if (departmen && departmen !== "Unknown") {
-            filteredSpvs = allSpvs.filter(
-              (u: any) => u.departmen?.toLowerCase() === departmen.toLowerCase()
+            const matched = allSpvs.filter(
+              (u: any) => u.departmen?.trim().toLowerCase() === departmen.trim().toLowerCase()
             );
-          }
-          if (filteredSpvs.length === 0) {
-            filteredSpvs = allSpvs;
+            if (matched.length > 0) {
+              filteredSpvs = matched;
+            }
           }
 
           setSpvOptions(filteredSpvs);
@@ -459,7 +465,7 @@ function IjinKerjaEksternalPageInner() {
           if (!spvData) return;
           const allSpvs = (spvData.users ?? []).filter((u: any) => u.role === "spv");
           const deptSpvs = allSpvs.filter(
-            (u: any) => u.departmen?.toLowerCase() === form.departemenPengawas.toLowerCase()
+            (u: any) => u.departmen?.trim().toLowerCase() === form.departemenPengawas.trim().toLowerCase()
           );
           if (deptSpvs.length > 0) {
             setSpvOptions(deptSpvs);
@@ -826,6 +832,101 @@ function IjinKerjaEksternalPageInner() {
 
       {/* ── MAIN CONTENT ── */}
       <main className="max-w-4xl mx-auto px-4 sm:px-6 pt-6 sm:pt-8">
+        {/* ── HERO BANNER ── */}
+        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-slate-950 via-indigo-950 to-purple-950 text-white p-6 sm:p-8 mb-8 border border-indigo-500/30 shadow-xl">
+          {/* Ambient Glows */}
+          <div className="pointer-events-none absolute -right-20 -top-20 w-80 h-80 bg-indigo-500/20 rounded-full blur-3xl" />
+          <div className="pointer-events-none absolute right-1/3 -bottom-20 w-60 h-60 bg-purple-600/20 rounded-full blur-3xl" />
+
+          <div className="relative z-10">
+            {/* Badges Row */}
+            <div className="flex flex-wrap items-center gap-2 mb-4">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-indigo-500 text-white shadow-sm">
+                <Building2 className="w-3.5 h-3.5" /> General Work Permit
+              </span>
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-white/10 text-indigo-200 border border-white/10 backdrop-blur-xs">
+                <Shield className="w-3.5 h-3.5 text-indigo-400" /> Dokumen: JAI/F-01/P.SHE-19
+              </span>
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-purple-500/20 text-purple-200 border border-purple-500/30">
+                Izin Induk Subkontraktor
+              </span>
+            </div>
+
+            {/* Title & Description */}
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
+              Izin Kerja Subkontraktor Eksternal
+            </h1>
+            <p className="text-slate-300 text-xs sm:text-sm mt-2 max-w-2xl leading-relaxed">
+              Formulir izin induk keselamatan kerja untuk seluruh rekanan kontraktor, vendor, teknisi eksternal, dan instalatur yang bekerja di lingkungan PT JAI.
+            </p>
+
+            {/* Quick Meta Chips */}
+            <div className="mt-5 pt-4 border-t border-white/10 grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+              <div className="bg-white/5 rounded-xl p-2.5 border border-white/5 backdrop-blur-xs">
+                <span className="text-slate-400 block text-[10px] uppercase font-bold tracking-wider">Pemohon / User</span>
+                <span className="font-bold text-white truncate block mt-0.5">
+                  {currentUser?.nama || "Daniar Priambodo"}
+                </span>
+                <span className="text-[11px] text-indigo-300 truncate block">Dept: {userDepartment || "PGA"}</span>
+              </div>
+
+              <div className="bg-white/5 rounded-xl p-2.5 border border-white/5 backdrop-blur-xs">
+                <span className="text-slate-400 block text-[10px] uppercase font-bold tracking-wider">Target Alur</span>
+                <span className="font-bold text-white block mt-0.5 text-[11px] truncate">
+                  SPV → Sec → SFO → MGR
+                </span>
+                <span className="text-[11px] text-emerald-400">4 Tahap Digital</span>
+              </div>
+
+              <div className="bg-white/5 rounded-xl p-2.5 border border-white/5 backdrop-blur-xs">
+                <span className="text-slate-400 block text-[10px] uppercase font-bold tracking-wider">Estimasi Waktu</span>
+                <span className="font-bold text-white block mt-0.5">±5 - 10 Menit</span>
+                <span className="text-[11px] text-indigo-300">Form Izin Induk</span>
+              </div>
+
+              <div className="bg-white/5 rounded-xl p-2.5 border border-white/5 backdrop-blur-xs">
+                <span className="text-slate-400 block text-[10px] uppercase font-bold tracking-wider">Tenaga Kerja</span>
+                <span className="font-bold text-white block mt-0.5 truncate">
+                  {form.jumlahTenagaKerja ? `${form.jumlahTenagaKerja} Orang` : "Belum ditentukan"}
+                </span>
+                <span className="text-[11px] text-amber-300 truncate block">
+                  {form.namaKontraktorPekerja || "Isi kontraktor"}
+                </span>
+              </div>
+            </div>
+
+            {/* Quick Section Jump Bar */}
+            <div className="mt-5 pt-4 border-t border-white/10 flex items-center gap-2 overflow-x-auto pb-1 text-xs">
+              <span className="text-[11px] font-bold text-indigo-300 uppercase tracking-wider shrink-0 mr-1">
+                Lompat Ke:
+              </span>
+              {[
+                { id: "bagian-1", num: "01", label: "Info Kontraktor" },
+                { id: "bagian-2", num: "02", label: "Lokasi & Pekerjaan" },
+                { id: "bagian-4", num: "04", label: "Identifikasi Bahaya" },
+                { id: "bagian-5", num: "05", label: "Daftar APD" },
+                { id: "bagian-9", num: "09", label: "Upload Lisensi K3" },
+                { id: "bagian-jsa", num: "10", label: "Dokumen JSA" },
+                { id: "bagian-11", num: "11", label: "Supervisor PJ" },
+                { id: "bagian-15", num: "15", label: "Komitmen & TTD" },
+              ].map((tab) => (
+                <button
+                  type="button"
+                  key={tab.id}
+                  onClick={() => {
+                    const el = document.getElementById(tab.id);
+                    if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+                  }}
+                  className="shrink-0 px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-slate-200 hover:text-white border border-white/10 transition-colors font-medium cursor-pointer"
+                >
+                  <span className="text-indigo-400 font-bold mr-1.5">{tab.num}</span>
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
         <form onSubmit={handleSubmit} className="space-y-6">
           {createdFormId && (
             <div className="bg-amber-50 border border-amber-300 rounded-2xl p-4 flex items-center justify-between gap-3 text-amber-900 text-xs sm:text-sm">
@@ -1365,7 +1466,7 @@ function IjinKerjaEksternalPageInner() {
                         {form.departemenPengawas ? "-- Pilih Pengawas --" : "Pilih departemen terlebih dahulu"}
                       </option>
                       {pengawasOptions
-                        .filter((item) => item.departemen === form.departemenPengawas)
+                        .filter((item) => item.departemen?.trim().toLowerCase() === form.departemenPengawas.trim().toLowerCase())
                         .map((item) => (
                           <option key={item.id} value={item.nama}>
                             {item.nama} / {item.nik}

@@ -11,7 +11,7 @@
 //   Cepat" di /home selalu konsisten. Untuk menambah menu baru (misalnya
 //   "Kelola Departemen"), edit lib/nav-config.ts, bukan file ini.
 "use client";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, useMemo } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
@@ -125,8 +125,19 @@ export default function Sidebar() {
   const sections = role ? getNavSections(role) : [];
   const initials = getInitials(userName);
 
-  const isActive = (href: string) =>
-    href === "/home" ? pathname === "/home" : pathname === href || pathname.startsWith(`${href}/`);
+  const allHrefs = useMemo(() => sections.flatMap((s) => s.items.map((i) => i.href)), [sections]);
+
+  const isActive = (href: string) => {
+    if (href === "/home") return pathname === "/home";
+    if (pathname === href) return true;
+    if (!pathname.startsWith(`${href}/`)) return false;
+    // Jika ada link lain di sidebar yang lebih spesifik dan cocok dengan pathname saat ini,
+    // maka link parent (misal /pengawas vs /pengawas/scaffolding) tidak boleh ikut aktif
+    const hasMoreSpecific = allHrefs.some(
+      (h) => h !== href && h.startsWith(`${href}/`) && (pathname === h || pathname.startsWith(`${h}/`))
+    );
+    return !hasMoreSpecific;
+  };
 
   return (
     <>

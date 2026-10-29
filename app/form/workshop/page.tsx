@@ -124,23 +124,27 @@ const Section = ({
   expanded,
   toggle,
   badge,
+  id,
   children,
 }: any) => (
-  <div className="bg-white border border-slate-200/90 rounded-2xl overflow-hidden mb-6 shadow-xs hover:shadow-sm transition-shadow">
+  <div
+    id={id || `section-${stepNumber}`}
+    className="bg-white border border-slate-200/90 rounded-2xl overflow-hidden mb-6 shadow-xs hover:shadow-sm transition-shadow scroll-mt-20"
+  >
     <button
       type="button"
       onClick={() => toggle(section)}
-      className="w-full flex items-center justify-between cursor-pointer bg-slate-50/80 hover:bg-orange-50/60 px-5 sm:px-7 py-4 border-b border-slate-200 transition-colors text-left"
+      className="w-full flex items-center justify-between cursor-pointer bg-slate-50/80 hover:bg-emerald-50/60 px-5 sm:px-7 py-4 border-b border-slate-200 transition-colors text-left"
     >
       <div className="flex items-center gap-3.5">
-        <div className="w-9 h-9 rounded-xl bg-orange-600 text-white flex items-center justify-center font-bold text-sm shadow-md shadow-orange-600/20 shrink-0">
+        <div className="w-9 h-9 rounded-xl bg-emerald-600 text-white flex items-center justify-center font-bold text-sm shadow-md shadow-emerald-600/20 shrink-0">
           {stepNumber}
         </div>
         <div>
           <div className="flex items-center gap-2">
             <h3 className="font-bold text-slate-900 text-sm sm:text-base tracking-tight">{title}</h3>
             {badge && (
-              <span className="hidden sm:inline-block text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-orange-100 text-orange-700">
+              <span className="hidden sm:inline-block text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
                 {badge}
               </span>
             )}
@@ -297,6 +301,17 @@ function WorkshopPermitFormInner() {
 
   const searchParams = useSearchParams();
   const idIjinKerja = searchParams.get("id_ijin_kerja");
+
+  // Otomatis sinkronisasi tipePerusahaan sesuai keberadaan idIjinKerja
+  useEffect(() => {
+    setFormData((prev) => {
+      const targetTipe = idIjinKerja ? "eksternal" : "internal";
+      if (prev.tipePerusahaan !== targetTipe) {
+        return { ...prev, tipePerusahaan: targetTipe };
+      }
+      return prev;
+    });
+  }, [idIjinKerja]);
 
   const [hasRestoredDraft, setHasRestoredDraft] = useState(false);
   const draftKey = idIjinKerja ? `draft_workshop_ext_${idIjinKerja}` : "draft_workshop_internal";
@@ -713,6 +728,100 @@ function WorkshopPermitFormInner() {
 
       {/* ── MAIN CONTENT ── */}
       <main className="max-w-4xl mx-auto px-4 sm:px-6 pt-6 sm:pt-8">
+        {/* ── HERO BANNER ── */}
+        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-slate-950 via-emerald-950 to-teal-950 text-white p-6 sm:p-8 mb-8 border border-emerald-500/30 shadow-xl">
+          {/* Ambient Glows */}
+          <div className="pointer-events-none absolute -right-20 -top-20 w-80 h-80 bg-emerald-500/20 rounded-full blur-3xl" />
+          <div className="pointer-events-none absolute right-1/3 -bottom-20 w-60 h-60 bg-teal-600/20 rounded-full blur-3xl" />
+
+          <div className="relative z-10">
+            {/* Badges Row */}
+            <div className="flex flex-wrap items-center gap-2 mb-4">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-500 text-slate-950 shadow-sm">
+                <Wrench className="w-3.5 h-3.5" /> Workshop Permit
+              </span>
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-white/10 text-emerald-200 border border-white/10 backdrop-blur-xs">
+                <Shield className="w-3.5 h-3.5 text-emerald-400" /> Standar K3: JAI/SHE/WKP-01
+              </span>
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-teal-500/20 text-teal-200 border border-teal-500/30">
+                Pekerjaan Bengkel & Fabrikasi
+              </span>
+            </div>
+
+            {/* Title & Description */}
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
+              Izin Kerja Bengkel & Workshop (Workshop Permit)
+            </h1>
+            <p className="text-slate-300 text-xs sm:text-sm mt-2 max-w-2xl leading-relaxed">
+              Formulir otorisasi keselamatan kerja untuk operasional mesin bubut, milling, cutting wheel, gerinda duduk, dan fabrikasi logam di bengkel PT JAI.
+            </p>
+
+            {/* Quick Meta Chips */}
+            <div className="mt-5 pt-4 border-t border-white/10 grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+              <div className="bg-white/5 rounded-xl p-2.5 border border-white/5 backdrop-blur-xs">
+                <span className="text-slate-400 block text-[10px] uppercase font-bold tracking-wider">Pemohon / User</span>
+                <span className="font-bold text-white truncate block mt-0.5">
+                  {user?.nama || "Daniar Priambodo"}
+                </span>
+                <span className="text-[11px] text-emerald-300 truncate block">Dept: {user?.departmen || "PGA"}</span>
+              </div>
+
+              <div className="bg-white/5 rounded-xl p-2.5 border border-white/5 backdrop-blur-xs">
+                <span className="text-slate-400 block text-[10px] uppercase font-bold tracking-wider">Tipe Pelaksana</span>
+                <span className="font-bold text-white block mt-0.5 capitalize">
+                  {formData.tipePerusahaan === "eksternal" ? "Subkontraktor" : "Karyawan Internal"}
+                </span>
+                <span className="text-[11px] text-slate-300 truncate block">
+                  {formData.tipePerusahaan === "eksternal" ? (idIjinKerja ? `Induk: ${idIjinKerja}` : "Eksternal") : "PT. JAI"}
+                </span>
+              </div>
+
+              <div className="bg-white/5 rounded-xl p-2.5 border border-white/5 backdrop-blur-xs">
+                <span className="text-slate-400 block text-[10px] uppercase font-bold tracking-wider">Estimasi Waktu</span>
+                <span className="font-bold text-white block mt-0.5">±5 - 7 Menit</span>
+                <span className="text-[11px] text-emerald-400">Verifikasi Mesin K3</span>
+              </div>
+
+              <div className="bg-white/5 rounded-xl p-2.5 border border-white/5 backdrop-blur-xs">
+                <span className="text-slate-400 block text-[10px] uppercase font-bold tracking-wider">Durasi Pekerjaan</span>
+                <span className="font-bold text-white block mt-0.5 truncate">
+                  {totalDuration || "Belum ditentukan"}
+                </span>
+                <span className="text-[11px] text-amber-300 truncate block">
+                  {formData.waktuPukul && formData.waktuSelesai ? `${formData.waktuPukul} - ${formData.waktuSelesai}` : "Isi jam kerja"}
+                </span>
+              </div>
+            </div>
+
+            {/* Quick Section Jump Bar */}
+            <div className="mt-5 pt-4 border-t border-white/10 flex items-center gap-2 overflow-x-auto pb-1 text-xs">
+              <span className="text-[11px] font-bold text-emerald-300 uppercase tracking-wider shrink-0 mr-1">
+                Lompat Ke:
+              </span>
+              {[
+                { id: "section-1", num: "01", label: "Informasi Registrasi" },
+                { id: "section-2", num: "02", label: "Klasifikasi & Mesin" },
+                { id: "section-3", num: "03", label: "Ceklis Pengamanan (24 Poin)" },
+                { id: "section-4", num: "04", label: "Alur Otorisasi" },
+                { id: "bagian-jsa", num: "05", label: "Dokumen JSA" },
+              ].map((tab) => (
+                <button
+                  type="button"
+                  key={tab.id}
+                  onClick={() => {
+                    const el = document.getElementById(tab.id);
+                    if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+                  }}
+                  className="shrink-0 px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-slate-200 hover:text-white border border-white/10 transition-colors font-medium cursor-pointer"
+                >
+                  <span className="text-emerald-400 font-bold mr-1.5">{tab.num}</span>
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Banner Pemulihan Draft */}
           {hasRestoredDraft && (
@@ -790,16 +899,28 @@ function WorkshopPermitFormInner() {
                 </label>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {[
-                    { value: "internal", label: "Internal / Karyawan PT.JAI", desc: "Alur: SPV → Admin K3 → SFO → SMR" },
-                    { value: "eksternal", label: "Eksternal / Subkontraktor", desc: "Alur: Kontraktor → SPV → Admin K3 → SFO → SMR" },
+                    {
+                      value: "internal",
+                      label: "Internal / Karyawan PT.JAI",
+                      desc: "Alur: SPV → Admin K3 → SFO → SMR",
+                      disabled: Boolean(idIjinKerja),
+                      reason: "Terkunci: Lampiran Izin Kerja Eksternal",
+                    },
+                    {
+                      value: "eksternal",
+                      label: "Eksternal / Subkontraktor",
+                      desc: "Alur: Kontraktor → SPV → Admin K3 → SFO → SMR",
+                      disabled: !idIjinKerja,
+                      reason: "Hanya dapat diajukan melalui formulir Izin Kerja Eksternal",
+                    },
                   ].map((opt) => (
                     <label
                       key={opt.value}
                       className={`flex flex-col gap-1.5 p-4 rounded-xl border-2 transition-all ${
-                        opt.value === "eksternal" && !idIjinKerja ? "cursor-not-allowed opacity-60" : "cursor-pointer"
+                        opt.disabled ? "cursor-not-allowed opacity-60 bg-slate-50" : "cursor-pointer"
                       } ${
                         formData.tipePerusahaan === opt.value
-                          ? "border-orange-500 bg-orange-50/60 shadow-xs"
+                          ? "border-emerald-500 bg-emerald-50/60 shadow-xs"
                           : "border-slate-200 hover:border-slate-300 bg-white"
                       }`}
                     >
@@ -809,20 +930,26 @@ function WorkshopPermitFormInner() {
                           name="tipePerusahaan"
                           value={opt.value}
                           checked={formData.tipePerusahaan === opt.value}
-                          disabled={opt.value === "eksternal" && !idIjinKerja}
-                          onChange={() =>
+                          disabled={opt.disabled}
+                          onChange={() => {
+                            if (opt.disabled) return;
                             setFormData((p) => ({
                               ...p,
                               tipePerusahaan: opt.value as any,
                               namaPekerja: "",
                               nikPekerja: "",
-                            }))
-                          }
-                          className="w-4 h-4 text-orange-600 focus:ring-orange-500"
+                            }));
+                          }}
+                          className="w-4 h-4 text-emerald-600 focus:ring-emerald-500"
                         />
                         <span className="text-xs sm:text-sm font-bold text-slate-800">{opt.label}</span>
                       </div>
                       <p className="text-[11px] text-slate-500 ml-6">{opt.desc}</p>
+                      {opt.disabled && (
+                        <p className="text-[10px] text-amber-700 font-medium ml-6">
+                          • {opt.reason}
+                        </p>
+                      )}
                     </label>
                   ))}
                 </div>

@@ -1241,6 +1241,18 @@ export default function FormDetailPage({ params }: PageProps) {
                           <Field label="Perusahaan Kontraktor" value={p.nama_kontraktor || p.kontraktor || "-"} />
                           <Field label="Pengawas Kontraktor" value={p.nama_pengawas_kontraktor || "-"} />
                           <Field label="NIK Kontraktor" value={p.kontraktor_nik || "-"} mono />
+                          <Field
+                            label="Kebutuhan Scaffolding"
+                            value={
+                              p.perlu_scaffolding ? (
+                                <span className="inline-flex items-center gap-1 font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200 text-xs">
+                                  Ya (Perlu Inspeksi Scaffolding)
+                                </span>
+                              ) : (
+                                "Tidak Perlu"
+                              )
+                            }
+                          />
                         </>
                       ) : (
                         <>

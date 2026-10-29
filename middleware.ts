@@ -33,6 +33,22 @@ const APPROVER_ROUTES = [
 const ADMIN_ONLY_ROUTES = [
   '/smtp-settings',
   '/api/smtp-settings',
+  '/admin/admin-k3-routing',
+  '/api/admin-k3-routing',
+  '/master-lisence',
+  '/api/master-lisence',
+  '/kelola-departemen',
+  '/api/departemen',
+  '/kelola-pengawas-departemen',
+  '/api/pengawas-departemen',
+  '/form-files',
+  '/api/form-files',
+];
+
+// 🔐 Route yang boleh diakses admin atau spv
+const ADMIN_OR_SPV_ROUTES = [
+  '/admin-users',
+  '/api/admin-users',
 ];
 
 // Helper untuk membersihkan cookie secara konsisten di semua path
@@ -149,6 +165,37 @@ export async function middleware(req: NextRequest) {
 
     // 🔐 Route khusus admin — tolak non-admin
     if (ADMIN_ONLY_ROUTES.some((r) => pathname.startsWith(r)) && role !== 'admin') {
+      // Pengecualian GET untuk API master yang dibutuhkan dropdown form pengajuan permit
+      const isAllowedGetMasterApi =
+        req.method === 'GET' &&
+        (pathname.startsWith('/api/departemen') ||
+          pathname.startsWith('/api/pengawas-departemen') ||
+          pathname.startsWith('/api/master-lisence/workers'));
+
+      if (!isAllowedGetMasterApi) {
+        if (pathname.startsWith('/api/')) {
+          return NextResponse.json({ error: 'Akses ditolak.' }, { status: 403 });
+        }
+        return NextResponse.redirect(new URL('/home', req.url));
+      }
+    }
+
+    // 🔐 Route admin atau spv (misal kelola user departemen) — tolak selain admin dan spv
+    // Pengecualian: /api/admin-users/approvers adalah endpoint yang dibutuhkan form permit untuk memuat dropdown approver
+    if (
+      ADMIN_OR_SPV_ROUTES.some((r) => pathname.startsWith(r)) &&
+      !pathname.startsWith('/api/admin-users/approvers') &&
+      role !== 'admin' &&
+      role !== 'spv'
+    ) {
+      if (pathname.startsWith('/api/')) {
+        return NextResponse.json({ error: 'Akses ditolak.' }, { status: 403 });
+      }
+      return NextResponse.redirect(new URL('/home', req.url));
+    }
+
+    // 🔐 Route pengawas & inspeksi — hanya untuk role terkait (pengawas, spv, sfo, kontraktor, admin)
+    if ((pathname.startsWith('/pengawas') || pathname.startsWith('/api/inspeksi-scaffolding')) && !['pengawas', 'spv', 'sfo', 'admin_k3', 'kontraktor', 'admin'].includes(role)) {
       return NextResponse.redirect(new URL('/home', req.url));
     }
 

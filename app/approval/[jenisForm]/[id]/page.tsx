@@ -5,7 +5,7 @@ import { useState, useEffect, use } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  ArrowLeft, CheckCircle, XCircle, AlertCircle,
+  ArrowLeft, ArrowRight, CheckCircle, XCircle, AlertCircle,
   Clock, Loader2, Flame, Info, Eye, FileText,
   LogOut, ZoomIn, X, Lock, CheckCircle2, Shield,
   Wrench, AlertTriangle, Layers, Download, RefreshCw,
@@ -1505,6 +1505,27 @@ export default function ApprovalDetailPage({
                         <Field label="Perusahaan Kontraktor" value={form.nama_kontraktor || form.kontraktor || "-"} />
                         <Field label="Pengawas Kontraktor" value={form.nama_pengawas_kontraktor || "-"} />
                         <Field label="NIK Kontraktor" value={form.kontraktor_nik || "-"} mono />
+                        <Field
+                          label="Kebutuhan Scaffolding"
+                          value={
+                            form.perlu_scaffolding ? (
+                              <div className="flex items-center gap-2">
+                                <span className="inline-flex items-center gap-1 font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200 text-xs">
+                                  Ya (Perlu Inspeksi Scaffolding)
+                                </span>
+                                <Link
+                                  href="/pengawas/scaffolding"
+                                  className="text-xs text-orange-600 hover:text-orange-700 font-bold underline inline-flex items-center gap-0.5"
+                                >
+                                  <span>Buka Inspeksi</span>
+                                  <ArrowRight className="w-3 h-3" />
+                                </Link>
+                              </div>
+                            ) : (
+                              "Tidak Perlu"
+                            )
+                          }
+                        />
                       </>
                     ) : (
                       <>

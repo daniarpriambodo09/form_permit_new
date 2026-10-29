@@ -8,7 +8,7 @@ import {
   AlertTriangle, Shield, ChevronRight, AlertCircle,
   CheckCircle, Loader2, Camera, Upload, X, ZoomIn, ImageIcon, Lock,
   Eye, CalendarClock, Clock, Check, Save, Send, ChevronDown, ChevronUp,
-  HardHat, ShieldAlert, Sparkles, Building2, UserCheck, Home, Info
+  HardHat, ShieldAlert, Sparkles, Building2, UserCheck, Home, Info, ShieldCheck
 } from "lucide-react";
 import JsaMethodSection, { type JsaMode } from "@/components/JsaMethodSection";
 import { type JsaFileInfo, type JsaUploadStatus as JsaStatus } from "@/components/JsaUploadSection";
@@ -147,11 +147,10 @@ function LisensiUploadButton({ namaPetugas, index, fotoUrl, uploadStatus, upload
       <button
         type="button"
         onClick={() => setShowOptions((v) => !v)}
-        className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${
-          uploadStatus === "error"
+        className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${uploadStatus === "error"
             ? "bg-rose-50 border-rose-300 text-rose-700 hover:bg-rose-100"
             : "bg-orange-50 border-orange-200 text-orange-700 hover:bg-orange-100 hover:border-orange-400 shadow-2xs"
-        }`}
+          }`}
         title={uploadError || "Upload foto lisensi"}
       >
         {uploadStatus === "uploading" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ImageIcon className="w-3.5 h-3.5" />}
@@ -215,8 +214,8 @@ function MasterLisenceViewModal({ worker, onClose }: { worker: WorkerLisenceOpti
   const status = getExpStatus(worker.tanggal_exp);
   const statusMeta = {
     expired: { label: "Kadaluarsa", cls: "bg-red-100 text-red-700 border-red-200" },
-    soon:    { label: "Segera Habis", cls: "bg-amber-100 text-amber-700 border-amber-200" },
-    active:  { label: "Aktif", cls: "bg-green-100 text-green-700 border-green-200" },
+    soon: { label: "Segera Habis", cls: "bg-amber-100 text-amber-700 border-amber-200" },
+    active: { label: "Aktif", cls: "bg-green-100 text-green-700 border-green-200" },
   }[status];
 
   return (
@@ -249,16 +248,14 @@ function MasterLisenceViewModal({ worker, onClose }: { worker: WorkerLisenceOpti
 // ── Check Item Kotak Centang Modern ──────────────────────────────────
 const CheckItem = ({ label, checked, onChange }: { label: string; checked: boolean; onChange: (checked: boolean) => void }) => (
   <label
-    className={`flex items-start gap-3 cursor-pointer p-3.5 rounded-xl border transition-all ${
-      checked
+    className={`flex items-start gap-3 cursor-pointer p-3.5 rounded-xl border transition-all ${checked
         ? "bg-orange-50/80 border-orange-300 text-orange-950 font-medium shadow-xs"
         : "bg-white border-slate-200 hover:border-slate-300 text-slate-700 hover:bg-slate-50"
-    }`}
+      }`}
   >
     <div
-      className={`w-5 h-5 rounded-md border flex items-center justify-center mt-0.5 shrink-0 transition-colors ${
-        checked ? "bg-orange-600 border-orange-600 text-white" : "border-slate-300 bg-white"
-      }`}
+      className={`w-5 h-5 rounded-md border flex items-center justify-center mt-0.5 shrink-0 transition-colors ${checked ? "bg-orange-600 border-orange-600 text-white" : "border-slate-300 bg-white"
+        }`}
     >
       {checked && <Check className="w-3.5 h-3.5 stroke-[3]" />}
     </div>
@@ -288,17 +285,20 @@ const Section = ({
   children: React.ReactNode;
   id?: string;
 }) => (
-  <div id={id} className="bg-white border border-slate-200/90 rounded-2xl overflow-hidden mb-6 shadow-xs hover:shadow-sm transition-shadow">
+  <div
+    id={id || `section-${stepNumber}`}
+    className="bg-white border border-slate-200/90 rounded-2xl overflow-hidden mb-6 shadow-xs hover:shadow-sm transition-shadow scroll-mt-20"
+  >
     <div className="w-full flex items-center justify-between bg-slate-50/80 px-5 sm:px-7 py-4 border-b border-slate-200 text-left">
       <div className="flex items-center gap-3.5">
-        <div className="w-9 h-9 rounded-xl bg-orange-600 text-white flex items-center justify-center font-bold text-sm shadow-md shadow-orange-600/20 shrink-0">
+        <div className="w-9 h-9 rounded-xl bg-sky-600 text-white flex items-center justify-center font-bold text-sm shadow-md shadow-sky-600/20 shrink-0">
           {stepNumber}
         </div>
         <div>
           <div className="flex items-center gap-2">
             <h3 className="font-bold text-slate-900 text-sm sm:text-base tracking-tight">{title}</h3>
             {badge && (
-              <span className="hidden sm:inline-block text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-orange-100 text-orange-700">
+              <span className="hidden sm:inline-block text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-sky-100 text-sky-800">
                 {badge}
               </span>
             )}
@@ -316,7 +316,15 @@ function HeightWorkFormPageInner() {
   const searchParams = useSearchParams();
   const idIjinKerja = searchParams.get("id_ijin_kerja");
 
-  const [tipePerusahaan, setTipePerusahaan] = useState<"internal" | "eksternal">("internal");
+  const [tipePerusahaan, setTipePerusahaan] = useState<"internal" | "eksternal">(
+    idIjinKerja ? "eksternal" : "internal"
+  );
+  const [user, setUser] = useState<{ nama?: string; username?: string; departmen?: string; role?: string } | null>(null);
+
+  // Otomatis sinkronisasi tipePerusahaan sesuai keberadaan idIjinKerja
+  useEffect(() => {
+    setTipePerusahaan(idIjinKerja ? "eksternal" : "internal");
+  }, [idIjinKerja]);
   const [deskripsiPekerjaan, setDeskripsiPekerjaan] = useState("");
   const [lokasi, setLokasi] = useState("");
   const [tanggalPelaksanaan, setTanggalPelaksanaan] = useState("");
@@ -374,6 +382,7 @@ function HeightWorkFormPageInner() {
 
   // ── JSA state ──────────────────────────────────────────────
   const [perluJsa, setPerluJsa] = useState(false);
+  const [perluScaffolding, setPerluScaffolding] = useState(false);
   const [jsaFile, setJsaFile] = useState<JsaFileInfo | null>(null);
   const [jsaUploadStatus, setJsaUploadStatus] = useState<JsaStatus>("idle");
   const [jsaUploadError, setJsaUploadError] = useState("");
@@ -426,7 +435,7 @@ function HeightWorkFormPageInner() {
           }));
         }
       }
-    } catch {}
+    } catch { }
 
     // Fetch langsung dari API general-permit untuk data pasti dan akurat
     setLoadingParent(true);
@@ -493,9 +502,13 @@ function HeightWorkFormPageInner() {
           const meRes = await fetch("/api/auth/me", { credentials: "include" });
           if (meRes.ok) {
             const meData = await meRes.json();
+            setUser(meData.user);
             userDept = meData.user?.departmen || "";
+            if (!namaDepartemen && userDept && userDept !== "Unknown") {
+              setNamaDepartemen(userDept);
+            }
           }
-        } catch {}
+        } catch { }
 
         const r = await fetch("/api/admin-users/approvers", { credentials: "include" });
         if (!r.ok) return;
@@ -635,7 +648,9 @@ function HeightWorkFormPageInner() {
   })();
 
   const petugasAktif = namaPetugas.slice(0, visibleCount).map((n, i) => ({ nama: n, idx: i })).filter(({ nama }) => nama.trim());
-  const lisensiMissing = petugasAktif.filter(({ idx }) => !fotoLisensi[idx]);
+  const lisensiMissing = tipePerusahaan === "internal"
+    ? petugasAktif.filter(({ idx }) => !fotoLisensi[idx])
+    : [];
   const lisensiUploading = uploadStatus.some((s) => s === "uploading");
 
   const TIME_24H_PATTERN = /^([01]\d|2[0-3]):([0-5]\d)$/;
@@ -681,6 +696,7 @@ function HeightWorkFormPageInner() {
     lanyardRope,
     helmKondisiBaik,
     perluJsa,
+    perluScaffolding: tipePerusahaan === "eksternal" ? perluScaffolding : false,
     jsaFileUrl: jsaFile?.url ?? null,
     ...(jsaMode === "build" && !jsaFile?.url ? { jsaData } : {}),
     idIjinKerja,
@@ -718,7 +734,7 @@ function HeightWorkFormPageInner() {
       return;
     }
 
-    if (lisensiMissing.length > 0) {
+    if (tipePerusahaan === "internal" && lisensiMissing.length > 0) {
       setError(`Foto lisensi wajib untuk: ${lisensiMissing.map(({ nama, idx }) => `Petugas ${idx + 1} (${nama})`).join(", ")}`);
       document.getElementById("bagian-petugas")?.scrollIntoView({ behavior: "smooth", block: "center" });
       return;
@@ -841,6 +857,106 @@ function HeightWorkFormPageInner() {
 
       {/* ── MAIN CONTENT ── */}
       <main className="max-w-4xl mx-auto px-4 sm:px-6 pt-6 sm:pt-8">
+        {/* ── HERO BANNER ── */}
+        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-slate-950 via-sky-950 to-blue-950 text-white p-6 sm:p-8 mb-8 border border-sky-500/30 shadow-xl">
+          {/* Ambient Glows */}
+          <div className="pointer-events-none absolute -right-20 -top-20 w-80 h-80 bg-sky-500/20 rounded-full blur-3xl" />
+          <div className="pointer-events-none absolute right-1/3 -bottom-20 w-60 h-60 bg-blue-600/20 rounded-full blur-3xl" />
+
+          <div className="relative z-10">
+            {/* Badges Row */}
+            <div className="flex flex-wrap items-center gap-2 mb-4">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-sky-500 text-slate-950 shadow-sm">
+                <HardHat className="w-3.5 h-3.5" /> Height Work Permit
+              </span>
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-white/10 text-sky-200 border border-white/10 backdrop-blur-xs">
+                <Shield className="w-3.5 h-3.5 text-sky-400" /> Standar K3: JAI/SHE/HW-02
+              </span>
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-blue-500/20 text-blue-200 border border-blue-500/30">
+                Ketinggian (&gt; 1.8 Meter)
+              </span>
+              {tipePerusahaan === "eksternal" && perluScaffolding && (
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-500 text-slate-950">
+                  <ShieldCheck className="w-3.5 h-3.5" /> Wajib Inspeksi Scaffolding
+                </span>
+              )}
+            </div>
+
+            {/* Title & Description */}
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
+              Izin Kerja Ketinggian (Height Work Permit)
+            </h1>
+            <p className="text-slate-300 text-xs sm:text-sm mt-2 max-w-2xl leading-relaxed">
+              Prosedur izin kerja aman wajib untuk seluruh pekerjaan pada elevasi di atas 1,8 meter, penggunaan tangga lipat/ekstensi, perancah (scaffolding), gondola, dan area atap.
+            </p>
+
+            {/* Quick Meta Chips */}
+            <div className="mt-5 pt-4 border-t border-white/10 grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+              <div className="bg-white/5 rounded-xl p-2.5 border border-white/5 backdrop-blur-xs">
+                <span className="text-slate-400 block text-[10px] uppercase font-bold tracking-wider">Pemohon / User</span>
+                <span className="font-bold text-white truncate block mt-0.5">
+                  {user?.nama || "Daniar Priambodo"}
+                </span>
+                <span className="text-[11px] text-sky-300 truncate block">Dept: {user?.departmen || namaDepartemen || "PGA"}</span>
+              </div>
+
+              <div className="bg-white/5 rounded-xl p-2.5 border border-white/5 backdrop-blur-xs">
+                <span className="text-slate-400 block text-[10px] uppercase font-bold tracking-wider">Tipe Pelaksana</span>
+                <span className="font-bold text-white block mt-0.5 capitalize">
+                  {tipePerusahaan === "eksternal" ? "Subkontraktor" : "Karyawan Internal"}
+                </span>
+                <span className="text-[11px] text-slate-300 truncate block">
+                  {tipePerusahaan === "eksternal" ? (idIjinKerja ? `Induk: ${idIjinKerja}` : "Eksternal") : (namaDepartemen || "PT. JAI")}
+                </span>
+              </div>
+
+              <div className="bg-white/5 rounded-xl p-2.5 border border-white/5 backdrop-blur-xs">
+                <span className="text-slate-400 block text-[10px] uppercase font-bold tracking-wider">Estimasi Waktu</span>
+                <span className="font-bold text-white block mt-0.5">±5 - 10 Menit</span>
+                <span className="text-[11px] text-emerald-400">Verifikasi APD K3</span>
+              </div>
+
+              <div className="bg-white/5 rounded-xl p-2.5 border border-white/5 backdrop-blur-xs">
+                <span className="text-slate-400 block text-[10px] uppercase font-bold tracking-wider">Durasi Pekerjaan</span>
+                <span className="font-bold text-white block mt-0.5 truncate">
+                  {totalDuration || "Belum ditentukan"}
+                </span>
+                <span className="text-[11px] text-amber-300 truncate block">
+                  {waktuMulai && waktuSelesai ? `${waktuMulai} - ${waktuSelesai}` : "Isi jam kerja"}
+                </span>
+              </div>
+            </div>
+
+            {/* Quick Section Jump Bar */}
+            <div className="mt-5 pt-4 border-t border-white/10 flex items-center gap-2 overflow-x-auto pb-1 text-xs">
+              <span className="text-[11px] font-bold text-sky-300 uppercase tracking-wider shrink-0 mr-1">
+                Lompat Ke:
+              </span>
+              {[
+                { id: "section-1", num: "01", label: "Informasi Pekerjaan" },
+                { id: "section-2", num: "02", label: "Petugas & Lisensi" },
+                { id: "section-3", num: "03", label: "Peralatan & APD" },
+                { id: "section-4", num: "04", label: "Keselamatan Kerja" },
+                { id: "section-5", num: "05", label: "Verifikasi Body Harness" },
+                { id: "bagian-jsa", num: "06", label: "Dokumen JSA" },
+              ].map((tab) => (
+                <button
+                  type="button"
+                  key={tab.id}
+                  onClick={() => {
+                    const el = document.getElementById(tab.id);
+                    if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+                  }}
+                  className="shrink-0 px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-slate-200 hover:text-white border border-white/10 transition-colors font-medium cursor-pointer"
+                >
+                  <span className="text-sky-400 font-bold mr-1.5">{tab.num}</span>
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
         <form onSubmit={handleSubmit} className="space-y-6">
           {error && (
             <div className="bg-rose-50 border border-rose-200 rounded-2xl p-4 flex items-start gap-3 text-rose-700 animate-in fade-in duration-200">
@@ -881,16 +997,28 @@ function HeightWorkFormPageInner() {
                 </label>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {[
-                    { value: "internal", label: "Internal / Karyawan PT.JAI", desc: "Alur: SPV → Admin K3 → SFO → SMR" },
-                    { value: "eksternal", label: "Eksternal / Subkontraktor", desc: "Alur: Kontraktor → SPV → Admin K3 → SFO → SMR" },
+                    {
+                      value: "internal",
+                      label: "Internal / Karyawan PT.JAI",
+                      desc: "Alur: SPV → Admin K3 → SFO → SMR",
+                      disabled: Boolean(idIjinKerja),
+                      reason: "Terkunci: Lampiran Izin Kerja Eksternal",
+                    },
+                    {
+                      value: "eksternal",
+                      label: "Eksternal / Subkontraktor",
+                      desc: "Alur: Kontraktor → SPV → Admin K3 → SFO → SMR",
+                      disabled: !idIjinKerja,
+                      reason: "Hanya dapat diajukan melalui formulir Izin Kerja Eksternal",
+                    },
                   ].map((opt) => (
                     <label
                       key={opt.value}
                       className={`flex flex-col gap-1.5 p-4 rounded-xl border-2 transition-all ${
-                        opt.value === "eksternal" && !idIjinKerja ? "cursor-not-allowed opacity-60" : "cursor-pointer"
+                        opt.disabled ? "cursor-not-allowed opacity-60 bg-slate-50" : "cursor-pointer"
                       } ${
                         tipePerusahaan === opt.value
-                          ? "border-orange-500 bg-orange-50/60 shadow-xs"
+                          ? "border-sky-500 bg-sky-50/60 shadow-xs"
                           : "border-slate-200 hover:border-slate-300 bg-white"
                       }`}
                     >
@@ -900,8 +1028,9 @@ function HeightWorkFormPageInner() {
                           name="tipePerusahaan"
                           value={opt.value}
                           checked={tipePerusahaan === opt.value}
-                          disabled={opt.value === "eksternal" && !idIjinKerja}
+                          disabled={opt.disabled}
                           onChange={() => {
+                            if (opt.disabled) return;
                             const val = opt.value as "internal" | "eksternal";
                             setTipePerusahaan(val);
                             if (val === "internal") {
@@ -912,11 +1041,16 @@ function HeightWorkFormPageInner() {
                             }
                             resetPetugasRows();
                           }}
-                          className="w-4 h-4 text-orange-600 focus:ring-orange-500"
+                          className="w-4 h-4 text-sky-600 focus:ring-sky-500"
                         />
                         <span className="text-xs sm:text-sm font-bold text-slate-800">{opt.label}</span>
                       </div>
                       <p className="text-[11px] text-slate-500 ml-6">{opt.desc}</p>
+                      {opt.disabled && (
+                        <p className="text-[10px] text-amber-700 font-medium ml-6">
+                          • {opt.reason}
+                        </p>
+                      )}
                     </label>
                   ))}
                 </div>
@@ -1040,18 +1174,58 @@ function HeightWorkFormPageInner() {
 
               {/* Nama Pengawas Kontraktor (Eksternal) */}
               {tipePerusahaan === "eksternal" && (
-                <div>
-                  <label className="block text-xs sm:text-sm font-bold text-slate-800 mb-1.5">
-                    Nama Pengawas Kontraktor <span className="text-rose-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={namaPengawasKontraktor}
-                    onChange={(e) => setNamaPengawasKontraktor(e.target.value)}
-                    placeholder="Nama pengawas dari pihak kontraktor"
-                    required
-                    className={inputCls}
-                  />
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-xs sm:text-sm font-bold text-slate-800 mb-1.5">
+                      Nama Pengawas Kontraktor <span className="text-rose-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={namaPengawasKontraktor}
+                      onChange={(e) => setNamaPengawasKontraktor(e.target.value)}
+                      placeholder="Nama pengawas dari pihak kontraktor"
+                      required
+                      className={inputCls}
+                    />
+                  </div>
+
+                  {/* Pertanyaan Penggunaan Scaffolding (Khusus Eksternal) */}
+                  <div className="p-4 rounded-xl border border-amber-200 bg-amber-50/70 space-y-2.5">
+                    <div className="flex items-start gap-2.5">
+                      <ShieldCheck className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
+                      <div>
+                        <label className="block text-xs sm:text-sm font-bold text-slate-800">
+                          Apakah pekerjaan ketinggian ini memerlukan scaffolding (perancah)? <span className="text-rose-500">*</span>
+                        </label>
+                        <p className="text-[11px] text-slate-600 mt-0.5">
+                          Jika memilih <strong>Ya</strong>, maka pengawas departemen akan melakukan inspeksi checksheet scaffolding sebelum pekerjaan dapat disetujui.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-4 pt-1 ml-6.5">
+                      <label className="inline-flex items-center gap-2 cursor-pointer text-xs sm:text-sm font-semibold text-slate-800">
+                        <input
+                          type="radio"
+                          name="perluScaffoldingRadio"
+                          checked={perluScaffolding === true}
+                          onChange={() => setPerluScaffolding(true)}
+                          className="w-4 h-4 text-orange-600 focus:ring-orange-500"
+                        />
+                        <span>Ya, Perlu Scaffolding</span>
+                      </label>
+                      <label className="inline-flex items-center gap-2 cursor-pointer text-xs sm:text-sm font-semibold text-slate-800">
+                        <input
+                          type="radio"
+                          name="perluScaffoldingRadio"
+                          checked={perluScaffolding === false}
+                          onChange={() => setPerluScaffolding(false)}
+                          className="w-4 h-4 text-orange-600 focus:ring-orange-500"
+                        />
+                        <span>Tidak Perlu</span>
+                      </label>
+                    </div>
+                  </div>
                 </div>
               )}
 
@@ -1115,25 +1289,22 @@ function HeightWorkFormPageInner() {
             <div>
               {tipePerusahaan === "eksternal" ? (
                 <>
-                  <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 mb-5 flex items-start gap-2.5">
-                    <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-                    <p className="text-xs sm:text-sm text-amber-800">
-                      Setiap petugas yang didaftarkan <strong>wajib</strong> melampirkan foto lisensi ketinggian yang masih berlaku.
+                  <div className="bg-blue-50/70 border border-blue-200 rounded-xl px-4 py-3 mb-5 flex items-start gap-2.5">
+                    <Info className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
+                    <p className="text-xs sm:text-sm text-blue-800">
+                      Daftar nama petugas eksternal / kontraktor. Upload foto lisensi bersifat <strong>opsional (tidak wajib)</strong> karena lisensi seluruh tenaga kerja telah dilampirkan pada formulir Izin Kerja Eksternal induk.
                     </p>
                   </div>
 
                   <div className="space-y-3">
                     {Array.from({ length: visibleCount }).map((_, i) => {
                       const namaFilled = !!namaPetugas[i]?.trim();
-                      const fotoMissing = namaFilled && !fotoLisensi[i];
 
                       return (
                         <div
                           key={i}
                           className={`p-3.5 sm:p-4 rounded-xl border transition-all ${
-                            fotoMissing
-                              ? "bg-amber-50/60 border-amber-300 shadow-xs"
-                              : namaFilled
+                            namaFilled
                               ? "bg-white border-slate-200 shadow-xs"
                               : "bg-slate-50/60 border-slate-200"
                           }`}
@@ -1148,7 +1319,7 @@ function HeightWorkFormPageInner() {
                                 placeholder={`Nama Petugas ${i + 1}`}
                                 value={namaPetugas[i]}
                                 onChange={(e) => handleNamaChange(i, e.target.value)}
-                                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs sm:text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-orange-400 bg-white placeholder-slate-400"
+                                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs sm:text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-400 bg-white placeholder-slate-400"
                               />
                             </div>
 
@@ -1170,23 +1341,21 @@ function HeightWorkFormPageInner() {
                               </label>
 
                               {namaFilled && (
-                                <LisensiUploadButton
-                                  namaPetugas={namaPetugas[i]}
-                                  index={i + 1}
-                                  fotoUrl={fotoLisensi[i]}
-                                  uploadStatus={uploadStatus[i]}
-                                  uploadError={uploadError[i]}
-                                  onUploaded={(url, status, err) => handleFotoUploaded(i, url, status, err)}
-                                  onRemoved={() => handleFotoRemoved(i)}
-                                />
+                                <div className="flex items-center gap-1.5">
+                                  <LisensiUploadButton
+                                    namaPetugas={namaPetugas[i]}
+                                    index={i + 1}
+                                    fotoUrl={fotoLisensi[i]}
+                                    uploadStatus={uploadStatus[i]}
+                                    uploadError={uploadError[i]}
+                                    onUploaded={(url, status, err) => handleFotoUploaded(i, url, status, err)}
+                                    onRemoved={() => handleFotoRemoved(i)}
+                                  />
+                                  <span className="text-[10px] text-slate-400 font-medium hidden sm:inline">(Opsional)</span>
+                                </div>
                               )}
                             </div>
                           </div>
-                          {fotoMissing && (
-                            <p className="text-[11px] font-semibold text-amber-700 mt-2 pl-9">
-                              ⚠️ Foto lisensi wajib diunggah untuk petugas ini.
-                            </p>
-                          )}
                         </div>
                       );
                     })}
@@ -1239,9 +1408,8 @@ function HeightWorkFormPageInner() {
                           return (
                             <div
                               key={i}
-                              className={`p-3.5 sm:p-4 rounded-xl border transition-all ${
-                                namaFilled ? "bg-white border-slate-200 shadow-xs" : "bg-slate-50/60 border-slate-200"
-                              }`}
+                              className={`p-3.5 sm:p-4 rounded-xl border transition-all ${namaFilled ? "bg-white border-slate-200 shadow-xs" : "bg-slate-50/60 border-slate-200"
+                                }`}
                             >
                               <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
                                 <div className="flex items-center gap-2.5 flex-1 min-w-0">
@@ -1251,9 +1419,8 @@ function HeightWorkFormPageInner() {
                                   <select
                                     value={selectedNik[i] ?? ""}
                                     onChange={(e) => handleWorkerSelect(i, e.target.value)}
-                                    className={`w-full px-3 py-2 border border-slate-200 rounded-lg text-xs sm:text-sm bg-white focus:outline-none focus:ring-2 focus:ring-orange-400 ${
-                                      !selectedNik[i] ? "text-slate-400" : "text-slate-800 font-medium"
-                                    }`}
+                                    className={`w-full px-3 py-2 border border-slate-200 rounded-lg text-xs sm:text-sm bg-white focus:outline-none focus:ring-2 focus:ring-orange-400 ${!selectedNik[i] ? "text-slate-400" : "text-slate-800 font-medium"
+                                      }`}
                                   >
                                     <option value="">— Pilih Petugas dari Master Lisence —</option>
                                     {availableOptions.map((w) => (
@@ -1264,11 +1431,10 @@ function HeightWorkFormPageInner() {
 
                                 <div className="flex items-center justify-between sm:justify-end gap-3 pl-8 sm:pl-0 shrink-0">
                                   <label
-                                    className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border text-xs font-semibold cursor-pointer transition-colors ${
-                                      berbadanSehat[i]
+                                    className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border text-xs font-semibold cursor-pointer transition-colors ${berbadanSehat[i]
                                         ? "bg-emerald-50 border-emerald-300 text-emerald-800"
                                         : "bg-white border-slate-200 text-slate-500 hover:bg-slate-50"
-                                    }`}
+                                      }`}
                                   >
                                     <input
                                       type="checkbox"
@@ -1292,9 +1458,8 @@ function HeightWorkFormPageInner() {
                               </div>
 
                               {currentWorker && status !== "active" && (
-                                <p className={`text-xs font-semibold mt-2.5 pl-8 sm:pl-9 flex items-center gap-1.5 ${
-                                  status === "expired" ? "text-rose-600" : "text-amber-600"
-                                }`}>
+                                <p className={`text-xs font-semibold mt-2.5 pl-8 sm:pl-9 flex items-center gap-1.5 ${status === "expired" ? "text-rose-600" : "text-amber-600"
+                                  }`}>
                                   <AlertCircle className="w-3.5 h-3.5" />
                                   {status === "expired" ? "Lisensi pekerja ini telah KADALUARSA" : "Lisensi pekerja ini hampir kadaluarsa"} (Exp: {formatDate(currentWorker.tanggal_exp)})
                                 </p>

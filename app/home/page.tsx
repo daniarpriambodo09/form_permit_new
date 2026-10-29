@@ -512,7 +512,19 @@ export default function HomePage() {
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
                 {/* Stat 1: Total */}
                 <Link
-                  href={isApprover ? "/approval" : role === "worker" ? "/my-forms" : "/dashboard"}
+                  href={
+                    role === "admin"
+                      ? "/dashboard"
+                      : role === "pengawas"
+                      ? "/pengawas"
+                      : role === "purchasing"
+                      ? "/purchasing"
+                      : isApprover
+                      ? "/approval"
+                      : role === "worker"
+                      ? "/my-forms"
+                      : "#"
+                  }
                   className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/90 shadow-2xs hover:shadow-md transition-all flex flex-col justify-between group"
                 >
                   <div className="flex items-center justify-between">
@@ -537,7 +549,19 @@ export default function HomePage() {
 
                 {/* Stat 2: Pending / Menunggu Tindakan */}
                 <Link
-                  href={isApprover ? "/approval?status=submitted" : role === "worker" ? "/my-forms" : "#"}
+                  href={
+                    role === "admin"
+                      ? "/dashboard"
+                      : role === "pengawas"
+                      ? "/pengawas"
+                      : role === "purchasing"
+                      ? "/purchasing"
+                      : isApprover
+                      ? "/approval?status=submitted"
+                      : role === "worker"
+                      ? "/my-forms"
+                      : "#"
+                  }
                   className="bg-white p-4 sm:p-5 rounded-2xl border border-amber-200/80 hover:border-amber-300 shadow-2xs hover:shadow-md transition-all flex flex-col justify-between group"
                 >
                   <div className="flex items-center justify-between">
@@ -567,7 +591,19 @@ export default function HomePage() {
 
                 {/* Stat 3: Approved */}
                 <Link
-                  href={isApprover ? "/approval?status=approved" : role === "worker" ? "/my-forms" : "#"}
+                  href={
+                    role === "admin"
+                      ? "/dashboard"
+                      : role === "pengawas"
+                      ? "/pengawas"
+                      : role === "purchasing"
+                      ? "/purchasing"
+                      : isApprover
+                      ? "/approval?status=approved"
+                      : role === "worker"
+                      ? "/my-forms"
+                      : "#"
+                  }
                   className="bg-white p-4 sm:p-5 rounded-2xl border border-emerald-200/80 hover:border-emerald-300 shadow-2xs hover:shadow-md transition-all flex flex-col justify-between group"
                 >
                   <div className="flex items-center justify-between">
@@ -588,7 +624,19 @@ export default function HomePage() {
 
                 {/* Stat 4: Draft / Rejected */}
                 <Link
-                  href={isApprover ? "/approval?status=rejected" : role === "worker" ? "/my-forms" : "#"}
+                  href={
+                    role === "admin"
+                      ? "/dashboard"
+                      : role === "pengawas"
+                      ? "/pengawas"
+                      : role === "purchasing"
+                      ? "/purchasing"
+                      : isApprover
+                      ? "/approval?status=rejected"
+                      : role === "worker"
+                      ? "/my-forms"
+                      : "#"
+                  }
                   className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/90 shadow-2xs hover:shadow-md transition-all flex flex-col justify-between group"
                 >
                   <div className="flex items-center justify-between">
@@ -789,7 +837,19 @@ export default function HomePage() {
               </div>
 
               <Link
-                href={isApprover ? "/approval" : role === "worker" ? "/my-forms" : "/dashboard"}
+                href={
+                  role === "admin"
+                    ? "/dashboard"
+                    : role === "pengawas"
+                    ? "/pengawas"
+                    : role === "purchasing"
+                    ? "/purchasing"
+                    : role === "worker"
+                    ? "/my-forms"
+                    : isApprover
+                    ? "/approval"
+                    : "#"
+                }
                 className="text-xs font-bold text-orange-600 hover:text-orange-700 inline-flex items-center gap-1 hover:underline"
               >
                 <span>Lihat Selengkapnya</span>

@@ -15,6 +15,7 @@ import {
   Clock,
   CheckCircle2,
   ShieldCheck,
+  ShieldAlert,
   FileText,
   AlertTriangle,
   RotateCcw,
@@ -106,9 +107,13 @@ const Section = ({
   expanded,
   toggle,
   badge,
+  id,
   children,
 }: any) => (
-  <div className="bg-white border border-slate-200/90 rounded-2xl overflow-hidden mb-6 shadow-sm hover:shadow-md transition-shadow">
+  <div
+    id={id || `section-${stepNumber}`}
+    className="bg-white border border-slate-200/90 rounded-2xl overflow-hidden mb-6 shadow-sm hover:shadow-md transition-shadow scroll-mt-20"
+  >
     <button
       type="button"
       onClick={() => toggle(section)}
@@ -369,6 +374,17 @@ function HotWorkPermitFormInner() {
 
   const searchParams = useSearchParams();
   const idIjinKerja = searchParams.get("id_ijin_kerja");
+
+  // Otomatis set tipePerusahaan berdasarkan ada/tidaknya idIjinKerja
+  useEffect(() => {
+    setFormData((prev) => {
+      const targetTipe = idIjinKerja ? "eksternal" : "internal";
+      if (prev.tipePerusahaan !== targetTipe) {
+        return { ...prev, tipePerusahaan: targetTipe };
+      }
+      return prev;
+    });
+  }, [idIjinKerja]);
 
   // Draft Key terisolasi per konteks (per parent permit jika eksternal, atau internal jika berdiri sendiri)
   const draftKey = idIjinKerja ? `draft_hot_work_ext_${idIjinKerja}` : "draft_hot_work_internal";
@@ -807,6 +823,100 @@ function HotWorkPermitFormInner() {
 
       {/* Main Container */}
       <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
+        {/* ── HERO BANNER ── */}
+        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-slate-950 via-rose-950 to-orange-950 text-white p-6 sm:p-8 mb-8 border border-orange-500/30 shadow-xl">
+          {/* Subtle Glows */}
+          <div className="pointer-events-none absolute -right-20 -top-20 w-80 h-80 bg-orange-600/20 rounded-full blur-3xl" />
+          <div className="pointer-events-none absolute right-1/3 -bottom-20 w-60 h-60 bg-rose-600/20 rounded-full blur-3xl" />
+
+          <div className="relative z-10">
+            {/* Badges Row */}
+            <div className="flex flex-wrap items-center gap-2 mb-4">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-orange-500 text-white shadow-sm">
+                <Flame className="w-3.5 h-3.5 animate-pulse" /> Hot Work Permit
+              </span>
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-white/10 text-orange-200 border border-white/10 backdrop-blur-xs">
+                <ShieldAlert className="w-3.5 h-3.5 text-rose-400" /> Standar K3: JAI/SHE/HWP-01
+              </span>
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-rose-500/20 text-rose-200 border border-rose-500/30">
+                Aktivitas Risiko Tinggi
+              </span>
+            </div>
+
+            {/* Title & Description */}
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
+              Izin Kerja Panas (Hot Work Permit)
+            </h1>
+            <p className="text-slate-300 text-xs sm:text-sm mt-2 max-w-2xl leading-relaxed">
+              Formulir izin keselamatan untuk pengelasan, pemotongan, gerinda, atau pekerjaan lain yang menimbulkan bunga api atau sumber panas di area operasional PT JAI.
+            </p>
+
+            {/* Quick Meta Chips */}
+            <div className="mt-5 pt-4 border-t border-white/10 grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+              <div className="bg-white/5 rounded-xl p-2.5 border border-white/5 backdrop-blur-xs">
+                <span className="text-slate-400 block text-[10px] uppercase font-bold tracking-wider">Pemohon / User</span>
+                <span className="font-bold text-white truncate block mt-0.5">
+                  {user?.nama || "Daniar Priambodo"}
+                </span>
+                <span className="text-[11px] text-orange-300">Dept: {user?.departmen || "PGA"}</span>
+              </div>
+
+              <div className="bg-white/5 rounded-xl p-2.5 border border-white/5 backdrop-blur-xs">
+                <span className="text-slate-400 block text-[10px] uppercase font-bold tracking-wider">Tipe Pelaksana</span>
+                <span className="font-bold text-white block mt-0.5 capitalize">
+                  {formData.tipePerusahaan === "eksternal" ? "Subkontraktor" : "Karyawan Internal"}
+                </span>
+                <span className="text-[11px] text-slate-300">
+                  {formData.tipePerusahaan === "eksternal" ? (idIjinKerja ? `Izin Induk: ${idIjinKerja}` : "Eksternal") : "PT. JAI"}
+                </span>
+              </div>
+
+              <div className="bg-white/5 rounded-xl p-2.5 border border-white/5 backdrop-blur-xs">
+                <span className="text-slate-400 block text-[10px] uppercase font-bold tracking-wider">Estimasi Waktu</span>
+                <span className="font-bold text-white block mt-0.5">±5 - 7 Menit</span>
+                <span className="text-[11px] text-emerald-400">Draft Auto-Saved</span>
+              </div>
+
+              <div className="bg-white/5 rounded-xl p-2.5 border border-white/5 backdrop-blur-xs">
+                <span className="text-slate-400 block text-[10px] uppercase font-bold tracking-wider">Durasi Pekerjaan</span>
+                <span className="font-bold text-white block mt-0.5 truncate">
+                  {totalDuration || "Belum ditentukan"}
+                </span>
+                <span className="text-[11px] text-amber-300">
+                  {formData.waktuPukul && formData.waktuSelesai ? `${formData.waktuPukul} - ${formData.waktuSelesai}` : "Isi jam kerja"}
+                </span>
+              </div>
+            </div>
+
+            {/* Quick Section Jump Bar */}
+            <div className="mt-5 pt-4 border-t border-white/10 flex items-center gap-2 overflow-x-auto pb-1 text-xs">
+              <span className="text-[11px] font-bold text-orange-300 uppercase tracking-wider shrink-0 mr-1">
+                Lompat Ke:
+              </span>
+              {[
+                { id: "section-1", num: "01", label: "Identitas & Jadwal" },
+                { id: "section-2", num: "02", label: "Klasifikasi Pekerjaan" },
+                { id: "section-3", num: "03", label: "Ceklis Pencegahan (31 Poin)" },
+                { id: "section-4", num: "04", label: "Otorisasi & Approval" },
+                { id: "section-5", num: "05", label: "Dokumen JSA" },
+              ].map((tab) => (
+                <button
+                  type="button"
+                  key={tab.id}
+                  onClick={() => {
+                    const el = document.getElementById(tab.id);
+                    if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+                  }}
+                  className="shrink-0 px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-slate-200 hover:text-white border border-white/10 transition-colors font-medium cursor-pointer"
+                >
+                  <span className="text-orange-400 font-bold mr-1.5">{tab.num}</span>
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
         {/* Banner Pemulihan Draft */}
         {hasRestoredDraft && (
           <div className="bg-amber-50 border border-amber-300/80 rounded-xl p-3.5 sm:p-4 mb-6 flex items-center justify-between gap-3 text-xs sm:text-sm text-amber-900 shadow-xs">
@@ -893,17 +1003,21 @@ function HotWorkPermitFormInner() {
                     value: "internal",
                     label: "Internal / Karyawan PT.JAI",
                     desc: "Alur: SPV → Admin K3 → SFO → SMR",
+                    disabled: Boolean(idIjinKerja),
+                    reason: "Terkunci: Lampiran Izin Kerja Eksternal",
                   },
                   {
                     value: "eksternal",
                     label: "Eksternal / Subkontraktor",
                     desc: "Alur: Kontraktor → SPV → Admin K3 → SFO → SMR",
+                    disabled: !idIjinKerja,
+                    reason: "Hanya dapat diajukan melalui formulir Izin Kerja Eksternal",
                   },
                 ].map((opt) => (
                   <label
                     key={opt.value}
                     className={`flex flex-col gap-1 p-3.5 rounded-xl border-2 transition-all ${
-                      opt.value === "eksternal" ? "cursor-not-allowed opacity-60" : "cursor-pointer"
+                      opt.disabled ? "cursor-not-allowed opacity-60 bg-slate-50" : "cursor-pointer"
                     } ${
                       formData.tipePerusahaan === opt.value
                         ? "border-orange-500 bg-orange-50/60 shadow-xs"
@@ -916,19 +1030,25 @@ function HotWorkPermitFormInner() {
                         name="tipePerusahaan"
                         value={opt.value}
                         checked={formData.tipePerusahaan === opt.value}
-                        onChange={() =>
+                        onChange={() => {
+                          if (opt.disabled) return;
                           setFormData((p) => {
                             const next = { ...p, tipePerusahaan: opt.value as any, namaPekerjaNIK: "" };
                             saveLocalDraft(next);
                             return next;
-                          })
-                        }
-                        disabled={opt.value === "eksternal" || !!idIjinKerja}
+                          });
+                        }}
+                        disabled={opt.disabled}
                         className="text-orange-600 focus:ring-orange-500"
                       />
                       <span className="text-xs sm:text-sm font-bold text-slate-900">{opt.label}</span>
                     </div>
                     <p className="text-[11px] text-slate-500 ml-6">{opt.desc}</p>
+                    {opt.disabled && (
+                      <p className="text-[10px] text-amber-700 font-medium ml-6">
+                        • {opt.reason}
+                      </p>
+                    )}
                   </label>
                 ))}
               </div>
@@ -1627,43 +1747,45 @@ function HotWorkPermitFormInner() {
         </Section>
 
         {/* ── BAGIAN 5: UPLOAD JSA ── */}
-        {idIjinKerja ? (
-          <LinkedJsaSection
-            idIjinKerja={idIjinKerja}
-            enabled={perluJsa}
-            setEnabled={setPerluJsa}
-            value={jsaData}
-            setValue={setJsaData}
-            jsaMode={jsaMode}
-            setJsaMode={setJsaMode}
-            jsaFile={jsaFile}
-            setJsaFile={setJsaFile}
-            onJsaInfoLoaded={({ mode, fileUrl, enabled }) => {
-              setJsaMode(mode);
-              setPerluJsa(enabled);
-              if (mode === "upload" && fileUrl) {
-                setJsaFile({ name: fileUrl.split("/").pop() || "Dokumen_JSA", size: 0, url: fileUrl });
-              }
-            }}
-          />
-        ) : (
-          <JsaMethodSection
-            mode={jsaMode}
-            setMode={setJsaMode}
-            perluJsa={perluJsa}
-            setPerluJsa={setPerluJsa}
-            jsaFile={jsaFile}
-            setJsaFile={setJsaFile}
-            jsaUploadStatus={jsaUploadStatus}
-            setJsaUploadStatus={setJsaUploadStatus}
-            jsaUploadError={jsaUploadError}
-            setJsaUploadError={setJsaUploadError}
-            jsaData={jsaData}
-            setJsaData={setJsaData}
-            sectionTitle="BAGIAN 5: JOB SAFETY ANALYSIS (JSA)"
-            sectionStyle="hot-work"
-          />
-        )}
+        <div id="section-5" className="scroll-mt-20">
+          {idIjinKerja ? (
+            <LinkedJsaSection
+              idIjinKerja={idIjinKerja}
+              enabled={perluJsa}
+              setEnabled={setPerluJsa}
+              value={jsaData}
+              setValue={setJsaData}
+              jsaMode={jsaMode}
+              setJsaMode={setJsaMode}
+              jsaFile={jsaFile}
+              setJsaFile={setJsaFile}
+              onJsaInfoLoaded={({ mode, fileUrl, enabled }) => {
+                setJsaMode(mode);
+                setPerluJsa(enabled);
+                if (mode === "upload" && fileUrl) {
+                  setJsaFile({ name: fileUrl.split("/").pop() || "Dokumen_JSA", size: 0, url: fileUrl });
+                }
+              }}
+            />
+          ) : (
+            <JsaMethodSection
+              mode={jsaMode}
+              setMode={setJsaMode}
+              perluJsa={perluJsa}
+              setPerluJsa={setPerluJsa}
+              jsaFile={jsaFile}
+              setJsaFile={setJsaFile}
+              jsaUploadStatus={jsaUploadStatus}
+              setJsaUploadStatus={setJsaUploadStatus}
+              jsaUploadError={jsaUploadError}
+              setJsaUploadError={setJsaUploadError}
+              jsaData={jsaData}
+              setJsaData={setJsaData}
+              sectionTitle="BAGIAN 5: JOB SAFETY ANALYSIS (JSA)"
+              sectionStyle="hot-work"
+            />
+          )}
+        </div>
       </div>
 
       {/* ── STICKY FLOATING ACTION BAR DI BAWAH ── */}

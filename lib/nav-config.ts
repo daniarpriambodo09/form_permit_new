@@ -68,6 +68,7 @@ export function getNavSections(role: UserRole): NavSection[] {
           beranda,
           { label: "Dashboard Analitik", href: "/dashboard", icon: BarChart3 },
           { label: "Daftar Form", href: "/approval", icon: ClipboardList },
+          { label: "Inspeksi Scaffolding", href: "/pengawas/scaffolding", icon: ShieldCheck },
         ],
       },
       {
@@ -137,6 +138,7 @@ export function getNavSections(role: UserRole): NavSection[] {
         items: [
           beranda,
           { label: "Penilaian Sub Kontraktor", href: "/pengawas", icon: ClipboardList },
+          { label: "Inspeksi Scaffolding", href: "/pengawas/scaffolding", icon: ShieldCheck },
         ],
       },
     ];
@@ -243,16 +245,16 @@ export function getFeaturedCards(role: UserRole): FeaturedCard[] {
   if (role === "pengawas") {
     return [
       {
+        title: "Inspeksi Scaffolding",
+        description: "Pemeriksaan teknis perancah scaffolding pada pekerjaan ketinggian.",
+        href: "/pengawas/scaffolding",
+        icon: ShieldCheck,
+      },
+      {
         title: "Checklist Pengawasan Harian",
         description: "Input berkala evaluasi 8 item K3 selama masa pekerjaan subkontraktor.",
         href: "/pengawas",
         icon: ClipboardList,
-      },
-      {
-        title: "Evaluasi Pasca Kerja",
-        description: "Pemeriksaan housekeeping dan kebersihan area setelah pekerjaan tuntas.",
-        href: "/pengawas",
-        icon: ShieldCheck,
       },
     ];
   }

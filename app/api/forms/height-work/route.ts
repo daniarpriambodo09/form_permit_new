@@ -62,7 +62,7 @@ export async function GET(req: NextRequest) {
       : `id_form, tanggal, tanggal_pelaksanaan, status,
          petugas_ketinggian, tipe_perusahaan, deskripsi_pekerjaan, lokasi,
          waktu_mulai, nama_pengawas_kontraktor, spv_terkait,
-         perlu_jsa, jsa_file_url, id_ijin_kerja`;
+         perlu_jsa, jsa_file_url, id_ijin_kerja, perlu_scaffolding`;
 
     let sql = `SELECT ${selectCols} FROM form_kerja_ketinggian`;
     const params: any[] = [];
@@ -139,6 +139,7 @@ export async function POST(req: NextRequest) {
       : 'Internal / Karyawan PT.JAI';
 
     const perluJsa   = formData.perluJsa === true;
+    const perluScaffolding = tipePerusahaan === 'eksternal' && formData.perluScaffolding === true;
     let jsaFileUrl   = perluJsa ? (formData.jsaFileUrl || null) : null;
     let jsaData      = formData.jsaData && typeof formData.jsaData === 'object' ? formData.jsaData : null;
     let linkedJsaData = idIjinKerja && formData.jsaData && typeof formData.jsaData === 'object' ? formData.jsaData : null;
@@ -203,7 +204,8 @@ export async function POST(req: NextRequest) {
         helm_kondisi_baik,
         spv_terkait, nama_kontraktor, sfo, mr_pga_mgr,
         perlu_jsa, jsa_file_url,
-        user_id, id_ijin_kerja, jsa_data
+        user_id, id_ijin_kerja, jsa_data,
+        perlu_scaffolding
       ) VALUES (
         $1,  $2,  $3,  $4,
         $5,  $6,
@@ -227,7 +229,8 @@ export async function POST(req: NextRequest) {
         $68,
         $69, $70, $71, $72,
         $73, $74,
-        $75, $76, $77
+        $75, $76, $77,
+        $78
       )`,
       [
         idForm, now, pelaksanaan, status,
@@ -277,8 +280,18 @@ export async function POST(req: NextRequest) {
         formData.spv_terkait || null, null, null, null,
         perluJsa, jsaFileUrl,
         userId, idIjinKerja, jsaData ? JSON.stringify(jsaData) : null,
+        perluScaffolding,
       ]
     );
+
+    if (perluScaffolding) {
+      await query(
+        `INSERT INTO inspeksi_scaffolding (id_form, id_ijin_kerja, lokasi, status, current_stage)
+         VALUES ($1, $2, $3, 'draft', 1)
+         ON CONFLICT (id_form) DO NOTHING`,
+        [idForm, idIjinKerja, formData.lokasi || null]
+      );
+    }
 
     if (linkedJsaData) {
       await query(`UPDATE form_ijin_kerja SET jsa_data = $1 WHERE id_form = $2`, [JSON.stringify(linkedJsaData), idIjinKerja]);
