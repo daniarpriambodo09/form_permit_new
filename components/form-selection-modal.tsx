@@ -20,6 +20,8 @@ interface FormTypeItem {
   color: string;
   category: FormCategory;
   categoryLabel: string;
+  docNo: string;
+  revNo: string;
   badge?: string;
 }
 
@@ -33,6 +35,8 @@ const formTypes: FormTypeItem[] = [
     color: "from-purple-500 to-indigo-500",
     category: "eksternal",
     categoryLabel: "Eksternal",
+    docNo: "JAI/F-01/P.SHE-19",
+    revNo: "Rev. 4",
     badge: "MULAI DI SINI",
   },
   {
@@ -44,6 +48,8 @@ const formTypes: FormTypeItem[] = [
     color: "from-red-500 to-orange-500",
     category: "internal",
     categoryLabel: "Internal",
+    docNo: "JAI/F-05/P.SHE-19",
+    revNo: "Rev. 1",
   },
   {
     id: "height-work",
@@ -54,6 +60,8 @@ const formTypes: FormTypeItem[] = [
     color: "from-blue-500 to-cyan-500",
     category: "internal",
     categoryLabel: "Internal",
+    docNo: "JAI/F-09/P.SHE-19",
+    revNo: "Rev. 0",
   },
   {
     id: "workshop",
@@ -64,6 +72,8 @@ const formTypes: FormTypeItem[] = [
     color: "from-green-500 to-emerald-500",
     category: "internal",
     categoryLabel: "Internal",
+    docNo: "JAI/F-12/P.SHE-19",
+    revNo: "Rev. 1",
   },
 ];
 
@@ -161,9 +171,19 @@ export default function FormSelectionModal({ isOpen, onClose }: FormSelectionMod
                     <div
                       className={`absolute inset-0 opacity-0 group-hover:opacity-5 bg-gradient-to-r ${form.color} transition-opacity`}
                     />
-                    <div className="relative p-6 flex items-start gap-4">
-                      <div className={`p-3 rounded-lg bg-gradient-to-br ${form.color} shrink-0 shadow-sm`}>
-                        <Icon className="w-6 h-6 text-white" />
+                    <div className="relative p-5 sm:p-6 flex items-start gap-3.5">
+                      <div className="flex flex-col items-center shrink-0 w-16">
+                        <div className={`p-3 rounded-xl bg-gradient-to-br ${form.color} shadow-sm`}>
+                          <Icon className="w-6 h-6 text-white" />
+                        </div>
+                        <div className="mt-1.5 text-center leading-none space-y-0.5">
+                          <p className="text-[8.5px] font-mono font-semibold text-slate-500 tracking-tighter whitespace-nowrap">
+                            {form.docNo}
+                          </p>
+                          <p className="text-[8px] font-medium text-slate-400 tracking-tight">
+                            {form.revNo}
+                          </p>
+                        </div>
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex flex-wrap items-center gap-2 mb-1">
@@ -214,4 +234,4 @@ export default function FormSelectionModal({ isOpen, onClose }: FormSelectionMod
       </div>
     </div>
   );
-}
+}

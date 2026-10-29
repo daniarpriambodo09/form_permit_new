@@ -903,7 +903,7 @@ function HeightWorkFormPageInner() {
             <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
               Izin Kerja Ketinggian (Height Work Permit)
             </h1>
-            <div className="mt-2 space-y-0.5 text-amber-300 text-xs sm:text-sm font-semibold max-w-2xl">
+            <div className="mt-1.5 space-y-0.5 text-amber-300/95 text-[11px] sm:text-xs font-medium max-w-2xl leading-snug">
               <p>Hanya pekerjaan yang tertera dibawah ini yang dicakup oleh Form Izin Bekerja di Ketinggian.</p>
               <p>Perhatikan ijin kerja dibawah ini sebelum memulai pekerjaan</p>
             </div>
