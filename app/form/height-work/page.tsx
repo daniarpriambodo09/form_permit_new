@@ -705,6 +705,15 @@ function HeightWorkFormPageInner() {
     helmKondisiBaik,
     perluJsa,
     perluScaffolding,
+    scaffoldingInspection: perluScaffolding && scaffoldingItems.some((it) => it.kondisi !== "") ? {
+      nama_inspektor: scaffoldingInspector || (tipePerusahaan === "internal" ? namaPengawasDepartemen : namaPengawasKontraktor) || user?.nama || "Pengawas",
+      tanggal_inspeksi: scaffoldingTanggal,
+      lokasi: scaffoldingLokasi || lokasi || "-",
+      tipe_perancah: scaffoldingTipePerancah || "Frame Scaffolding",
+      items: scaffoldingItems,
+      ketentuan_lainnya: scaffoldingKetentuan,
+      is_submitted: isSubmit,
+    } : null,
     jsaFileUrl: jsaFile?.url ?? null,
     ...(jsaMode === "build" && !jsaFile?.url ? { jsaData } : {}),
     idIjinKerja,
@@ -1262,10 +1271,7 @@ function HeightWorkFormPageInner() {
                       type="radio"
                       name="perluScaffoldingRadio"
                       checked={perluScaffolding === true}
-                      onChange={() => {
-                        setPerluScaffolding(true);
-                        setShowScaffoldingCard(true);
-                      }}
+                      onChange={() => setPerluScaffolding(true)}
                       className="w-4 h-4 text-orange-600 focus:ring-orange-500"
                     />
                     <span>Ya, Perlu Scaffolding</span>
@@ -1287,41 +1293,30 @@ function HeightWorkFormPageInner() {
 
                 {perluScaffolding && (
                   <div className="mt-3 ml-6.5 space-y-2">
-                    <button
-                      type="button"
-                      onClick={() => setShowScaffoldingCard((v: boolean) => !v)}
-                      className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all shadow-xs cursor-pointer ${showScaffoldingCard
-                          ? "bg-slate-800 hover:bg-slate-900 text-white"
-                          : "bg-orange-600 hover:bg-orange-700 text-white"
-                        }`}
-                    >
-                      <ShieldCheck className="w-4 h-4 text-orange-300" />
-                      <span>{showScaffoldingCard ? "Sembunyikan Form Inspeksi Scaffolding" : "Buat / Isi Inspeksi Scaffolding"}</span>
-                    </button>
-                    <p className="text-[11px] text-slate-500">
-                      {showScaffoldingCard
-                        ? "Checksheet 17 komponen perancah terbuka di bawah ini. Anda dapat melengkapi checklist kelaikan sebelum mengajukan izin."
-                        : "Klik tombol di atas untuk melengkapi lembar inspeksi 17 komponen perancah secara langsung pada form ini."}
-                    </p>
-                  </div>
-                )}
+                    <div className="flex items-center gap-2.5 flex-wrap">
+                      <button
+                        type="button"
+                        onClick={() => setShowScaffoldingCard(true)}
+                        className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-bold bg-orange-600 hover:bg-orange-700 text-white transition-all shadow-xs cursor-pointer"
+                      >
+                        <ShieldCheck className="w-4 h-4 text-orange-200" />
+                        <span>
+                          {scaffoldingItems.some((it) => it.kondisi !== "")
+                            ? "Lihat / Edit Inspeksi Scaffolding"
+                            : "Buat Inspeksi Scaffolding"}
+                        </span>
+                      </button>
 
-                {perluScaffolding && showScaffoldingCard && (
-                  <div className="mt-4 pt-4 border-t border-slate-200">
-                    <ScaffoldingInspectionCard
-                      namaInspektor={scaffoldingInspector || (tipePerusahaan === "internal" ? namaPengawasDepartemen : namaPengawasKontraktor) || user?.nama || ""}
-                      setNamaInspektor={setScaffoldingInspector}
-                      tanggalInspeksi={scaffoldingTanggal}
-                      setTanggalInspeksi={setScaffoldingTanggal}
-                      lokasi={scaffoldingLokasi || lokasi || ""}
-                      setLokasi={setScaffoldingLokasi}
-                      tipePerancah={scaffoldingTipePerancah}
-                      setTipePerancah={setScaffoldingTipePerancah}
-                      items={scaffoldingItems}
-                      setItems={setScaffoldingItems}
-                      ketentuan={scaffoldingKetentuan}
-                      setKetentuan={setScaffoldingKetentuan}
-                    />
+                      {scaffoldingItems.some((it) => it.kondisi !== "") && (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                          <Check className="w-3.5 h-3.5 text-emerald-600" />
+                          {scaffoldingItems.filter((it) => it.kondisi !== "").length}/17 Komponen Terisi
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-[11px] text-slate-500">
+                      Klik tombol di atas untuk membuka popup lembar inspeksi 17 komponen perancah.
+                    </p>
                   </div>
                 )}
               </div>
@@ -1593,33 +1588,32 @@ function HeightWorkFormPageInner() {
             </div>
 
             {/* Keterangan / Point Penting Penggunaan APD & Tangga Listrik/AWP */}
-            <div className="mt-4 p-4 rounded-xl border border-amber-200 bg-amber-50/70 text-slate-800 space-y-3">
-              <div className="space-y-2">
-                <div className="flex items-center gap-2 text-amber-900">
-                  <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
-                  <span className="font-extrabold text-xs sm:text-sm tracking-wide uppercase">
-                    POINT PENTING :
-                  </span>
-                </div>
-                <ul className="list-disc list-inside space-y-1.5 text-xs text-slate-700 pl-1 leading-relaxed">
-                  <li>Tangga Listrik / AWP tidak bisa digunakan diluar gedung saat hujan</li>
-                  <li>Setelah penggunaan tangga listrik selesai, segera mengembalikan kunci pagar tangga listrik dan APD</li>
-                  <li>Harap menjaga kebersihan tangga listrik setelah pemakaian</li>
-                  <li>Pastikan beban tidak melebihi kapasitas maksimal Safety Line = 150 kg</li>
-                  <li>Penggunaan tangga listrik / awp harus sesuai dengan Operation standar dan wajib mengenakan APD</li>
-                </ul>
+            <div className="mt-4 p-4 rounded-xl border border-amber-200 bg-amber-50/70 text-slate-800 space-y-2">
+              <div className="flex items-center gap-2 text-amber-900">
+                <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+                <span className="font-extrabold text-xs sm:text-sm tracking-wide uppercase">
+                  POINT PENTING :
+                </span>
               </div>
+              <ul className="list-disc list-inside space-y-1.5 text-xs text-slate-700 pl-1 leading-relaxed">
+                <li>Tangga Listrik / AWP tidak bisa digunakan diluar gedung saat hujan</li>
+                <li>Setelah penggunaan tangga listrik selesai, segera mengembalikan kunci pagar tangga listrik dan APD</li>
+                <li>Harap menjaga kebersihan tangga listrik setelah pemakaian</li>
+                <li>Pastikan beban tidak melebihi kapasitas maksimal Safety Line = 150 kg</li>
+                <li>Penggunaan tangga listrik / awp harus sesuai dengan Operation standar dan wajib mengenakan APD</li>
+              </ul>
+            </div>
 
-              {/* Keterangan Tambahan Terpisah */}
-              <div className="pt-2.5 border-t border-amber-200/90">
-                <div className="p-3 rounded-lg bg-amber-100/70 border border-amber-300 text-xs text-amber-950 space-y-1">
-                  <span className="font-bold uppercase tracking-wider block text-[11px] text-amber-900">
-                    Keterangan Tambahan :
-                  </span>
-                  <p className="font-medium leading-relaxed">
-                    Penggunaan tangga listrik / AWP pada malam hari, pengajuan lewat security dan memastikan area kerja intensitas cahaya cukup.
-                  </p>
-                </div>
+            {/* Keterangan Tambahan Terpisah (Background Biru) */}
+            <div className="mt-3 p-3.5 rounded-xl bg-blue-50 border border-blue-200 text-xs text-blue-900 flex items-start gap-2.5">
+              <Info className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
+              <div className="space-y-0.5">
+                <span className="font-extrabold uppercase tracking-wider block text-[11px] text-blue-800">
+                  Keterangan Tambahan :
+                </span>
+                <p className="font-semibold leading-relaxed text-blue-900">
+                  Penggunaan tangga listrik / AWP pada malam hari, pengajuan lewat security dan memastikan area kerja intensitas cahaya cukup
+                </p>
               </div>
             </div>
           </Section>
@@ -1855,6 +1849,92 @@ function HeightWorkFormPageInner() {
 
       {previewWorker && (
         <MasterLisenceViewModal worker={previewWorker} onClose={() => setPreviewWorker(null)} />
+      )}
+
+      {perluScaffolding && showScaffoldingCard && (
+        <div
+          className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-5 animate-in fade-in duration-200"
+          onClick={() => setShowScaffoldingCard(false)}
+        >
+          <div
+            className="bg-slate-50 rounded-2xl border border-slate-200 shadow-2xl max-w-6xl w-full max-h-[92vh] flex flex-col overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="bg-white border-b border-slate-200 px-4 sm:px-6 py-3.5 flex items-center justify-between gap-3 shrink-0">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-orange-100 text-orange-600 flex items-center justify-center shrink-0">
+                  <ShieldCheck className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm sm:text-base font-extrabold text-slate-900">
+                    Form Inspeksi &amp; Kelayakan Scaffolding
+                  </h3>
+                  <p className="text-[11px] sm:text-xs text-slate-500">
+                    Lengkapi pemeriksaan 17 komponen standar perancah sebelum mengajukan izin kerja ketinggian
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowScaffoldingCard(false)}
+                className="p-2 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
+                title="Tutup Popup"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Body (Scrollable) */}
+            <div className="flex-1 overflow-y-auto px-4 sm:px-6 pb-6">
+              <ScaffoldingInspectionCard
+                namaInspektor={scaffoldingInspector || (tipePerusahaan === "internal" ? namaPengawasDepartemen : namaPengawasKontraktor) || user?.nama || ""}
+                setNamaInspektor={setScaffoldingInspector}
+                tanggalInspeksi={scaffoldingTanggal}
+                setTanggalInspeksi={setScaffoldingTanggal}
+                lokasi={scaffoldingLokasi || lokasi || ""}
+                setLokasi={setScaffoldingLokasi}
+                tipePerancah={scaffoldingTipePerancah}
+                setTipePerancah={setScaffoldingTipePerancah}
+                items={scaffoldingItems}
+                setItems={setScaffoldingItems}
+                ketentuan={scaffoldingKetentuan}
+                setKetentuan={setScaffoldingKetentuan}
+              />
+            </div>
+
+            {/* Modal Footer */}
+            <div className="bg-white border-t border-slate-200 px-4 sm:px-6 py-3 flex items-center justify-between gap-3 shrink-0">
+              <div className="text-xs text-slate-600 font-medium">
+                Status Pengisian:{" "}
+                <strong className="text-slate-900">
+                  {scaffoldingItems.filter((it) => it.kondisi !== "").length}/17 Komponen
+                </strong>{" "}
+                &bull;{" "}
+                <strong className="text-slate-900">
+                  {scaffoldingKetentuan.filter((kt) => kt.prosedur !== "").length}/3 Ketentuan
+                </strong>
+              </div>
+              <div className="flex items-center gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => setShowScaffoldingCard(false)}
+                  className="px-4 py-2 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-xs sm:text-sm font-bold transition-colors cursor-pointer"
+                >
+                  Tutup
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowScaffoldingCard(false)}
+                  className="inline-flex items-center gap-1.5 px-5 py-2 rounded-xl bg-orange-600 hover:bg-orange-700 text-white text-xs sm:text-sm font-bold shadow-xs transition-all cursor-pointer"
+                >
+                  <Check className="w-4 h-4" />
+                  <span>Simpan &amp; Selesai</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
