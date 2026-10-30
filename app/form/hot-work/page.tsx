@@ -609,8 +609,13 @@ function HotWorkPermitFormInner() {
       setWorkerOptions([]);
       return;
     }
+    const dept = user?.departmen;
+    const url = dept && dept !== "Unknown"
+      ? `/api/master-lisence/workers?jenisKerja=hot_work&departemen=${encodeURIComponent(dept)}`
+      : "/api/master-lisence/workers?jenisKerja=hot_work";
+
     setLoadingWorkers(true);
-    fetch("/api/master-lisence/workers?jenisKerja=hot_work", {
+    fetch(url, {
       credentials: "include",
     })
       .then((r) => (r.ok ? r.json() : { data: [] }))
@@ -620,7 +625,7 @@ function HotWorkPermitFormInner() {
         setWorkerOptions([]);
       })
       .finally(() => setLoadingWorkers(false));
-  }, [formData.tipePerusahaan]);
+  }, [formData.tipePerusahaan, user?.departmen]);
 
   const toggle = (s: string) => setExpanded((prev) => ({ ...prev, [s]: !prev[s as keyof typeof prev] }));
   const setJ = (patch: any) => {

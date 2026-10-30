@@ -521,14 +521,19 @@ function WorkshopPermitFormInner() {
     fetchUser();
   }, [idIjinKerja]);
 
-  // ── Fetch pekerja Workshop dari Master Lisence saat Internal ──
+  // ── Fetch pekerja Workshop dari Master Lisence saat Internal (filter by departemen user) ──
   useEffect(() => {
     if (formData.tipePerusahaan !== "internal") {
       setWorkerOptions([]);
       return;
     }
+    const dept = user?.departmen;
+    const url = dept && dept !== "Unknown"
+      ? `/api/master-lisence/workers?jenisKerja=workshop&departemen=${encodeURIComponent(dept)}`
+      : "/api/master-lisence/workers?jenisKerja=workshop";
+
     setLoadingWorkers(true);
-    fetch("/api/master-lisence/workers?jenisKerja=workshop", {
+    fetch(url, {
       credentials: "include",
     })
       .then((r) => (r.ok ? r.json() : { data: [] }))
@@ -538,7 +543,7 @@ function WorkshopPermitFormInner() {
         setWorkerOptions([]);
       })
       .finally(() => setLoadingWorkers(false));
-  }, [formData.tipePerusahaan]);
+  }, [formData.tipePerusahaan, user?.departmen]);
 
   const toggle = (s: string) =>
     setExpanded((prev) => ({ ...prev, [s]: !prev[s as keyof typeof prev] }));
