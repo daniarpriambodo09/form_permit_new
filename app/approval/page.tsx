@@ -764,7 +764,7 @@ export default function ApprovalPage() {
                     { id: "workshop", label: "Workshop" },
                     { id: "height-work", label: "Ketinggian" },
                     { id: "general-permit", label: "Eksternal" },
-                    ...(isSecurity || isAdmin ? [{ id: "external-permit", label: "Safety Induction" }] : []),
+                    ...(isSecurity || isAdmin ? [{ id: "external-permit", label: "Safety Induction (JAI/F-04/P.SHE-19 Rev. 1)" }] : []),
                   ].map(item => {
                     const isSelected = filterJenis === item.id;
                     return (

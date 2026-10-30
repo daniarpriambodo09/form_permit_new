@@ -11,7 +11,7 @@ import {
   sendRejectionNotification,
   sendExternalApprovalNotification,
 } from '@/lib/email';
-import { getAdminK3ApproverForForm, JenisFormK3 } from '@/lib/admin-k3-routing';
+import { getAdminK3ApproverForForm, getAssignedApproverForForm, JenisFormK3 } from '@/lib/admin-k3-routing';
 
 // ── Tipe data ────────────────────────────────────────────────
 
@@ -249,6 +249,24 @@ export async function notifyNextApprover(params: {
       // sengaja tidak return, lanjut ke logika default di bawah
     }
 
+    // ── ROUTING PILIHAN APPROVER: stage SFO atau SMR yang dipilih oleh approver sebelumnya ──
+    if (approverRole === 'sfo' || approverRole === 'smr') {
+      const assigned = await getAssignedApproverForForm(idForm, approverRole);
+      if (assigned?.email) {
+        await sendApprovalNotification({
+          idForm,
+          jenisForm: getFormLabel(formType),
+          namaPemohon,
+          tanggal: formatTanggal(tanggal),
+          approverName: assigned.nama,
+          approverEmail: assigned.email,
+          formTypeSlug: formType,
+        });
+        console.log(`[EMAIL] Approver ${approverRole.toUpperCase()} terpilih untuk ${formType} ${idForm} → ${assigned.nama} (${assigned.email})`);
+        return;
+      }
+    }
+
     const makerDepartmen = await getMakerDepartmen(userId);
 
     if (approverRole === 'spv' && (formType === 'hot-work' || formType === 'workshop')) {
@@ -480,6 +498,40 @@ export async function notifyGeneralPermitNextApprover(params: {
       }
       console.log(`[EMAIL] Tidak ditemukan SPV terpilih yang cocok untuk Ijin Kerja Eksternal ${idForm} — fallback ke semua SPV di departemen.`);
       // sengaja tidak return, lanjut ke fallback default di bawah
+    }
+
+    // ── ROUTING KHUSUS: stage Admin K3 untuk general-permit (Ijin Kerja Eksternal) ──
+    if (approverRole === 'admin_k3') {
+      const routed = await getAdminK3ApproverForForm('general-permit');
+      if (routed?.email) {
+        await sendExternalApprovalNotification({
+          idForm,
+          namaPemohon,
+          tanggal: formatTanggal(tanggal),
+          approverName: routed.nama,
+          approverEmail: routed.email,
+          attachmentCount: 0,
+        });
+        console.log(`[EMAIL] Admin K3 routing aktif untuk general-permit ${idForm} → dikirim ke ${routed.nama} (${routed.email})`);
+        return;
+      }
+    }
+
+    // ── ROUTING PILIHAN APPROVER: stage SFO atau SMR pada Ijin Kerja Eksternal ──
+    if (approverRole === 'sfo' || approverRole === 'smr') {
+      const assigned = await getAssignedApproverForForm(idForm, approverRole);
+      if (assigned?.email) {
+        await sendExternalApprovalNotification({
+          idForm,
+          namaPemohon,
+          tanggal: formatTanggal(tanggal),
+          approverName: assigned.nama,
+          approverEmail: assigned.email,
+          attachmentCount: 0,
+        });
+        console.log(`[EMAIL] Approver ${approverRole.toUpperCase()} terpilih untuk Ijin Kerja Eksternal ${idForm} → ${assigned.nama} (${assigned.email})`);
+        return;
+      }
     }
 
     const approvers = await getApproverEmails(approverRole, makerDepartmen);

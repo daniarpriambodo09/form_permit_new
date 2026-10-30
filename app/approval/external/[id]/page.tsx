@@ -24,6 +24,7 @@ import PenilaianSubkontraktorSection, {
   createEmptyPenilaianSubkontraktor,
   type PenilaianSubkontraktorData,
 } from "@/components/PenilaianSubkontraktorSection";
+import NextApproverModal from "@/components/NextApproverModal";
 
 const labels: Record<string, string> = {
   "hot-work": "Hot Work Permit",
@@ -150,6 +151,9 @@ export default function ExternalApprovalPage({ params }: { params: Promise<{ id:
   // ── Reject modal state (SPV/SFO/SMR) ────────────────────────
   const [showReject, setShowReject] = useState(false);
   const [catatan, setCatatan] = useState("");
+  const [pendingApproveSource, setPendingApproveSource] = useState<
+    "general-permit" | "attachments" | "jsa" | "penilaian" | null
+  >(null);
 
   // ── Signature pad state (Security) ──────────────────────────
   const [signSubmitting, setSignSubmitting] = useState(false);
@@ -227,8 +231,19 @@ export default function ExternalApprovalPage({ params }: { params: Promise<{ id:
     window.location.href = "/login/approver";
   };
 
+  const nextApproverTargetRole: "sfo" | "smr" | null =
+    user?.role === "admin_k3" || (isAdmin && Number(data?.general?.current_stage) === 2)
+      ? "sfo"
+      : user?.role === "sfo" || (isAdmin && Number(data?.general?.current_stage) === 3)
+        ? "smr"
+        : null;
+
   // ── SFO / Admin: Approve Form Penilaian Sub Kontraktor ────────
-  const approvePenilaianSubkontraktor = async () => {
+  const approvePenilaianSubkontraktor = async (nextApproverUserId?: number) => {
+    if (nextApproverTargetRole && !nextApproverUserId) {
+      setPendingApproveSource("penilaian");
+      return;
+    }
     setPenilaianLoading(true);
     setError("");
     setMessage("");
@@ -236,9 +251,12 @@ export default function ExternalApprovalPage({ params }: { params: Promise<{ id:
       const res = await fetch(`/api/approval/external/${id}/penilaian-subkontraktor`, {
         method: "PATCH",
         credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(nextApproverUserId ? { next_approver_user_id: nextApproverUserId } : {}),
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || "Gagal menyetujui Penilaian Sub Kontraktor");
+      setPendingApproveSource(null);
       setMessage("Form Penilaian Sub Kontraktor dan seluruh lampiran terkait berhasil disetujui otomatis.");
       await loadData();
     } catch (err: any) {
@@ -249,8 +267,12 @@ export default function ExternalApprovalPage({ params }: { params: Promise<{ id:
   };
 
   // ── Approve lampiran (hot-work, workshop, height-work) ────────
-  const approveAttachments = async () => {
+  const approveAttachments = async (nextApproverUserId?: number) => {
     if (!data) return;
+    if (nextApproverTargetRole && !nextApproverUserId) {
+      setPendingApproveSource("attachments");
+      return;
+    }
     setActionLoading(true);
     setError("");
     const results = await Promise.all(data.attachments.map(async (attachment) => {
@@ -258,28 +280,40 @@ export default function ExternalApprovalPage({ params }: { params: Promise<{ id:
         method: "PATCH",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "approve" }),
+        body: JSON.stringify({
+          action: "approve",
+          ...(nextApproverUserId ? { next_approver_user_id: nextApproverUserId } : {}),
+        }),
       });
       return { ok: response.ok, body: await response.json() };
     }));
     const approved = results.filter((result) => result.ok).length;
     const failed = results.filter((result) => !result.ok);
+    setPendingApproveSource(null);
     setMessage(`${approved} lampiran berhasil diproses${failed.length ? `. ${failed.length} lampiran belum dapat diproses karena belum giliran approval atau sudah diproses.` : "."} Status lampiran dan form induk telah disinkronkan.`);
     await loadData();
     setActionLoading(false);
   };
 
   // ── Approve JSA ───────────────────────────────────────────────
-  const approveJsa = async () => {
+  const approveJsa = async (nextApproverUserId?: number) => {
+    if (nextApproverTargetRole === "smr" && user?.role === "sfo" && !nextApproverUserId) {
+      setPendingApproveSource("jsa");
+      return;
+    }
     setActionLoading(true);
     setError("");
     const response = await fetch(`/api/approval/external/${id}/jsa`, {
       method: "PATCH", credentials: "include", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "approve" }),
+      body: JSON.stringify({
+        action: "approve",
+        ...(nextApproverUserId ? { next_approver_user_id: nextApproverUserId } : {}),
+      }),
     });
     const result = await response.json();
     if (!response.ok) setError(result.error || "JSA tidak dapat disetujui");
     else {
+      setPendingApproveSource(null);
       setMessage(`JSA dan seluruh lampiran terkait berhasil disetujui otomatis untuk role ${user?.role}.`);
       await loadData();
     }
@@ -347,9 +381,13 @@ export default function ExternalApprovalPage({ params }: { params: Promise<{ id:
   };
 
   // ── SPV / SFO / SMR: approve / reject form induk ────────────────
-  const handleGeneralPermitAction = async (action: "approve" | "reject") => {
+  const handleGeneralPermitAction = async (action: "approve" | "reject", nextApproverUserId?: number) => {
     if (action === "reject" && !catatan.trim()) {
       setError("Catatan alasan penolakan wajib diisi.");
+      return;
+    }
+    if (action === "approve" && nextApproverTargetRole && !nextApproverUserId) {
+      setPendingApproveSource("general-permit");
       return;
     }
     setActionLoading(true);
@@ -359,10 +397,15 @@ export default function ExternalApprovalPage({ params }: { params: Promise<{ id:
         method: "PATCH",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action, catatan_reject: catatan }),
+        body: JSON.stringify({
+          action,
+          catatan_reject: catatan,
+          ...(nextApproverUserId ? { next_approver_user_id: nextApproverUserId } : {}),
+        }),
       });
       const result = await res.json();
       if (!res.ok) throw new Error(result.error || "Gagal memproses approval");
+      setPendingApproveSource(null);
       setMessage(action === "approve" ? "Form induk dan seluruh lampiran terkait berhasil disetujui otomatis." : "Form berhasil ditolak.");
       setShowReject(false);
       setCatatan("");
@@ -594,7 +637,7 @@ export default function ExternalApprovalPage({ params }: { params: Promise<{ id:
     // 3. Safety Induction Security
     {
       id: "safety-induction",
-      title: "Safety Induction Security",
+      title: "Safety Induction JAI/F-04/P.SHE-19 Rev. 1",
       subtitle: "Verifikasi Pos Security & Pekerja",
       icon: Shield,
       badge: siApproved ? "Terverifikasi" : siHasData ? "Draft" : "Belum Diisi",
@@ -604,7 +647,7 @@ export default function ExternalApprovalPage({ params }: { params: Promise<{ id:
     // 4. Penilaian Subkontraktor
     {
       id: "penilaian",
-      title: "Penilaian Subkontraktor",
+      title: "Penilaian Subkontraktor JAI/F-08/P.SHE-19 Rev. 1",
       subtitle: "Evaluasi Lapangan & Barcode",
       icon: FileCheck,
       badge: entriesCount > 0 ? `${entriesCount} Terisi` : isPenilaianSfoApproved ? "✓ SFO OK" : "Form K3",
@@ -916,9 +959,12 @@ export default function ExternalApprovalPage({ params }: { params: Promise<{ id:
                 <div className="flex items-center gap-2.5">
                   <Shield className="w-5 h-5 text-teal-600 shrink-0" />
                   <div>
-                    <p className="font-bold text-teal-950">Tahap Verifikasi Pos Security &amp; Safety Induction</p>
+                    <p className="font-bold text-teal-950">Tahap Verifikasi Pos Security &amp; Safety Induction (JAI/F-04/P.SHE-19 Rev. 1)</p>
                     <p className="text-[11px] text-teal-800 mt-0.5">
                       Silakan periksa kartu identitas pekerja subkontraktor dan bubuhkan tanda tangan digital Security pada tab Dokumen &amp; Form Terkait → Safety Induction.
+                    </p>
+                    <p className="text-[11px] font-semibold text-teal-900 mt-1">
+                      Area terbatas : Utility Area, Panel Utama, Tandon Air &amp; Water Treatment, IPAL (Hydro Kalva bio)
                     </p>
                   </div>
                 </div>
@@ -1479,7 +1525,7 @@ export default function ExternalApprovalPage({ params }: { params: Promise<{ id:
                           </p>
                           <button
                             type="button"
-                            onClick={approveAttachments}
+                            onClick={() => approveAttachments()}
                             disabled={!pendingAttachments || actionLoading}
                             className="inline-flex items-center gap-1.5 px-4 py-2 bg-orange-600 hover:bg-orange-700 disabled:bg-slate-200 disabled:text-slate-400 text-white rounded-xl font-bold text-xs transition-colors shadow-xs cursor-pointer"
                           >
@@ -1547,7 +1593,7 @@ export default function ExternalApprovalPage({ params }: { params: Promise<{ id:
                             <div className="pt-2 flex justify-end">
                               <button
                                 type="button"
-                                onClick={approveJsa}
+                                onClick={() => approveJsa()}
                                 disabled={actionLoading}
                                 className="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer"
                               >
@@ -1571,7 +1617,12 @@ export default function ExternalApprovalPage({ params }: { params: Promise<{ id:
                           <Shield className="w-4 h-4" />
                         </div>
                         <div>
-                          <h3 className="font-bold text-slate-800 text-xs sm:text-sm">Safety Induction Pos Security</h3>
+                          <div className="flex items-center gap-2">
+                            <h3 className="font-bold text-slate-800 text-xs sm:text-sm">Safety Induction Pos Security</h3>
+                            <span className="text-[10px] font-mono font-semibold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 border border-slate-200">
+                              JAI/F-04/P.SHE-19 Rev. 1
+                            </span>
+                          </div>
                           <p className="text-[11px] text-slate-500">Pemeriksaan tata tertib K3 &amp; verifikasi identitas pekerja lapangan</p>
                         </div>
                       </div>
@@ -1635,7 +1686,12 @@ export default function ExternalApprovalPage({ params }: { params: Promise<{ id:
                           <FileCheck className="w-4 h-4" />
                         </div>
                         <div>
-                          <h3 className="font-bold text-slate-800 text-xs sm:text-sm">Form Penilaian Sub Kontraktor</h3>
+                          <div className="flex items-center gap-2">
+                            <h3 className="font-bold text-slate-800 text-xs sm:text-sm">Form Penilaian Sub Kontraktor</h3>
+                            <span className="text-[10px] font-mono font-semibold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 border border-slate-200">
+                              JAI/F-08/P.SHE-19 Rev. 1
+                            </span>
+                          </div>
                           <p className="text-[11px] text-slate-500">Evaluasi checklist K3 harian di lapangan dan tanda tangan digital</p>
                         </div>
                       </div>
@@ -1676,7 +1732,7 @@ export default function ExternalApprovalPage({ params }: { params: Promise<{ id:
                           ) : (
                             <button
                               type="button"
-                              onClick={approvePenilaianSubkontraktor}
+                              onClick={() => approvePenilaianSubkontraktor()}
                               disabled={penilaianLoading}
                               className="flex items-center gap-1.5 px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-purple-300 text-white rounded-xl font-bold text-xs transition-all shadow-xs active:scale-95 cursor-pointer"
                             >
@@ -1789,6 +1845,26 @@ export default function ExternalApprovalPage({ params }: { params: Promise<{ id:
 
         </main>
       </div>
+
+      {nextApproverTargetRole && (
+        <NextApproverModal
+          isOpen={pendingApproveSource !== null}
+          onClose={() => setPendingApproveSource(null)}
+          targetRole={nextApproverTargetRole}
+          submitting={actionLoading || penilaianLoading}
+          onConfirm={(selectedUserId) => {
+            if (pendingApproveSource === "general-permit") {
+              handleGeneralPermitAction("approve", selectedUserId);
+            } else if (pendingApproveSource === "attachments") {
+              approveAttachments(selectedUserId);
+            } else if (pendingApproveSource === "jsa") {
+              approveJsa(selectedUserId);
+            } else if (pendingApproveSource === "penilaian") {
+              approvePenilaianSubkontraktor(selectedUserId);
+            }
+          }}
+        />
+      )}
     </div>
   );
 }

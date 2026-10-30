@@ -198,9 +198,14 @@ export default function SafetyInductionSection({
             <Shield className="w-4 h-4" />
           </div>
           <div>
-            <h2 className="font-bold text-xs sm:text-sm text-slate-800">
-              Safety Induction Pos Security
-            </h2>
+            <div className="flex items-center gap-2">
+              <h2 className="font-bold text-xs sm:text-sm text-slate-800">
+                Safety Induction Pos Security
+              </h2>
+              <span className="text-[10px] font-mono font-semibold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 border border-slate-200">
+                JAI/F-04/P.SHE-19 Rev. 1
+              </span>
+            </div>
             <p className="text-[10px] text-slate-400 mt-0.5">
               Tata tertib pekerja subkontraktor &amp; verifikasi keselamatan pos security
             </p>
@@ -441,7 +446,11 @@ export default function SafetyInductionSection({
               </div>
 
               {/* Area Terbatas Badges */}
-              <div className="pt-2 border-t border-slate-100">
+              <div className="pt-2 border-t border-slate-100 space-y-2">
+                <div className="p-2.5 rounded-lg bg-amber-50 border border-amber-200 text-amber-900 text-xs font-semibold flex items-center gap-2">
+                  <Lock className="w-4 h-4 text-amber-700 shrink-0" />
+                  <span>Area terbatas : Utility Area, Panel Utama, Tandon Air &amp; Water Treatment, IPAL (Hydro Kalva bio)</span>
+                </div>
                 <p className="font-bold text-slate-800 mb-1.5 flex items-center gap-1.5">
                   <Lock className="w-3 h-3 text-slate-500" />
                   Daftar Area Terbatas:

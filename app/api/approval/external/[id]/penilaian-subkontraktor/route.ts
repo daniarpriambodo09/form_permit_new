@@ -5,6 +5,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { query, queryOne } from "@/lib/db";
 import { verifyToken, COOKIE_NAME } from "@/lib/auth";
 import { syncCascadeApproval } from "@/lib/approval-sync";
+import { setAssignedApproverCascade } from "@/lib/admin-k3-routing";
 
 function getUser(req: NextRequest) {
   const token = req.cookies.get(COOKIE_NAME)?.value;
@@ -26,6 +27,12 @@ export async function PATCH(
   }
 
   const { id } = await params;
+  let body: any = {};
+  try {
+    body = await req.json();
+  } catch {
+    body = {};
+  }
   try {
     const existing = await queryOne<{ id_form: string; status: string; penilaian_subkontraktor: any }>(
       `SELECT id_form, status, penilaian_subkontraktor FROM form_ijin_kerja WHERE id_form = $1`,
@@ -67,6 +74,11 @@ export async function PATCH(
         WHERE id_form = $2`,
       [JSON.stringify(updatedData), id]
     );
+
+    const nextApproverUserId = Number(body?.next_approver_user_id || 0);
+    if (nextApproverUserId > 0) {
+      await setAssignedApproverCascade(id, "smr", nextApproverUserId, user.userId);
+    }
 
     // Sinkronisasi approval otomatis ke form induk, JSA, dan lampiran kerja untuk role SFO
     await syncCascadeApproval({

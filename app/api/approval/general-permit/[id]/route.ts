@@ -12,6 +12,11 @@ import { query, queryOne } from "@/lib/db";
 import { verifyToken, COOKIE_NAME, UserRole } from "@/lib/auth";
 import { notifyGeneralPermitNextApprover, notifyGeneralPermitRejected } from "@/lib/approval-email";
 import { syncCascadeApproval } from "@/lib/approval-sync";
+import {
+    setAssignedApproverCascade,
+    getAssignedApproverForForm,
+    getAdminK3ApproverForForm,
+} from "@/lib/admin-k3-routing";
 
 function getUser(req: NextRequest) {
     const token = req.cookies.get(COOKIE_NAME)?.value;
@@ -152,9 +157,33 @@ export async function PATCH(
             }
         }
 
+        if (currentStage === 2 && userRole === "admin_k3") {
+            const routedK3 = await getAdminK3ApproverForForm("general-permit");
+            if (routedK3 && routedK3.id !== user.userId) {
+                return NextResponse.json(
+                    { error: `Form ini ditugaskan khusus untuk Admin K3: ${routedK3.nama}. Anda tidak berwenang menyetujuinya.` },
+                    { status: 403 }
+                );
+            }
+        } else if ((currentStage === 3 && userRole === "sfo") || (currentStage === 4 && userRole === "smr")) {
+            const assigned = await getAssignedApproverForForm(id, userRole);
+            if (assigned && assigned.id !== user.userId) {
+                return NextResponse.json(
+                    { error: `Form ini ditugaskan khusus untuk ${userRole.toUpperCase()}: ${assigned.nama}. Anda tidak berwenang menyetujuinya.` },
+                    { status: 403 }
+                );
+            }
+        }
+
         const isLastStage = currentStage === 5;
         const nextStage = currentStage + 1;
         const cols = stageInfo!;
+
+        const nextRole = currentStage === 2 ? "sfo" : currentStage === 3 ? "smr" : null;
+        const nextApproverUserId = Number(body.next_approver_user_id || 0);
+        if (nextRole && nextApproverUserId > 0) {
+            await setAssignedApproverCascade(id, nextRole, nextApproverUserId, user.userId);
+        }
 
         // Jika stage 1 (SPV), otomatis input nama & NIK dari SPV Terkait yang telah dipilih
         const approverName = (currentStage === 1 && form.spv_terkait_pj) ? form.spv_terkait_pj : userName;

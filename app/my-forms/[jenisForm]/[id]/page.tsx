@@ -14,6 +14,7 @@ import PenilaianSubkontraktorSection, {
 } from "@/components/PenilaianSubkontraktorSection";
 import EditModal from "@/components/EditModal";
 import {
+  Plus,
   ArrowLeft, Download, Edit3, XCircle, RefreshCw, FileText,
   Clock, CheckCircle2, AlertCircle, Check, X, Shield, ShieldCheck,
   Calendar, CalendarClock, CalendarCheck, MapPin, Building2, User,
@@ -431,7 +432,8 @@ export default function FormDetailPage({ params }: PageProps) {
       const isSiVerified = Boolean(p.security_approved || p.safety_induction?.status === "submitted" || p.safety_induction?.status === "verified");
       items.push({
         id: "safety-induction",
-        title: "Safety Induction Security",
+        title: "Safety Induction JAI/F-04/P.SHE-19 Rev. 1",
+        docNo: "JAI/F-04/P.SHE-19 Rev. 1",
         subtitle: "Verifikasi Pos Security & Pekerja",
         icon: Shield,
         badge: isSiVerified ? "Terverifikasi" : "Menunggu",
@@ -452,7 +454,7 @@ export default function FormDetailPage({ params }: PageProps) {
       );
       items.push({
         id: "penilaian",
-        title: "Penilaian Subkontraktor",
+        title: "Penilaian Subkontraktor JAI/F-08/P.SHE-19 Rev. 1",
         subtitle: "Evaluasi Lapangan & Barcode",
         icon: ClipboardCheck,
         badge: entriesCount > 0 ? `${entriesCount} Terisi` : hasMengetahui ? "Mengetahui" : "Form K3",
@@ -2012,72 +2014,145 @@ export default function FormDetailPage({ params }: PageProps) {
                 {/* 1. LINKED JOB PERMITS */}
                 {activeLampiran === "linked-permits" && formType === "general-permit" && (
                   <div className="bg-white rounded-2xl border border-slate-200/90 shadow-2xs overflow-hidden">
-                    <div className="bg-slate-50/70 border-b border-slate-200/70 px-4 sm:px-5 py-3 flex items-center justify-between gap-3 flex-wrap">
+                    <div className="bg-slate-50/70 border-b border-slate-200/70 px-4 sm:px-5 py-3.5 flex items-center justify-between gap-3 flex-wrap">
                       <div className="flex items-center gap-2.5">
-                        <div className="w-7 h-7 rounded-lg bg-orange-100 text-orange-600 flex items-center justify-center shrink-0">
+                        <div className="w-8 h-8 rounded-xl bg-orange-100 text-orange-600 flex items-center justify-center shrink-0 shadow-2xs">
                           <Layers className="w-4 h-4" />
                         </div>
                         <div>
-                          <h3 className="font-bold text-slate-800 text-xs sm:text-sm">Form Perizinan Khusus Terkait (Linked Job Permits)</h3>
+                          <div className="flex items-center gap-2">
+                            <h3 className="font-bold text-slate-800 text-xs sm:text-sm">Form Perizinan Khusus Terkait (Linked Job Permits)</h3>
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-orange-100 text-orange-700">
+                              {(linkedJobForms as any)?.all?.length ?? 0} Lampiran
+                            </span>
+                          </div>
                           <p className="text-[11px] text-slate-500">Izin kerja spesifik yang dibuat di bawah otorisasi surat izin eksternal ini</p>
                         </div>
                       </div>
                     </div>
                     <div className="p-4 sm:p-5">
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-start">
                         {[
-                          { key: "hotWork", label: "Hot Work Permit", type: "hot-work", desc: "Pekerjaan pengelasan, gerinda, pemotongan api", icon: Flame, color: "text-orange-600 bg-orange-50 border-orange-200" },
-                          { key: "heightWork", label: "Kerja Ketinggian", type: "height-work", desc: "Pekerjaan di atas ketinggian >= 1.8 meter", icon: AlertTriangle, color: "text-purple-600 bg-purple-50 border-purple-200" },
-                          { key: "workshop", label: "Workshop Permit", type: "workshop", desc: "Pekerjaan permesinan / fabrikasi workshop", icon: Wrench, color: "text-blue-600 bg-blue-50 border-blue-200" },
+                          {
+                            key: "hotWork",
+                            label: "Hot Work Permit",
+                            type: "hot-work",
+                            desc: "Pengelasan, gerinda, pemotongan api",
+                            icon: Flame,
+                            iconColor: "text-orange-600",
+                            iconBg: "bg-orange-50",
+                            headerBorder: "border-orange-100",
+                            tagBg: "bg-orange-50 text-orange-700 border-orange-200",
+                          },
+                          {
+                            key: "heightWork",
+                            label: "Kerja Ketinggian",
+                            type: "height-work",
+                            desc: "Pekerjaan di atas ketinggian >= 1.8 m",
+                            icon: AlertTriangle,
+                            iconColor: "text-purple-600",
+                            iconBg: "bg-purple-50",
+                            headerBorder: "border-purple-100",
+                            tagBg: "bg-purple-50 text-purple-700 border-purple-200",
+                          },
+                          {
+                            key: "workshop",
+                            label: "Workshop Permit",
+                            type: "workshop",
+                            desc: "Permesinan / fabrikasi workshop",
+                            icon: Wrench,
+                            iconColor: "text-blue-600",
+                            iconBg: "bg-blue-50",
+                            headerBorder: "border-blue-100",
+                            tagBg: "bg-blue-50 text-blue-700 border-blue-200",
+                          },
                         ].map((item) => {
-                          const found = (linkedJobForms as any)?.[item.key];
+                          const list: any[] = (linkedJobForms as any)?.items?.[item.key] ?? ((linkedJobForms as any)?.[item.key] ? [(linkedJobForms as any)[item.key]] : []);
                           const Icon = item.icon;
 
-                          if (found) {
-                            return (
-                              <div key={item.key} className="p-3.5 rounded-xl border border-slate-200 bg-slate-50/70 space-y-3">
-                                <div className="flex items-center justify-between">
-                                  <div className="flex items-center gap-2">
-                                    <div className={`w-7 h-7 rounded-lg flex items-center justify-center border ${item.color}`}>
-                                      <Icon className="w-3.5 h-3.5" />
+                          return (
+                            <div
+                              key={item.key}
+                              className="bg-slate-50/60 rounded-2xl border border-slate-200/80 p-3.5 flex flex-col justify-between min-h-[380px] shadow-2xs hover:border-slate-300 transition-all"
+                            >
+                              {/* Header Kategori */}
+                              <div className="space-y-3">
+                                <div className={`flex items-start justify-between gap-2 pb-3 border-b ${item.headerBorder}`}>
+                                  <div className="flex items-center gap-2.5">
+                                    <div className={`w-8 h-8 rounded-xl ${item.iconBg} ${item.iconColor} flex items-center justify-center shrink-0 border border-white shadow-2xs`}>
+                                      <Icon className="w-4 h-4" />
                                     </div>
                                     <div>
-                                      <h4 className="text-xs font-bold text-slate-800">{item.label}</h4>
-                                      <span className="text-[10px] font-mono text-slate-400">{found.id_form}</span>
+                                      <h4 className="text-xs font-bold text-slate-800 leading-tight">{item.label}</h4>
+                                      <p className="text-[10px] text-slate-400 mt-0.5 line-clamp-1">{item.desc}</p>
                                     </div>
                                   </div>
-                                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
-                                    {found.status}
+                                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${item.tagBg}`}>
+                                    {list.length}
                                   </span>
                                 </div>
+
+                                {/* List Item Form yang Terhubung */}
+                                <div className="space-y-2.5">
+                                  {list.length === 0 ? (
+                                    <div className="py-8 px-3 text-center rounded-xl bg-white/70 border border-dashed border-slate-200 flex flex-col items-center justify-center">
+                                      <Icon className="w-6 h-6 text-slate-300 mb-1.5 opacity-60" />
+                                      <p className="text-xs font-semibold text-slate-600">Belum Ada Lampiran</p>
+                                      <p className="text-[10px] text-slate-400 mt-0.5">Tekan tombol di bawah untuk menambahkan</p>
+                                    </div>
+                                  ) : (
+                                    list.map((found: any, idx: number) => {
+                                      const isApproved = found.status === "approved";
+                                      const isRejected = found.status === "rejected";
+                                      const statusBadge = isApproved
+                                        ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                                        : isRejected
+                                          ? "bg-red-50 text-red-700 border-red-200"
+                                          : "bg-blue-50 text-blue-700 border-blue-200";
+
+                                      return (
+                                        <div
+                                          key={found.id_form || idx}
+                                          className="p-3 bg-white rounded-xl border border-slate-200/90 shadow-2xs space-y-2.5 hover:shadow-xs transition-shadow"
+                                        >
+                                          <div className="flex items-center justify-between gap-1.5">
+                                            <div className="flex items-center gap-1.5 min-w-0">
+                                              <span className="text-[10px] font-black text-slate-400 w-4">#{idx + 1}</span>
+                                              <span className="text-xs font-mono font-bold text-slate-800 truncate">
+                                                {found.id_form}
+                                              </span>
+                                            </div>
+                                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border uppercase tracking-wider ${statusBadge}`}>
+                                              {found.status}
+                                            </span>
+                                          </div>
+
+                                          <Link
+                                            href={`/my-forms/${item.type}/${found.id_form}`}
+                                            className="w-full inline-flex items-center justify-center gap-1.5 py-1.5 bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200/90 rounded-lg text-[11px] font-bold transition-colors"
+                                          >
+                                            <Eye className="w-3.5 h-3.5 text-slate-500" />
+                                            <span>Lihat Detail</span>
+                                          </Link>
+                                        </div>
+                                      );
+                                    })
+                                  )}
+                                </div>
+                              </div>
+
+                              {/* Action Footer: Tambah Form Baru */}
+                              <div className="pt-3 mt-3 border-t border-slate-200/70">
                                 <Link
-                                  href={`/my-forms/${item.type}/${found.id_form}`}
-                                  className="w-full inline-flex items-center justify-center gap-1.5 py-1.5 bg-white hover:bg-slate-100 border border-slate-200 rounded-lg text-xs font-bold text-slate-700 transition-colors"
+                                  href={`/form/${item.type}?id_ijin_kerja=${p.id_form}`}
+                                  className="w-full inline-flex items-center justify-center gap-1.5 py-2 px-3 bg-white hover:bg-orange-50 border border-dashed border-orange-300 hover:border-orange-400 text-orange-600 rounded-xl text-xs font-bold transition-all shadow-2xs hover:shadow-xs group cursor-pointer"
                                 >
-                                  <Eye className="w-3.5 h-3.5" />
-                                  <span>Lihat Detail {item.label}</span>
+                                  <div className="w-4 h-4 rounded-full bg-orange-100 group-hover:bg-orange-200 flex items-center justify-center transition-colors">
+                                    <Plus className="w-3 h-3 text-orange-600" />
+                                  </div>
+                                  <span>+ Tambah {item.label}</span>
                                 </Link>
                               </div>
-                            );
-                          }
-
-                          return (
-                            <div key={item.key} className="p-3.5 rounded-xl border border-dashed border-slate-300 bg-white space-y-3 flex flex-col justify-between">
-                              <div className="flex items-start gap-2.5">
-                                <div className="w-7 h-7 rounded-lg bg-slate-100 flex items-center justify-center text-slate-400 shrink-0">
-                                  <Icon className="w-3.5 h-3.5" />
-                                </div>
-                                <div>
-                                  <h4 className="text-xs font-bold text-slate-700">{item.label}</h4>
-                                  <p className="text-[11px] text-slate-400 mt-0.5">{item.desc}</p>
-                                </div>
-                              </div>
-                              <Link
-                                href={`/form/${item.type}?id_ijin_kerja=${p.id_form}`}
-                                className="w-full inline-flex items-center justify-center gap-1.5 py-1.5 bg-orange-50 hover:bg-orange-100 text-orange-700 border border-orange-200 rounded-lg text-xs font-bold transition-colors"
-                              >
-                                <span>+ Buat {item.label}</span>
-                              </Link>
                             </div>
                           );
                         })}
@@ -2130,7 +2205,7 @@ export default function FormDetailPage({ params }: PageProps) {
                           <Shield className="w-4 h-4" />
                         </div>
                         <div>
-                          <h3 className="font-bold text-slate-800 text-xs sm:text-sm">Safety Induction Pos Security</h3>
+                          <div className="flex items-center gap-2"><h3 className="font-bold text-slate-800 text-xs sm:text-sm">Safety Induction Pos Security</h3><span className="text-[10px] font-mono font-semibold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 border border-slate-200">JAI/F-04/P.SHE-19 Rev. 1</span></div>
                           <p className="text-[11px] text-slate-500">Hasil pengarahan tata tertib K3 dan verifikasi kartu identitas pekerja</p>
                         </div>
                       </div>
@@ -2259,7 +2334,7 @@ export default function FormDetailPage({ params }: PageProps) {
                           <ClipboardCheck className="w-4 h-4" />
                         </div>
                         <div>
-                          <h3 className="font-bold text-slate-800 text-xs sm:text-sm">Penilaian K3 Subkontraktor</h3>
+                          <div className="flex items-center gap-2"><h3 className="font-bold text-slate-800 text-xs sm:text-sm">Form Penilaian Sub Kontraktor</h3><span className="text-[10px] font-mono font-semibold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 border border-slate-200">JAI/F-08/P.SHE-19 Rev. 1</span></div>
                           <p className="text-[11px] text-slate-500">Evaluasi penerapan K3 di lapangan oleh Pengawas Dept, Purchasing, dan SFO</p>
                         </div>
                       </div>
@@ -2408,24 +2483,24 @@ export default function FormDetailPage({ params }: PageProps) {
                                   const itemsList = Array.isArray(scaffoldingData?.items) && scaffoldingData.items.length > 0
                                     ? scaffoldingData.items
                                     : [
-                                        { no: 1, bagian: "OPEN FRAME", kondisi_standar: "TIDAK BENGKOK / KEROPOS, PIN PENGUNCI ADA", kondisi: "", komentar: "" },
-                                        { no: 2, bagian: "HORIZONTAL FRAME", kondisi_standar: "TIDAK BENGKOK / KEROPOS", kondisi: "", komentar: "" },
-                                        { no: 3, bagian: "HORIZONTAL PLATE", kondisi_standar: "TERPASANG KUAT SEBAGAI PELATARAN KERJA", kondisi: "", komentar: "" },
-                                        { no: 4, bagian: "CROSS BRACE", kondisi_standar: "TERPASANG KUAT, TIDAK BENGKOK & TERKUNCI", kondisi: "", komentar: "" },
-                                        { no: 5, bagian: "JACK BASE / U-HEAD", kondisi_standar: "TERPASANG KUAT SEBAGAI LEVELING", kondisi: "", komentar: "" },
-                                        { no: 6, bagian: "JOINT PIN", kondisi_standar: "TERPASANG TIDAK KENDOR", kondisi: "", komentar: "" },
-                                        { no: 7, bagian: "STAIR FRAME", kondisi_standar: "TERPASANG KUAT DILENGKAPI HANDRAIL", kondisi: "", komentar: "" },
-                                        { no: 8, bagian: "BASE PLATE", kondisi_standar: "TERPASANG KUAT DENGAN KONDISI RATA", kondisi: "", komentar: "" },
-                                        { no: 9, bagian: "HORIZONTAL PIPE", kondisi_standar: "TERPASANG KUAT DIATAS JACK BASE", kondisi: "", komentar: "" },
-                                        { no: 10, bagian: "ANGLE PIPE SUPPORT", kondisi_standar: "TERPASANG KUAT TIDAK BENGKOK / KEROPOS", kondisi: "", komentar: "" },
-                                        { no: 11, bagian: "HANDRAIL", kondisi_standar: "TERPASANG KUAT DENGAN TINGGI Min. 90 Cm.", kondisi: "", komentar: "" },
-                                        { no: 12, bagian: "KLEM PIPA", kondisi_standar: "TERPASANG KUAT/SAMBUNGAN PIPA Min.3 KLEM", kondisi: "", komentar: "" },
-                                        { no: 13, bagian: "PELATARAN KERJA", kondisi_standar: "TERPASANG KUAT DENGAN LEBAR Min. 40 Cm.", kondisi: "", komentar: "" },
-                                        { no: 14, bagian: "KONDISI TANAH DASAR", kondisi_standar: "KONDISI TANAH RATA TIDAK MUDAH AMBLAS", kondisi: "", komentar: "" },
-                                        { no: 15, bagian: "TOE BOARD", kondisi_standar: "TERPASANG KELILING KETINGGIAN Min. 20 Cm.", kondisi: "", komentar: "" },
-                                        { no: 16, bagian: "WALL TEE", kondisi_standar: "TERPASANG 3 TRAP VERTICAL DAN HORIZONTAL", kondisi: "", komentar: "" },
-                                        { no: 17, bagian: "OPENING", kondisi_standar: "TERPASANG PIPA HORIZONTAL DAN SUDUT/SIKU, SAFETY NET", kondisi: "", komentar: "" },
-                                      ];
+                                      { no: 1, bagian: "OPEN FRAME", kondisi_standar: "TIDAK BENGKOK / KEROPOS, PIN PENGUNCI ADA", kondisi: "", komentar: "" },
+                                      { no: 2, bagian: "HORIZONTAL FRAME", kondisi_standar: "TIDAK BENGKOK / KEROPOS", kondisi: "", komentar: "" },
+                                      { no: 3, bagian: "HORIZONTAL PLATE", kondisi_standar: "TERPASANG KUAT SEBAGAI PELATARAN KERJA", kondisi: "", komentar: "" },
+                                      { no: 4, bagian: "CROSS BRACE", kondisi_standar: "TERPASANG KUAT, TIDAK BENGKOK & TERKUNCI", kondisi: "", komentar: "" },
+                                      { no: 5, bagian: "JACK BASE / U-HEAD", kondisi_standar: "TERPASANG KUAT SEBAGAI LEVELING", kondisi: "", komentar: "" },
+                                      { no: 6, bagian: "JOINT PIN", kondisi_standar: "TERPASANG TIDAK KENDOR", kondisi: "", komentar: "" },
+                                      { no: 7, bagian: "STAIR FRAME", kondisi_standar: "TERPASANG KUAT DILENGKAPI HANDRAIL", kondisi: "", komentar: "" },
+                                      { no: 8, bagian: "BASE PLATE", kondisi_standar: "TERPASANG KUAT DENGAN KONDISI RATA", kondisi: "", komentar: "" },
+                                      { no: 9, bagian: "HORIZONTAL PIPE", kondisi_standar: "TERPASANG KUAT DIATAS JACK BASE", kondisi: "", komentar: "" },
+                                      { no: 10, bagian: "ANGLE PIPE SUPPORT", kondisi_standar: "TERPASANG KUAT TIDAK BENGKOK / KEROPOS", kondisi: "", komentar: "" },
+                                      { no: 11, bagian: "HANDRAIL", kondisi_standar: "TERPASANG KUAT DENGAN TINGGI Min. 90 Cm.", kondisi: "", komentar: "" },
+                                      { no: 12, bagian: "KLEM PIPA", kondisi_standar: "TERPASANG KUAT/SAMBUNGAN PIPA Min.3 KLEM", kondisi: "", komentar: "" },
+                                      { no: 13, bagian: "PELATARAN KERJA", kondisi_standar: "TERPASANG KUAT DENGAN LEBAR Min. 40 Cm.", kondisi: "", komentar: "" },
+                                      { no: 14, bagian: "KONDISI TANAH DASAR", kondisi_standar: "KONDISI TANAH RATA TIDAK MUDAH AMBLAS", kondisi: "", komentar: "" },
+                                      { no: 15, bagian: "TOE BOARD", kondisi_standar: "TERPASANG KELILING KETINGGIAN Min. 20 Cm.", kondisi: "", komentar: "" },
+                                      { no: 16, bagian: "WALL TEE", kondisi_standar: "TERPASANG 3 TRAP VERTICAL DAN HORIZONTAL", kondisi: "", komentar: "" },
+                                      { no: 17, bagian: "OPENING", kondisi_standar: "TERPASANG PIPA HORIZONTAL DAN SUDUT/SIKU, SAFETY NET", kondisi: "", komentar: "" },
+                                    ];
 
                                   return itemsList.map((item: any, idx: number) => {
                                     const isStandar = item.kondisi === "standart";

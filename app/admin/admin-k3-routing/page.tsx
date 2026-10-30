@@ -14,9 +14,10 @@ interface AdminK3User {
 }
 
 const JENIS_LIST: { key: string; label: string }[] = [
-  { key: "hot-work",    label: "Hot Work Permit" },
-  { key: "height-work", label: "Kerja Ketinggian" },
-  { key: "workshop",    label: "Workshop Permit" },
+  { key: "hot-work",       label: "Hot Work Permit" },
+  { key: "height-work",    label: "Kerja Ketinggian" },
+  { key: "workshop",       label: "Workshop Permit" },
+  { key: "general-permit", label: "Ijin Kerja Eksternal" },
 ];
 
 export default function AdminK3RoutingPage() {

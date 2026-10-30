@@ -43,7 +43,7 @@ export async function exportPenilaianToExcel(
   // ── 1. Judul & Header ──
   sheet.mergeCells("A1:G1");
   const titleCell = sheet.getCell("A1");
-  titleCell.value = "FORM PENILAIAN SUB KONTRAKTOR";
+  titleCell.value = "FORM PENILAIAN SUB KONTRAKTOR - JAI/F-08/P.SHE-19 Rev. 1";
   titleCell.font = { name: "Arial", size: 14, bold: true, color: { argb: "FF0F172A" } };
   titleCell.alignment = { horizontal: "center", vertical: "middle" };
   sheet.getRow(1).height = 28;
@@ -267,10 +267,15 @@ export async function exportPenilaianToPdf(
   doc.setTextColor(15, 23, 42);
   doc.text("FORM PENILAIAN SUB KONTRAKTOR", pageWidth / 2, curY, { align: "center" });
 
-  curY += 6;
-  doc.setFontSize(10);
-  doc.setFont("helvetica", "normal");
+  curY += 5;
+  doc.setFontSize(9);
+  doc.setFont("helvetica", "bold");
   doc.setTextColor(100, 116, 139);
+  doc.text("JAI/F-08/P.SHE-19 Rev. 1", pageWidth / 2, curY, { align: "center" });
+
+  curY += 5;
+  doc.setFontSize(9);
+  doc.setFont("helvetica", "normal");
   doc.text("Lampiran Evaluasi & Pengawasan Ijin Kerja Eksternal", pageWidth / 2, curY, {
     align: "center",
   });

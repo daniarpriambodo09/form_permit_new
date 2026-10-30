@@ -114,16 +114,7 @@ export async function POST(req: NextRequest) {
       if (userId && gp.user_id !== parseInt(userId)) {
         return NextResponse.json({ error: 'Ijin Kerja Eksternal ini bukan milik Anda' }, { status: 403 });
       }
-      const existing = await queryOne(
-        `SELECT id_form FROM form_kerja_panas WHERE id_ijin_kerja = $1`,
-        [idIjinKerja]
-      );
-      if (existing) {
-        return NextResponse.json(
-          { error: `Ijin Kerja Panas untuk ${idIjinKerja} sudah pernah dibuat (${existing.id_form}). Maksimal 1 form per jenis kerja.` },
-          { status: 409 }
-        );
-      }
+      // Multiple forms per jenis kerja diperbolehkan
     }
 
     const startStage = 1;
@@ -275,26 +266,13 @@ export async function POST(req: NextRequest) {
 
     // ── Pewarisan approval otomatis dari Ijin Kerja Eksternal induk ──
     if (idIjinKerja) {
-      const parentForm = await queryOne<{
-        spv_approved: boolean;
-        spv_approved_by: string | null;
-        spv_approved_at: string | null;
-        spv_nik: string | null;
-        spv_terkait_pj: string | null;
-        nik_spv_terkait_pj: string | null;
-        sfo_approved: boolean;
-        sfo_approved_by: string | null;
-        sfo_approved_at: string | null;
-        sfo_nik: string | null;
-        pga_approved: boolean;
-        pga_approved_by: string | null;
-        pga_approved_at: string | null;
-        pga_nik: string | null;
-      }>(
+      const parentForm = await queryOne<any>(
         `SELECT spv_approved, spv_approved_by, spv_approved_at, spv_nik,
                 spv_terkait_pj, nik_spv_terkait_pj,
+                admin_k3_approved, admin_k3_approved_by, admin_k3_approved_at, admin_k3_nik,
                 sfo_approved, sfo_approved_by, sfo_approved_at, sfo_nik,
-                pga_approved, pga_approved_by, pga_approved_at, pga_nik
+                pga_approved, pga_approved_by, pga_approved_at, pga_nik,
+                status, approved_by, approved_at
            FROM form_ijin_kerja
           WHERE id_form = $1`,
         [idIjinKerja]
@@ -314,6 +292,29 @@ export async function POST(req: NextRequest) {
                     nik_pemberi_ijin = COALESCE(nik_pemberi_ijin, $3)
               WHERE id_form = $4`,
             [spvName, spvAt, spvNik, idForm]
+          );
+        }
+
+        if (parentForm.admin_k3_approved) {
+          await query(
+            `UPDATE form_kerja_panas
+                SET admin_k3_approved = TRUE,
+                    admin_k3_approved_by = $1,
+                    admin_k3_approved_at = $2,
+                    admin_k3_nik = $3
+              WHERE id_form = $4`,
+            [parentForm.admin_k3_approved_by, parentForm.admin_k3_approved_at || now, parentForm.admin_k3_nik, idForm]
+          );
+        }
+
+        if (parentForm.status === 'approved') {
+          await query(
+            `UPDATE form_kerja_panas
+                SET status = 'approved',
+                    approved_by = COALESCE($1, 'System Cascade'),
+                    approved_at = $2
+              WHERE id_form = $3`,
+            [parentForm.approved_by, parentForm.approved_at || now, idForm]
           );
         }
 

@@ -513,7 +513,12 @@ export default function PenilaianSubkontraktorSection({
         <div className="bg-slate-50/80 border-b border-slate-200/80 px-4 sm:px-5 py-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
-              <h2 className="font-bold text-xs sm:text-sm text-slate-800">Form Penilaian Sub Kontraktor</h2>
+              <div className="flex items-center gap-2">
+                <h2 className="font-bold text-xs sm:text-sm text-slate-800">Form Penilaian Sub Kontraktor</h2>
+                <span className="text-[10px] font-mono font-semibold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 border border-slate-200">
+                  JAI/F-08/P.SHE-19 Rev. 1
+                </span>
+              </div>
               <p className="text-[10px] text-slate-400 mt-0.5">
                 Checklist inspeksi harian K3 ({displayEntries.length} hari) &amp; persetujuan digital
               </p>

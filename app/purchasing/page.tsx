@@ -1,6 +1,6 @@
 // app/purchasing/page.tsx
 // Halaman khusus untuk Purchasing:
-// - Melihat daftar form Ijin Kerja Eksternal terkait Penilaian Sub Kontraktor.
+// - Melihat daftar form Ijin Kerja Eksternal terkait Form Penilaian Sub Kontraktor (JAI/F-08/P.SHE-19 Rev. 1).
 // - Meninjau hasil checklist pengawasan yang telah diisi & disetujui Pengawas Dept.
 // - Melakukan approval/otorisasi Purchasing (barcode digital).
 // - Mengirim otomatis notifikasi email ke SFO yang terdaftar setelah Purchasing approve.
@@ -135,7 +135,7 @@ export default function PurchasingDashboardPage() {
   const handleApprovePurchasing = async () => {
     if (!selectedForm) return;
 
-    if (!confirm("Setujui Form Penilaian Sub Kontraktor ini? Notifikasi email akan otomatis dikirimkan ke tim SFO terdaftar.")) {
+    if (!confirm("Setujui Form Form Penilaian Sub Kontraktor (JAI/F-08/P.SHE-19 Rev. 1) ini? Notifikasi email akan otomatis dikirimkan ke tim SFO terdaftar.")) {
       return;
     }
 
@@ -252,7 +252,7 @@ export default function PurchasingDashboardPage() {
               </div>
               <div>
                 <h1 className="text-base sm:text-lg font-bold text-slate-800 leading-tight">
-                  Penilaian Sub Kontraktor — Purchasing
+                  Form Penilaian Sub Kontraktor (JAI/F-08/P.SHE-19 Rev. 1) — Purchasing
                 </h1>
                 <p className="text-xs text-slate-500">
                   Daftar form, verifikasi otorisasi & ekspor file Excel / PDF
@@ -520,7 +520,7 @@ export default function PurchasingDashboardPage() {
               <div>
                 <div className="flex items-center gap-2">
                   <h3 className="text-base font-bold text-white">
-                    Verifikasi Penilaian Sub Kontraktor — {selectedForm.id_form}
+                    Verifikasi Form Penilaian Sub Kontraktor (JAI/F-08/P.SHE-19 Rev. 1) — {selectedForm.id_form}
                   </h3>
                   <span className="text-[10px] font-bold px-2 py-0.5 bg-blue-500/20 text-blue-300 border border-blue-500/30 rounded-md">
                     Purchasing

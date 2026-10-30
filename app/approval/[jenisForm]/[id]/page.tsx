@@ -17,6 +17,7 @@ import React from "react";
 import { useApproverAuth } from "@/hooks/useApproverAuth";
 import AuthLoadingSpinner from "@/components/AuthLoadingSpinner";
 import JsaViewer from "@/components/JsaViewer";
+import NextApproverModal from "@/components/NextApproverModal";
 
 // ── Helpers ───────────────────────────────────────────────────
 const formatDate = (d?: string | null) => {
@@ -95,14 +96,14 @@ const statusConfig: Record<string, { label: string; dot: string; bg: string; tex
 };
 
 const roleLabel: Record<string, string> = {
-  spv:        "SPV / Pemberi Izin",
+  spv: "SPV / Pemberi Izin",
   kontraktor: "Kontraktor",
-  admin_k3:   "Admin K3",
-  sfo:        "SFO",
-  smr:        "SMR / PGA",
-  admin:      "Administrator",
-  firewatch:  "Fire Watch",
-  worker:     "Worker",
+  admin_k3: "Admin K3",
+  sfo: "SFO",
+  smr: "SMR / PGA",
+  admin: "Administrator",
+  firewatch: "Fire Watch",
+  worker: "Worker",
 };
 
 // ── Checklist Data Items ──────────────────────────────────────
@@ -199,9 +200,8 @@ const Field = ({
       {label}
     </span>
     <p
-      className={`text-xs sm:text-sm font-semibold text-slate-800 break-words ${
-        mono ? "font-mono" : ""
-      }`}
+      className={`text-xs sm:text-sm font-semibold text-slate-800 break-words ${mono ? "font-mono" : ""
+        }`}
     >
       {value ?? "-"}
     </p>
@@ -213,11 +213,10 @@ const BoolBadges = ({ items }: { items: { label: string; active: boolean }[] }) 
     {items.map((item, idx) => (
       <span
         key={idx}
-        className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold border transition-all ${
-          item.active
+        className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold border transition-all ${item.active
             ? "bg-emerald-50 text-emerald-800 border-emerald-300 shadow-2xs"
             : "bg-slate-50/80 text-slate-400 border-slate-200 line-through opacity-60"
-        }`}
+          }`}
       >
         {item.active ? (
           <Check className="w-3 h-3 text-emerald-600 stroke-[2.5]" />
@@ -283,13 +282,14 @@ export default function ApprovalDetailPage({
   // ── Auth guard via hook ────────────────────────────────────
   const { user, loading: authLoading } = useApproverAuth();
 
-  const [form, setForm]             = useState<any>(null);
-  const [loading, setLoading]       = useState(true);
+  const [form, setForm] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [showReject, setShowReject] = useState(false);
-  const [catatan, setCatatan]       = useState("");
-  const [done, setDone]             = useState<"approved" | "rejected" | null>(null);
-  const [error, setError]           = useState("");
+  const [showNextApproverModal, setShowNextApproverModal] = useState(false);
+  const [catatan, setCatatan] = useState("");
+  const [done, setDone] = useState<"approved" | "rejected" | null>(null);
+  const [error, setError] = useState("");
 
   // Tab State
   const [activeTab, setActiveTab] = useState<"detail" | "lampiran">("detail");
@@ -301,19 +301,19 @@ export default function ApprovalDetailPage({
 
   // Height-work: Bagian 5 inspection checklist for Admin K3
   const [harness, setHarness] = useState({
-    helm:     false,
-    webbing:  false,
-    dring:    false,
-    gesper:   false,
+    helm: false,
+    webbing: false,
+    dring: false,
+    gesper: false,
     absorber: false,
     snapHook: false,
-    rope:     false,
+    rope: false,
   });
 
   const isHotOrWorkshop = jenisForm !== "height-work";
-  const isWorkshop      = jenisForm === "workshop";
-  const isHotWork       = jenisForm === "hot-work";
-  const isHeightWork    = jenisForm === "height-work";
+  const isWorkshop = jenisForm === "workshop";
+  const isHotWork = jenisForm === "hot-work";
+  const isHeightWork = jenisForm === "height-work";
 
   const meta = jenisMeta[jenisForm] || {
     label: jenisForm,
@@ -364,9 +364,21 @@ export default function ApprovalDetailPage({
     }
   };
 
-  const handleAction = async (action: "approve" | "reject") => {
+  const nextApproverTargetRole: "sfo" | "smr" | null =
+    user?.role === "admin_k3" || (user?.role === "admin" && Number(form?.current_stage) === 2)
+      ? "sfo"
+      : user?.role === "sfo" || (user?.role === "admin" && Number(form?.current_stage) === 3)
+        ? "smr"
+        : null;
+
+  const handleAction = async (action: "approve" | "reject", nextApproverUserId?: number) => {
     if (action === "reject" && !catatan.trim()) {
       setError("Catatan alasan penolakan wajib diisi sebelum menolak form.");
+      return;
+    }
+
+    if (action === "approve" && nextApproverTargetRole && !nextApproverUserId) {
+      setShowNextApproverModal(true);
       return;
     }
 
@@ -375,28 +387,32 @@ export default function ApprovalDetailPage({
 
     try {
       const patchBody: Record<string, any> = { action, catatan_reject: catatan };
+      if (nextApproverUserId) {
+        patchBody.next_approver_user_id = nextApproverUserId;
+      }
 
       // Height-work: sertakan checklist Helm, Body Harness & Lanyard saat Admin K3 approve
       if (jenisForm === "height-work" && user?.role === "admin_k3" && action === "approve") {
         patchBody.harness_checklist = {
-          helm_kondisi_baik:                harness.helm,
-          webbing_kondisi_baik:             harness.webbing,
-          dring_kondisi_baik:               harness.dring,
-          gesper_kondisi_baik:              harness.gesper,
+          helm_kondisi_baik: harness.helm,
+          webbing_kondisi_baik: harness.webbing,
+          dring_kondisi_baik: harness.dring,
+          gesper_kondisi_baik: harness.gesper,
           absorter_dan_timbes_kondisi_baik: harness.absorber,
-          snap_hook_kondisi_baik:           harness.snapHook,
-          rope_lanyard_kondisi_baik:        harness.rope,
+          snap_hook_kondisi_baik: harness.snapHook,
+          rope_lanyard_kondisi_baik: harness.rope,
         };
       }
 
       const res = await fetch(`/api/approval/${jenisForm}/${id}`, {
-        method:      "PATCH",
+        method: "PATCH",
         credentials: "include",
-        headers:     { "Content-Type": "application/json" },
-        body:        JSON.stringify(patchBody),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(patchBody),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
+      setShowNextApproverModal(false);
       setDone(action === "approve" ? "approved" : "rejected");
     } catch (e: any) {
       setError(e.message);
@@ -434,9 +450,8 @@ export default function ApprovalDetailPage({
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
         <div className="bg-white rounded-3xl shadow-xl border border-slate-200/90 p-8 sm:p-10 max-w-md w-full text-center animate-in fade-in zoom-in-95 duration-200">
-          <div className={`w-16 h-16 rounded-2xl mx-auto mb-4 flex items-center justify-center ${
-            isApproved ? "bg-emerald-100 text-emerald-600" : "bg-rose-100 text-rose-600"
-          }`}>
+          <div className={`w-16 h-16 rounded-2xl mx-auto mb-4 flex items-center justify-center ${isApproved ? "bg-emerald-100 text-emerald-600" : "bg-rose-100 text-rose-600"
+            }`}>
             {isApproved ? <CheckCircle2 className="w-10 h-10" /> : <XCircle className="w-10 h-10" />}
           </div>
           <h2 className="text-xl sm:text-2xl font-bold text-slate-900 mb-2">
@@ -492,9 +507,9 @@ export default function ApprovalDetailPage({
 
   // ── Form & User Data Mapping ──────────────────────────────
   const isEksternal = form?.tipe_perusahaan === "eksternal" || form?.petugas_ketinggian === "eksternal";
-  const userRole    = user.role;
-  const userNama    = user.nama || user.username;
-  const userNik     = user.nik ?? "";
+  const userRole = user.role;
+  const userNama = user.nama || user.username;
+  const userNik = user.nik ?? "";
   const userJabatan = user.jabatan;
 
   const currentDbStage = form.current_stage ?? 1;
@@ -502,10 +517,10 @@ export default function ApprovalDetailPage({
 
   // Stages approval pipeline
   const stages: { label: string; key: string; icon: string; dbStage: number; roleName: string }[] = [
-    { label: "SPV",      key: "spv",      icon: "👷", dbStage: 1, roleName: "SPV / Pemberi Izin" },
+    { label: "SPV", key: "spv", icon: "👷", dbStage: 1, roleName: "SPV / Pemberi Izin" },
     { label: "Admin K3", key: "admin_k3", icon: "🛡️", dbStage: 2, roleName: "Admin K3" },
-    { label: "SFO",      key: "sfo",      icon: "🔒", dbStage: 3, roleName: "SFO" },
-    { label: "SMR / PGA",key: "mr_pga",   icon: "✅", dbStage: 4, roleName: "SMR / PGA Manager" },
+    { label: "SFO", key: "sfo", icon: "🔒", dbStage: 3, roleName: "SFO" },
+    { label: "SMR / PGA", key: "mr_pga", icon: "✅", dbStage: 4, roleName: "SMR / PGA Manager" },
   ];
 
   const stageRoleNames: Record<number, string> = {
@@ -518,17 +533,17 @@ export default function ApprovalDetailPage({
 
   const isAlreadyApprovedByMe =
     userRole === "spv" ? isTruthy(form.spv_approved) :
-    userRole === "admin_k3" ? isTruthy(form.admin_k3_approved) :
-    userRole === "sfo" ? isTruthy(form.sfo_approved) :
-    userRole === "smr" ? (isTruthy(form.mr_pga_approved) || isTruthy(form.pga_approved)) :
-    false;
+      userRole === "admin_k3" ? isTruthy(form.admin_k3_approved) :
+        userRole === "sfo" ? isTruthy(form.sfo_approved) :
+          userRole === "smr" ? (isTruthy(form.mr_pga_approved) || isTruthy(form.pga_approved)) :
+            false;
 
   const myApprovalDetails =
     userRole === "spv" ? { by: form.spv_approved_by, at: form.spv_approved_at, nik: form.spv_nik } :
-    userRole === "admin_k3" ? { by: form.admin_k3_approved_by, at: form.admin_k3_approved_at, nik: form.admin_k3_nik } :
-    userRole === "sfo" ? { by: form.sfo_approved_by, at: form.sfo_approved_at, nik: form.sfo_nik } :
-    userRole === "smr" ? { by: form.mr_pga_approved_by || form.pga_approved_by, at: form.mr_pga_approved_at || form.pga_approved_at, nik: form.mr_pga_nik } :
-    null;
+      userRole === "admin_k3" ? { by: form.admin_k3_approved_by, at: form.admin_k3_approved_at, nik: form.admin_k3_nik } :
+        userRole === "sfo" ? { by: form.sfo_approved_by, at: form.sfo_approved_at, nik: form.sfo_nik } :
+          userRole === "smr" ? { by: form.mr_pga_approved_by || form.pga_approved_by, at: form.mr_pga_approved_at || form.pga_approved_at, nik: form.mr_pga_nik } :
+            null;
 
   const roleToStageNumber: Partial<Record<string, number>> = {
     spv: 1,
@@ -553,33 +568,33 @@ export default function ApprovalDetailPage({
   // Petugas Ketinggian List
   const petugasList = isHeightWork
     ? Array.from({ length: 10 })
-        .map((_, i) => {
-          const idx = i + 1;
-          const nama = form[`nama_petugas_${idx}`];
-          if (!nama) return null;
-          return {
-            idx,
-            nama,
-            sehat: isTruthy(form[`petugas_${idx}_sehat`]),
-            foto: form[`foto_lisensi_${idx}`] as string | null,
-          };
-        })
-        .filter(Boolean) as { idx: number; nama: string; sehat: boolean; foto: string | null }[]
+      .map((_, i) => {
+        const idx = i + 1;
+        const nama = form[`nama_petugas_${idx}`];
+        if (!nama) return null;
+        return {
+          idx,
+          nama,
+          sehat: isTruthy(form[`petugas_${idx}_sehat`]),
+          foto: form[`foto_lisensi_${idx}`] as string | null,
+        };
+      })
+      .filter(Boolean) as { idx: number; nama: string; sehat: boolean; foto: string | null }[]
     : [];
 
   const areaBerisikoBadges = [
-    { label: "Ruang Tertutup",        active: isTruthy(form.ruang_tertutup) },
-    { label: "Bahan Mudah Terbakar",  active: isTruthy(form.bahan_mudah_terbakar) },
-    { label: "Gas/Bejana/Tangki",     active: isTruthy(form.gas_bejana_tangki) },
-    { label: "Ketinggian",            active: isTruthy(form.height_work) },
+    { label: "Ruang Tertutup", active: isTruthy(form.ruang_tertutup) },
+    { label: "Bahan Mudah Terbakar", active: isTruthy(form.bahan_mudah_terbakar) },
+    { label: "Gas/Bejana/Tangki", active: isTruthy(form.gas_bejana_tangki) },
+    { label: "Ketinggian", active: isTruthy(form.height_work) },
     { label: "Cairan/Gas Bertekanan", active: isTruthy(form.cairan_gas_bertekan) },
-    { label: "Cairan Hydrocarbon",    active: isTruthy(form.cairan_hydrocarbon) },
+    { label: "Cairan Hydrocarbon", active: isTruthy(form.cairan_hydrocarbon) },
   ];
 
   const peralatanKhususBadges = [
     { label: "Preventive Genset Pump Room", active: isTruthy(form.preventive_genset_pump_room) },
-    { label: "Tangki Solar",                 active: isTruthy(form.tangki_solar) },
-    { label: "Panel Listrik",                active: isTruthy(form.panel_listrik) },
+    { label: "Tangki Solar", active: isTruthy(form.tangki_solar) },
+    { label: "Panel Listrik", active: isTruthy(form.panel_listrik) },
   ];
 
   return (
@@ -617,11 +632,10 @@ export default function ApprovalDetailPage({
                 </span>
 
                 <span
-                  className={`text-[10px] font-bold px-2 py-0.5 rounded-md border ${
-                    isEksternal
+                  className={`text-[10px] font-bold px-2 py-0.5 rounded-md border ${isEksternal
                       ? "bg-purple-50 text-purple-700 border-purple-200"
                       : "bg-blue-50 text-blue-700 border-blue-200"
-                  }`}
+                    }`}
                 >
                   {getTipeLabel(form.tipe_perusahaan)}
                 </span>
@@ -741,15 +755,14 @@ export default function ApprovalDetailPage({
               return (
                 <div
                   key={stage.key}
-                  className={`relative p-3.5 rounded-xl border transition-all ${
-                    isApproved
+                  className={`relative p-3.5 rounded-xl border transition-all ${isApproved
                       ? "bg-emerald-50/50 border-emerald-300 text-emerald-950"
                       : isCurrent && !isRejected
-                      ? "bg-amber-50/50 border-amber-300 text-amber-950 ring-2 ring-amber-200/50 shadow-2xs"
-                      : isRejected && isCurrent
-                      ? "bg-rose-50/50 border-rose-300 text-rose-950"
-                      : "bg-slate-50/60 border-slate-200/80 text-slate-400"
-                  }`}
+                        ? "bg-amber-50/50 border-amber-300 text-amber-950 ring-2 ring-amber-200/50 shadow-2xs"
+                        : isRejected && isCurrent
+                          ? "bg-rose-50/50 border-rose-300 text-rose-950"
+                          : "bg-slate-50/60 border-slate-200/80 text-slate-400"
+                    }`}
                 >
                   <div className="flex items-center justify-between mb-1.5">
                     <span className="text-sm">{stage.icon}</span>
@@ -936,8 +949,8 @@ export default function ApprovalDetailPage({
                     </p>
                     {[
                       { key: "webbing", label: "Webbing (jahitan baik, tidak terpotong)" },
-                      { key: "dring",   label: "D-Ring (tidak retak, tidak berkarat)" },
-                      { key: "gesper",  label: "Adjustment Buckle (mengunci kuat)" },
+                      { key: "dring", label: "D-Ring (tidak retak, tidak berkarat)" },
+                      { key: "gesper", label: "Adjustment Buckle (mengunci kuat)" },
                     ].map((item) => (
                       <label key={item.key} className="flex items-start gap-2 cursor-pointer">
                         <input
@@ -959,7 +972,7 @@ export default function ApprovalDetailPage({
                     {[
                       { key: "absorber", label: "Absorber & Timbles kondisi baik" },
                       { key: "snapHook", label: "Snap Hook (mengunci sempurna)" },
-                      { key: "rope",     label: "Rope Lanyard (tidak berserabut)" },
+                      { key: "rope", label: "Rope Lanyard (tidak berserabut)" },
                     ].map((item) => (
                       <label key={item.key} className="flex items-start gap-2 cursor-pointer">
                         <input
@@ -1049,11 +1062,10 @@ export default function ApprovalDetailPage({
         <div className="flex border-b border-slate-200 gap-2 overflow-x-auto">
           <button
             onClick={() => setActiveTab("detail")}
-            className={`flex items-center gap-2 px-5 py-3 text-xs sm:text-sm font-bold border-b-2 transition-all whitespace-nowrap ${
-              activeTab === "detail"
+            className={`flex items-center gap-2 px-5 py-3 text-xs sm:text-sm font-bold border-b-2 transition-all whitespace-nowrap ${activeTab === "detail"
                 ? "border-orange-500 text-orange-600 bg-orange-50/50 rounded-t-xl"
                 : "border-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-50 rounded-t-xl"
-            }`}
+              }`}
           >
             <FileText className="w-4 h-4" />
             <span>Rincian &amp; Formulir Izin Kerja</span>
@@ -1061,11 +1073,10 @@ export default function ApprovalDetailPage({
 
           <button
             onClick={() => setActiveTab("lampiran")}
-            className={`flex items-center gap-2 px-5 py-3 text-xs sm:text-sm font-bold border-b-2 transition-all whitespace-nowrap ${
-              activeTab === "lampiran"
+            className={`flex items-center gap-2 px-5 py-3 text-xs sm:text-sm font-bold border-b-2 transition-all whitespace-nowrap ${activeTab === "lampiran"
                 ? "border-orange-500 text-orange-600 bg-orange-50/50 rounded-t-xl"
                 : "border-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-50 rounded-t-xl"
-            }`}
+              }`}
           >
             <Paperclip className="w-4 h-4" />
             <span>Dokumen &amp; Form Terkait</span>
@@ -1204,18 +1215,17 @@ export default function ApprovalDetailPage({
                     {/* Grid Detail Pekerjaan Panas / Workshop */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
                       {[
-                        { l: "Cutting (Pemotongan)",  d: form.detail_cutting,  m: form.t_mulai_cutting,  s: form.t_selesai_cutting  },
-                        { l: "Grinding (Gerinda)",    d: form.detail_grinding, m: form.t_mulai_grinding, s: form.t_selesai_grinding },
-                        { l: "Welding (Pengelasan)",  d: form.detail_welding,  m: form.t_mulai_welding,  s: form.t_selesai_welding  },
+                        { l: "Cutting (Pemotongan)", d: form.detail_cutting, m: form.t_mulai_cutting, s: form.t_selesai_cutting },
+                        { l: "Grinding (Gerinda)", d: form.detail_grinding, m: form.t_mulai_grinding, s: form.t_selesai_grinding },
+                        { l: "Welding (Pengelasan)", d: form.detail_welding, m: form.t_mulai_welding, s: form.t_selesai_welding },
                         { l: "Painting (Pengecatan)", d: form.detail_painting, m: form.t_mulai_painting, s: form.t_selesai_painting },
                       ].map((item) => (
                         <div
                           key={item.l}
-                          className={`p-3 rounded-xl border transition-all flex flex-col justify-between ${
-                            item.d || item.m
+                          className={`p-3 rounded-xl border transition-all flex flex-col justify-between ${item.d || item.m
                               ? "bg-white border-slate-300 shadow-2xs"
                               : "bg-slate-50/50 border-slate-200/60 opacity-60"
-                          }`}
+                            }`}
                         >
                           <div>
                             <div className="flex items-center justify-between mb-1">
@@ -1322,9 +1332,8 @@ export default function ApprovalDetailPage({
                             <span className="text-slate-700 font-medium pr-2">{label}</span>
                             <span className="text-center">
                               <span
-                                className={`inline-block px-2 py-0.5 rounded text-[11px] font-bold ${
-                                  checked ? "bg-emerald-100 text-emerald-800" : "bg-rose-100 text-rose-800"
-                                }`}
+                                className={`inline-block px-2 py-0.5 rounded text-[11px] font-bold ${checked ? "bg-emerald-100 text-emerald-800" : "bg-rose-100 text-rose-800"
+                                  }`}
                               >
                                 {checked ? "YA" : "TIDAK"}
                               </span>
@@ -1351,9 +1360,8 @@ export default function ApprovalDetailPage({
                             <span className="text-slate-700 font-medium pr-2">{label}</span>
                             <span className="text-center">
                               <span
-                                className={`inline-block px-2 py-0.5 rounded text-[11px] font-bold ${
-                                  checked ? "bg-emerald-100 text-emerald-800" : "bg-rose-100 text-rose-800"
-                                }`}
+                                className={`inline-block px-2 py-0.5 rounded text-[11px] font-bold ${checked ? "bg-emerald-100 text-emerald-800" : "bg-rose-100 text-rose-800"
+                                  }`}
                               >
                                 {checked ? "YA" : "TIDAK"}
                               </span>
@@ -1376,9 +1384,8 @@ export default function ApprovalDetailPage({
                             <span className="text-slate-700 font-medium pr-2">{label}</span>
                             <span className="text-center">
                               <span
-                                className={`inline-block px-2 py-0.5 rounded text-[11px] font-bold ${
-                                  checked ? "bg-emerald-100 text-emerald-800" : "bg-rose-100 text-rose-800"
-                                }`}
+                                className={`inline-block px-2 py-0.5 rounded text-[11px] font-bold ${checked ? "bg-emerald-100 text-emerald-800" : "bg-rose-100 text-rose-800"
+                                  }`}
                               >
                                 {checked ? "YA" : "TIDAK"}
                               </span>
@@ -1401,9 +1408,8 @@ export default function ApprovalDetailPage({
                             <span className="text-slate-700 font-medium pr-2">{label}</span>
                             <span className="text-center">
                               <span
-                                className={`inline-block px-2 py-0.5 rounded text-[11px] font-bold ${
-                                  checked ? "bg-emerald-100 text-emerald-800" : "bg-rose-100 text-rose-800"
-                                }`}
+                                className={`inline-block px-2 py-0.5 rounded text-[11px] font-bold ${checked ? "bg-emerald-100 text-emerald-800" : "bg-rose-100 text-rose-800"
+                                  }`}
                               >
                                 {checked ? "YA" : "TIDAK"}
                               </span>
@@ -1423,9 +1429,8 @@ export default function ApprovalDetailPage({
                             <span className="text-slate-700 font-medium pr-2">{label}</span>
                             <span className="text-center">
                               <span
-                                className={`inline-block px-2 py-0.5 rounded text-[11px] font-bold ${
-                                  checked ? "bg-emerald-100 text-emerald-800" : "bg-rose-100 text-rose-800"
-                                }`}
+                                className={`inline-block px-2 py-0.5 rounded text-[11px] font-bold ${checked ? "bg-emerald-100 text-emerald-800" : "bg-rose-100 text-rose-800"
+                                  }`}
                               >
                                 {checked ? "YA" : "TIDAK"}
                               </span>
@@ -1456,9 +1461,8 @@ export default function ApprovalDetailPage({
                                 <span className="text-slate-700 font-medium pr-2">{label}</span>
                                 <span className="text-center">
                                   <span
-                                    className={`inline-block px-2 py-0.5 rounded text-[11px] font-bold ${
-                                      checked ? "bg-emerald-100 text-emerald-800" : "bg-rose-100 text-rose-800"
-                                    }`}
+                                    className={`inline-block px-2 py-0.5 rounded text-[11px] font-bold ${checked ? "bg-emerald-100 text-emerald-800" : "bg-rose-100 text-rose-800"
+                                      }`}
                                   >
                                     {checked ? "YA" : "TIDAK"}
                                   </span>
@@ -1474,9 +1478,8 @@ export default function ApprovalDetailPage({
                         <span className="text-slate-700 font-medium pr-2">Kondisi Fire Blanket / Perisai Metal</span>
                         <span className="text-center">
                           <span
-                            className={`inline-block px-2 py-0.5 rounded text-[11px] font-bold ${
-                              isTruthy(form.kondisi_fire_blanket) ? "bg-emerald-100 text-emerald-800" : "bg-rose-100 text-rose-800"
-                            }`}
+                            className={`inline-block px-2 py-0.5 rounded text-[11px] font-bold ${isTruthy(form.kondisi_fire_blanket) ? "bg-emerald-100 text-emerald-800" : "bg-rose-100 text-rose-800"
+                              }`}
                           >
                             {isTruthy(form.kondisi_fire_blanket) ? "LAYAK" : "TIDAK"}
                           </span>
@@ -1608,9 +1611,8 @@ export default function ApprovalDetailPage({
 
                           <div className="flex items-center gap-2.5 shrink-0">
                             <span
-                              className={`text-xs font-bold px-2.5 py-0.5 rounded-full ${
-                                sehat ? "bg-emerald-100 text-emerald-800" : "bg-rose-100 text-rose-800"
-                              }`}
+                              className={`text-xs font-bold px-2.5 py-0.5 rounded-full ${sehat ? "bg-emerald-100 text-emerald-800" : "bg-rose-100 text-rose-800"
+                                }`}
                             >
                               {sehat ? "✓ Sehat" : "✗ Tidak Sehat"}
                             </span>
@@ -1684,9 +1686,8 @@ export default function ApprovalDetailPage({
                         >
                           <span className="text-slate-700 font-medium pr-2">{item.l}</span>
                           <span
-                            className={`px-2 py-0.5 rounded text-[10px] font-bold shrink-0 ${
-                              active ? "bg-emerald-100 text-emerald-800" : "bg-rose-100 text-rose-800"
-                            }`}
+                            className={`px-2 py-0.5 rounded text-[10px] font-bold shrink-0 ${active ? "bg-emerald-100 text-emerald-800" : "bg-rose-100 text-rose-800"
+                              }`}
                           >
                             {active ? "YA" : "TIDAK"}
                           </span>
@@ -1723,8 +1724,8 @@ export default function ApprovalDetailPage({
                           </p>
                           {[
                             { l: "Webbing baik", v: form.webbing_kondisi_baik },
-                            { l: "D-Ring baik",  v: form.dring_kondisi_baik },
-                            { l: "Gesper baik",  v: form.gesper_kondisi_baik },
+                            { l: "D-Ring baik", v: form.dring_kondisi_baik },
+                            { l: "Gesper baik", v: form.gesper_kondisi_baik },
                           ].map((x, i) => (
                             <div key={i} className="flex items-center justify-between text-xs">
                               <span className="text-slate-700">{x.l}</span>
@@ -1741,8 +1742,8 @@ export default function ApprovalDetailPage({
                           </p>
                           {[
                             { l: "Absorber & Timbles", v: form.absorter_dan_timbes_kondisi_baik },
-                            { l: "Snap Hook",          v: form.snap_hook_kondisi_baik },
-                            { l: "Rope Lanyard",       v: form.rope_lanyard_kondisi_baik },
+                            { l: "Snap Hook", v: form.snap_hook_kondisi_baik },
+                            { l: "Rope Lanyard", v: form.rope_lanyard_kondisi_baik },
                           ].map((x, i) => (
                             <div key={i} className="flex items-center justify-between text-xs">
                               <span className="text-slate-700">{x.l}</span>
@@ -1785,11 +1786,10 @@ export default function ApprovalDetailPage({
               <button
                 type="button"
                 onClick={() => setActiveLampiranTab("jsa")}
-                className={`w-full text-left p-4 rounded-2xl border transition-all ${
-                  activeLampiranTab === "jsa"
+                className={`w-full text-left p-4 rounded-2xl border transition-all ${activeLampiranTab === "jsa"
                     ? "bg-white border-orange-500 shadow-sm ring-1 ring-orange-400"
                     : "bg-white/80 border-slate-200 hover:bg-white"
-                }`}
+                  }`}
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2.5">
@@ -1809,11 +1809,10 @@ export default function ApprovalDetailPage({
                 <button
                   type="button"
                   onClick={() => setActiveLampiranTab("lisensi")}
-                  className={`w-full text-left p-4 rounded-2xl border transition-all ${
-                    activeLampiranTab === "lisensi"
+                  className={`w-full text-left p-4 rounded-2xl border transition-all ${activeLampiranTab === "lisensi"
                       ? "bg-white border-orange-500 shadow-sm ring-1 ring-orange-400"
                       : "bg-white/80 border-slate-200 hover:bg-white"
-                  }`}
+                    }`}
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2.5">
@@ -1834,11 +1833,10 @@ export default function ApprovalDetailPage({
                 <button
                   type="button"
                   onClick={() => setActiveLampiranTab("scaffolding")}
-                  className={`w-full text-left p-4 rounded-2xl border transition-all ${
-                    activeLampiranTab === "scaffolding"
+                  className={`w-full text-left p-4 rounded-2xl border transition-all ${activeLampiranTab === "scaffolding"
                       ? "bg-white border-orange-500 shadow-sm ring-1 ring-orange-400"
                       : "bg-white/80 border-slate-200 hover:bg-white"
-                  }`}
+                    }`}
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2.5">
@@ -1851,8 +1849,8 @@ export default function ApprovalDetailPage({
                           {scaffoldingData?.inspection_status === "approved"
                             ? "Disetujui Penuh"
                             : scaffoldingData?.inspection_status === "submitted"
-                            ? "Diajukan Pengawas"
-                            : "Draft / Menunggu"}
+                              ? "Diajukan Pengawas"
+                              : "Draft / Menunggu"}
                         </p>
                       </div>
                     </div>
@@ -1865,11 +1863,10 @@ export default function ApprovalDetailPage({
                 <button
                   type="button"
                   onClick={() => setActiveLampiranTab("parent")}
-                  className={`w-full text-left p-4 rounded-2xl border transition-all ${
-                    activeLampiranTab === "parent"
+                  className={`w-full text-left p-4 rounded-2xl border transition-all ${activeLampiranTab === "parent"
                       ? "bg-white border-orange-500 shadow-sm ring-1 ring-orange-400"
                       : "bg-white/80 border-slate-200 hover:bg-white"
-                  }`}
+                    }`}
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2.5">
@@ -2066,24 +2063,24 @@ export default function ApprovalDetailPage({
                                 const itemsList = Array.isArray(scaffoldingData?.items) && scaffoldingData.items.length > 0
                                   ? scaffoldingData.items
                                   : [
-                                      { no: 1, bagian: "OPEN FRAME", kondisi_standar: "TIDAK BENGKOK / KEROPOS, PIN PENGUNCI ADA", kondisi: "", komentar: "" },
-                                      { no: 2, bagian: "HORIZONTAL FRAME", kondisi_standar: "TIDAK BENGKOK / KEROPOS", kondisi: "", komentar: "" },
-                                      { no: 3, bagian: "HORIZONTAL PLATE", kondisi_standar: "TERPASANG KUAT SEBAGAI PELATARAN KERJA", kondisi: "", komentar: "" },
-                                      { no: 4, bagian: "CROSS BRACE", kondisi_standar: "TERPASANG KUAT, TIDAK BENGKOK & TERKUNCI", kondisi: "", komentar: "" },
-                                      { no: 5, bagian: "JACK BASE / U-HEAD", kondisi_standar: "TERPASANG KUAT SEBAGAI LEVELING", kondisi: "", komentar: "" },
-                                      { no: 6, bagian: "JOINT PIN", kondisi_standar: "TERPASANG TIDAK KENDOR", kondisi: "", komentar: "" },
-                                      { no: 7, bagian: "STAIR FRAME", kondisi_standar: "TERPASANG KUAT DILENGKAPI HANDRAIL", kondisi: "", komentar: "" },
-                                      { no: 8, bagian: "BASE PLATE", kondisi_standar: "TERPASANG KUAT DENGAN KONDISI RATA", kondisi: "", komentar: "" },
-                                      { no: 9, bagian: "HORIZONTAL PIPE", kondisi_standar: "TERPASANG KUAT DIATAS JACK BASE", kondisi: "", komentar: "" },
-                                      { no: 10, bagian: "ANGLE PIPE SUPPORT", kondisi_standar: "TERPASANG KUAT TIDAK BENGKOK / KEROPOS", kondisi: "", komentar: "" },
-                                      { no: 11, bagian: "HANDRAIL", kondisi_standar: "TERPASANG KUAT DENGAN TINGGI Min. 90 Cm.", kondisi: "", komentar: "" },
-                                      { no: 12, bagian: "KLEM PIPA", kondisi_standar: "TERPASANG KUAT/SAMBUNGAN PIPA Min.3 KLEM", kondisi: "", komentar: "" },
-                                      { no: 13, bagian: "PELATARAN KERJA", kondisi_standar: "TERPASANG KUAT DENGAN LEBAR Min. 40 Cm.", kondisi: "", komentar: "" },
-                                      { no: 14, bagian: "KONDISI TANAH DASAR", kondisi_standar: "KONDISI TANAH RATA TIDAK MUDAH AMBLAS", kondisi: "", komentar: "" },
-                                      { no: 15, bagian: "TOE BOARD", kondisi_standar: "TERPASANG KELILING KETINGGIAN Min. 20 Cm.", kondisi: "", komentar: "" },
-                                      { no: 16, bagian: "WALL TEE", kondisi_standar: "TERPASANG 3 TRAP VERTICAL DAN HORIZONTAL", kondisi: "", komentar: "" },
-                                      { no: 17, bagian: "OPENING", kondisi_standar: "TERPASANG PIPA HORIZONTAL DAN SUDUT/SIKU, SAFETY NET", kondisi: "", komentar: "" },
-                                    ];
+                                    { no: 1, bagian: "OPEN FRAME", kondisi_standar: "TIDAK BENGKOK / KEROPOS, PIN PENGUNCI ADA", kondisi: "", komentar: "" },
+                                    { no: 2, bagian: "HORIZONTAL FRAME", kondisi_standar: "TIDAK BENGKOK / KEROPOS", kondisi: "", komentar: "" },
+                                    { no: 3, bagian: "HORIZONTAL PLATE", kondisi_standar: "TERPASANG KUAT SEBAGAI PELATARAN KERJA", kondisi: "", komentar: "" },
+                                    { no: 4, bagian: "CROSS BRACE", kondisi_standar: "TERPASANG KUAT, TIDAK BENGKOK & TERKUNCI", kondisi: "", komentar: "" },
+                                    { no: 5, bagian: "JACK BASE / U-HEAD", kondisi_standar: "TERPASANG KUAT SEBAGAI LEVELING", kondisi: "", komentar: "" },
+                                    { no: 6, bagian: "JOINT PIN", kondisi_standar: "TERPASANG TIDAK KENDOR", kondisi: "", komentar: "" },
+                                    { no: 7, bagian: "STAIR FRAME", kondisi_standar: "TERPASANG KUAT DILENGKAPI HANDRAIL", kondisi: "", komentar: "" },
+                                    { no: 8, bagian: "BASE PLATE", kondisi_standar: "TERPASANG KUAT DENGAN KONDISI RATA", kondisi: "", komentar: "" },
+                                    { no: 9, bagian: "HORIZONTAL PIPE", kondisi_standar: "TERPASANG KUAT DIATAS JACK BASE", kondisi: "", komentar: "" },
+                                    { no: 10, bagian: "ANGLE PIPE SUPPORT", kondisi_standar: "TERPASANG KUAT TIDAK BENGKOK / KEROPOS", kondisi: "", komentar: "" },
+                                    { no: 11, bagian: "HANDRAIL", kondisi_standar: "TERPASANG KUAT DENGAN TINGGI Min. 90 Cm.", kondisi: "", komentar: "" },
+                                    { no: 12, bagian: "KLEM PIPA", kondisi_standar: "TERPASANG KUAT/SAMBUNGAN PIPA Min.3 KLEM", kondisi: "", komentar: "" },
+                                    { no: 13, bagian: "PELATARAN KERJA", kondisi_standar: "TERPASANG KUAT DENGAN LEBAR Min. 40 Cm.", kondisi: "", komentar: "" },
+                                    { no: 14, bagian: "KONDISI TANAH DASAR", kondisi_standar: "KONDISI TANAH RATA TIDAK MUDAH AMBLAS", kondisi: "", komentar: "" },
+                                    { no: 15, bagian: "TOE BOARD", kondisi_standar: "TERPASANG KELILING KETINGGIAN Min. 20 Cm.", kondisi: "", komentar: "" },
+                                    { no: 16, bagian: "WALL TEE", kondisi_standar: "TERPASANG 3 TRAP VERTICAL DAN HORIZONTAL", kondisi: "", komentar: "" },
+                                    { no: 17, bagian: "OPENING", kondisi_standar: "TERPASANG PIPA HORIZONTAL DAN SUDUT/SIKU, SAFETY NET", kondisi: "", komentar: "" },
+                                  ];
 
                                 return itemsList.map((item: any, idx: number) => {
                                   const isStandar = item.kondisi === "standart";
@@ -2215,6 +2212,16 @@ export default function ApprovalDetailPage({
           src={previewImage.src}
           label={previewImage.label}
           onClose={() => setPreviewImage(null)}
+        />
+      )}
+
+      {nextApproverTargetRole && (
+        <NextApproverModal
+          isOpen={showNextApproverModal}
+          onClose={() => setShowNextApproverModal(false)}
+          targetRole={nextApproverTargetRole}
+          submitting={submitting}
+          onConfirm={(selectedUserId) => handleAction("approve", selectedUserId)}
         />
       )}
     </div>

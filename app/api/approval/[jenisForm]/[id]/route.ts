@@ -9,6 +9,13 @@ import { query, queryOne } from '@/lib/db';
 import { verifyToken, COOKIE_NAME, UserRole, canUserApproveAtStage, getStageToRoleMap, getStageConfig } from '@/lib/auth';
 import { notifyNextApprover, notifyFormRejected, FormType } from '@/lib/approval-email';
 import { syncCascadeApproval } from '@/lib/approval-sync';
+import {
+  setAssignedApproverForForm,
+  setAssignedApproverCascade,
+  getAssignedApproverForForm,
+  getAdminK3ApproverForForm,
+  JenisFormK3,
+} from '@/lib/admin-k3-routing';
 
 function getUser(req: NextRequest) {
   const token = req.cookies.get(COOKIE_NAME)?.value;
@@ -314,10 +321,38 @@ export async function PATCH(
     }
 
     // ── APPROVE ──────────────────────────────────────────────
+    if (userRole === 'admin_k3') {
+      const routedK3 = await getAdminK3ApproverForForm(formType as JenisFormK3);
+      if (routedK3 && routedK3.id !== user.userId) {
+        return NextResponse.json(
+          { error: `Form ini ditugaskan khusus untuk Admin K3: ${routedK3.nama}. Anda tidak berwenang menyetujuinya.` },
+          { status: 403 }
+        );
+      }
+    } else if (userRole === 'sfo' || userRole === 'smr') {
+      const assigned = await getAssignedApproverForForm(id, userRole);
+      if (assigned && assigned.id !== user.userId) {
+        return NextResponse.json(
+          { error: `Form ini ditugaskan khusus untuk ${userRole.toUpperCase()}: ${assigned.nama}. Anda tidak berwenang menyetujuinya.` },
+          { status: 403 }
+        );
+      }
+    }
+
     const stageConfig = getStageConfig(formType, tipePerusahaan);
     const maxStage = stageConfig.totalStages;
     const isLastStage = currentStage === maxStage;
     const nextStage = currentStage + 1;
+    const stageMap = getStageToRoleMap(formType, tipePerusahaan);
+    const nextRole = !isLastStage ? stageMap[nextStage] : null;
+    const nextApproverUserId = Number(body.next_approver_user_id || 0);
+
+    if ((nextRole === 'sfo' || nextRole === 'smr') && nextApproverUserId > 0) {
+      await setAssignedApproverForForm(id, nextRole, nextApproverUserId, user.userId);
+      if (form.id_ijin_kerja) {
+        await setAssignedApproverCascade(form.id_ijin_kerja, nextRole, nextApproverUserId, user.userId);
+      }
+    }
 
     const cols = getRoleApprovalColumns(userRole, formType, isLastStage);
     if (!cols && userRole !== 'admin') {

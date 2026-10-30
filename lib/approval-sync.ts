@@ -25,13 +25,17 @@ export interface SyncCascadeParams {
 
 export async function syncJobFormsStageAndStatus(idIjinKerja: string, now: string): Promise<void> {
   for (const tbl of ["form_kerja_panas", "form_kerja_workshop", "form_kerja_ketinggian"]) {
+    const pgaCondition = tbl === "form_kerja_ketinggian"
+      ? "mr_pga_approved = TRUE"
+      : "(mr_pga_approved = TRUE OR pga_approved = TRUE)";
+
     await query(
       `UPDATE ${tbl}
           SET status = CASE
                 WHEN spv_approved = TRUE
                  AND admin_k3_approved = TRUE
                  AND sfo_approved = TRUE
-                 AND mr_pga_approved = TRUE
+                 AND ${pgaCondition}
                 THEN 'approved'
                 ELSE status
               END,
@@ -132,13 +136,13 @@ export async function syncCascadeApproval(params: SyncCascadeParams): Promise<vo
 
       // C. Update linked job forms (form_kerja_panas, form_kerja_workshop, form_kerja_ketinggian)
       for (const tbl of ["form_kerja_panas", "form_kerja_workshop", "form_kerja_ketinggian"]) {
+        const extraNikCol = tbl !== "form_kerja_ketinggian" ? ", nik_pemberi_ijin = COALESCE(nik_pemberi_ijin, $3)" : "";
         await query(
           `UPDATE ${tbl}
               SET spv_approved = TRUE,
                   spv_approved_by = $1,
                   spv_approved_at = $2,
-                  spv_nik = $3,
-                  nik_pemberi_ijin = COALESCE(nik_pemberi_ijin, $3),
+                  spv_nik = $3${extraNikCol},
                   updated_at = $2
             WHERE id_ijin_kerja = $4 AND status IN ('submitted', 'draft')`,
           [spvName, now, spvNik, idIjinKerja]
@@ -326,6 +330,23 @@ export async function syncCascadeApproval(params: SyncCascadeParams): Promise<vo
           WHERE id_form = $6`,
         [JSON.stringify(si), approverName, now, approverNik, signatureUrl, idIjinKerja]
       );
+
+      // C. Pastikan seluruh lampiran izin kerja khusus ikut status approved
+      for (const tbl of ["form_kerja_panas", "form_kerja_workshop", "form_kerja_ketinggian"]) {
+        await query(
+          `UPDATE ${tbl}
+              SET status = 'approved',
+                  spv_approved = TRUE,
+                  admin_k3_approved = TRUE,
+                  sfo_approved = TRUE,
+                  mr_pga_approved = TRUE,
+                  approved_by = COALESCE(approved_by, $1),
+                  approved_at = COALESCE(approved_at, $2),
+                  updated_at = $2
+            WHERE id_ijin_kerja = $3`,
+          [approverName, now, idIjinKerja]
+        );
+      }
     }
 
     // ─────────────────────────────────────────────────────────────

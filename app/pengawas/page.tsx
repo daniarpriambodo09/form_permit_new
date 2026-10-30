@@ -209,7 +209,7 @@ export default function PengawasDashboardPage() {
     if (!isPenilaianComplete) {
       setEvalActionMsg({
         type: "error",
-        text: "Evaluasi Akhir belum dapat disetujui. Penilaian Sub Kontraktor harus disetujui lengkap terlebih dahulu oleh Pengawas Dept, Purchasing, dan SFO.",
+        text: "Evaluasi Akhir belum dapat disetujui. Form Penilaian Sub Kontraktor (JAI/F-08/P.SHE-19 Rev. 1) harus disetujui lengkap terlebih dahulu oleh Pengawas Dept, Purchasing, dan SFO.",
       });
       return;
     }
@@ -386,7 +386,7 @@ export default function PengawasDashboardPage() {
               </div>
               <div>
                 <h1 className="text-base sm:text-lg font-bold text-slate-800 leading-tight">
-                  Penilaian Sub Kontraktor — Pengawas Dept
+                  Form Penilaian Sub Kontraktor (JAI/F-08/P.SHE-19 Rev. 1) — Pengawas Dept
                 </h1>
                 <p className="text-xs text-slate-500">
                   Pengisian checklist harian & persetujuan digital
@@ -675,7 +675,7 @@ export default function PengawasDashboardPage() {
         </main>
       </div>
 
-      {/* Modal Pengisian Penilaian Sub Kontraktor */}
+      {/* Modal Pengisian Form Penilaian Sub Kontraktor (JAI/F-08/P.SHE-19 Rev. 1) */}
       {selectedForm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 overflow-y-auto">
           <div className="bg-white rounded-2xl max-w-4xl w-full max-h-[92vh] flex flex-col shadow-2xl border border-slate-200 overflow-hidden my-4">
@@ -684,7 +684,7 @@ export default function PengawasDashboardPage() {
               <div>
                 <div className="flex items-center gap-2">
                   <h3 className="text-base font-bold text-white">
-                    Penilaian Sub Kontraktor — {selectedForm.id_form}
+                    Form Penilaian Sub Kontraktor (JAI/F-08/P.SHE-19 Rev. 1) — {selectedForm.id_form}
                   </h3>
                   <span className="text-[10px] font-bold px-2 py-0.5 bg-orange-500/20 text-orange-300 border border-orange-500/30 rounded-md">
                     Pengawas Dept
@@ -852,7 +852,7 @@ export default function PengawasDashboardPage() {
 
               {/* Modal Body */}
               <div className="flex-1 overflow-y-auto p-6 space-y-5">
-                {/* Warning if Penilaian Sub Kontraktor is not fully approved */}
+                {/* Warning if Form Penilaian Sub Kontraktor (JAI/F-08/P.SHE-19 Rev. 1) is not fully approved */}
                 {isLocked && (
                   <div className="bg-amber-50 border border-amber-300 rounded-xl p-4 flex items-start gap-3">
                     <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
@@ -862,7 +862,7 @@ export default function PengawasDashboardPage() {
                         Evaluasi Akhir Terkunci
                       </h4>
                       <p className="text-xs text-amber-800 mt-1 leading-relaxed">
-                        Evaluasi Akhir baru dapat diisi dan disetujui setelah <strong>Penilaian Sub Kontraktor</strong> telah disetujui lengkap oleh <strong>Pengawas Dept</strong>, <strong>Purchasing</strong>, dan <strong>SFO</strong>.
+                        Evaluasi Akhir baru dapat diisi dan disetujui setelah <strong>Form Penilaian Sub Kontraktor (JAI/F-08/P.SHE-19 Rev. 1)</strong> telah disetujui lengkap oleh <strong>Pengawas Dept</strong>, <strong>Purchasing</strong>, dan <strong>SFO</strong>.
                       </p>
                       <div className="mt-3 flex items-center gap-2 text-[11px] font-semibold flex-wrap">
                         <span className={`px-2.5 py-1 rounded-md border ${selectedEvalForm.approval_status.pengawas ? "bg-emerald-50 text-emerald-800 border-emerald-200" : "bg-amber-100 text-amber-900 border-amber-300"}`}>
@@ -1010,7 +1010,7 @@ export default function PengawasDashboardPage() {
                   {isLocked ? (
                     <span className="text-amber-700 font-semibold flex items-center gap-1.5">
                       <Lock className="w-4 h-4 text-amber-600 shrink-0" />
-                      Penilaian Sub Kontraktor belum disetujui lengkap
+                      Form Penilaian Sub Kontraktor (JAI/F-08/P.SHE-19 Rev. 1) belum disetujui lengkap
                     </span>
                   ) : selectedEvalForm.evaluasi_akhir?.pengawas_approved ? (
                     <span className="text-emerald-700 font-semibold flex items-center gap-1.5">

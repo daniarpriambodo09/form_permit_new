@@ -44,7 +44,7 @@ export async function PUT(req: NextRequest) {
     const jenisForm = body.jenis_form as JenisFormK3;
     const userId = Number(body.user_id);
 
-    const validJenis: JenisFormK3[] = ['hot-work', 'height-work', 'workshop'];
+    const validJenis: JenisFormK3[] = ['hot-work', 'height-work', 'workshop', 'general-permit'];
     if (!validJenis.includes(jenisForm)) {
       return NextResponse.json({ error: 'Jenis form tidak valid' }, { status: 400 });
     }

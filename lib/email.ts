@@ -158,6 +158,12 @@ export async function sendEmail(options: EmailOptions): Promise<void> {
   const toDisplay = Array.isArray(options.to) ? options.to.join(', ') : options.to;
   console.log(`[EMAIL] Sending to: ${toDisplay} | Subject: ${options.subject}`);
 
+  // Mode uji: jangan kirim ke jaringan eksternal/alamat asli, catat pemicuan email
+  if (process.env.EMAIL_TEST_MODE === 'true' || process.env.NODE_ENV === 'test') {
+    console.log(`[EMAIL TEST MODE] Terverifikasi terpicu: Ke: ${toDisplay} | Subjek: ${options.subject}`);
+    return;
+  }
+
   try {
     const info = await transporter.sendMail({
       from:    cfg.from,

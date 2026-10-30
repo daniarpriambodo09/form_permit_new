@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { query, queryOne } from "@/lib/db";
 import { verifyToken, COOKIE_NAME, UserRole } from "@/lib/auth";
 import { syncCascadeApproval } from "@/lib/approval-sync";
+import { setAssignedApproverCascade } from "@/lib/admin-k3-routing";
 
 const STAGE_ROLES: UserRole[] = ["firewatch", "spv", "sfo"];
 
@@ -114,6 +115,10 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     await query(`UPDATE form_ijin_kerja SET jsa_data = $1, updated_at = $2 WHERE id_form = $3`, [JSON.stringify(jsa), now, id]);
 
     if (action === "approve" && (role === "spv" || role === "sfo")) {
+      const nextApproverUserId = Number(body.next_approver_user_id || 0);
+      if (role === "sfo" && nextApproverUserId > 0) {
+        await setAssignedApproverCascade(id, "smr", nextApproverUserId, user.userId);
+      }
       await syncCascadeApproval({
         idIjinKerja: id,
         role: role as UserRole,

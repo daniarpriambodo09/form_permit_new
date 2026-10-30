@@ -19,6 +19,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query, queryOne } from '@/lib/db';
 import { verifyToken, COOKIE_NAME, UserRole } from '@/lib/auth';
+import { ensureApproverAssignmentTable, getAllRouting } from '@/lib/admin-k3-routing';
 
 function getUser(req: NextRequest) {
   const token = req.cookies.get(COOKIE_NAME)?.value;
@@ -182,10 +183,10 @@ function buildSelectQuery(
       id_ijin_kerja,
        (${TIPE_EXPR_FW}) AS tipe_perusahaan,
        '${formType}' AS jenis_form
-     FROM ${table}
+     FROM ${table} f
      WHERE (${whereClause})
-       AND (id_ijin_kerja IS NULL OR TRIM(id_ijin_kerja) = '')
-     ORDER BY tanggal ASC`,
+       AND (f.id_ijin_kerja IS NULL OR TRIM(f.id_ijin_kerja) = '')
+     ORDER BY f.tanggal ASC`,
     params,
   ];
 }
@@ -234,7 +235,9 @@ async function queryGeneralPermitByStage(
   spvDepartmen?: string | null,
   spvNama?: string | null,
   spvNik?: string | null,
-  spvUsername?: string | null
+  spvUsername?: string | null,
+  assignedRole?: 'sfo' | 'smr',
+  assignedUserId?: number
 ) {
   if (spvDepartmen != null) {
     return query(
@@ -275,6 +278,13 @@ async function queryGeneralPermitByStage(
       [stage, spvDepartmen, spvNama ?? '', spvNik ?? null, spvUsername ?? '']
     );
   }
+  const assignClause = assignedRole && assignedUserId
+    ? ` AND (
+          NOT EXISTS (SELECT 1 FROM form_approver_assignments faa WHERE faa.id_form = form_ijin_kerja.id_form AND faa.role = $2)
+          OR EXISTS (SELECT 1 FROM form_approver_assignments faa WHERE faa.id_form = form_ijin_kerja.id_form AND faa.role = $2 AND faa.user_id = $3)
+        )`
+    : '';
+  const queryParams = assignedRole && assignedUserId ? [stage, assignedRole, assignedUserId] : [stage];
   return query(
     `SELECT id_form, tanggal, tanggal_pelaksanaan, status, current_stage,
             nama_kontraktor_pekerja AS nama_kontraktor_nik,
@@ -299,9 +309,9 @@ async function queryGeneralPermitByStage(
           OR ($1 = 3 AND admin_k3_approved = TRUE AND sfo_approved = FALSE)
           OR ($1 = 4 AND sfo_approved = TRUE AND pga_approved = FALSE)
           OR ($1 = 5 AND pga_approved = TRUE AND security_approved = FALSE)
-        )
+        )${assignClause}
       ORDER BY tanggal ASC`,
-    [stage]
+    queryParams
   );
 }
 
@@ -412,7 +422,9 @@ async function countGeneralPermitByStage(
   spvDepartmen?: string | null,
   spvNama?: string | null,
   spvNik?: string | null,
-  spvUsername?: string | null
+  spvUsername?: string | null,
+  assignedRole?: 'sfo' | 'smr',
+  assignedUserId?: number
 ): Promise<number> {
   if (spvDepartmen != null) {
     const res = await query(
@@ -441,6 +453,13 @@ async function countGeneralPermitByStage(
     );
     return parseInt(res[0].count);
   }
+  const assignClause = assignedRole && assignedUserId
+    ? ` AND (
+          NOT EXISTS (SELECT 1 FROM form_approver_assignments faa WHERE faa.id_form = form_ijin_kerja.id_form AND faa.role = $2)
+          OR EXISTS (SELECT 1 FROM form_approver_assignments faa WHERE faa.id_form = form_ijin_kerja.id_form AND faa.role = $2 AND faa.user_id = $3)
+        )`
+    : '';
+  const queryParams = assignedRole && assignedUserId ? [stage, assignedRole, assignedUserId] : [stage];
   const res = await query(
     `SELECT COUNT(*) AS count
        FROM form_ijin_kerja
@@ -452,8 +471,8 @@ async function countGeneralPermitByStage(
           OR ($1 = 3 AND admin_k3_approved = TRUE AND sfo_approved = FALSE)
           OR ($1 = 4 AND sfo_approved = TRUE AND pga_approved = FALSE)
           OR ($1 = 5 AND pga_approved = TRUE AND security_approved = FALSE)
-        )`,
-    [stage]
+        )${assignClause}`,
+    queryParams
   );
   return parseInt(res[0].count);
 }
@@ -526,6 +545,8 @@ export async function GET(req: NextRequest) {
     const countOnly = searchParams.get('countOnly') === '1';
     const userRole = user.role as UserRole;
     const allFormTypes: FormType[] = ['hot-work', 'workshop', 'height-work'];
+
+    await ensureApproverAssignmentTable();
 
     // ── ADMIN: lihat semua ──────────────────────────────────────
     if (userRole === 'admin') {
@@ -705,14 +726,22 @@ export async function GET(req: NextRequest) {
 
     // ── ADMIN K3 ─────────────────────────────────────────────────
     if (userRole === 'admin_k3') {
+      const k3Routing = await getAllRouting();
+      const canK3See = (ft: string) => !k3Routing[ft] || k3Routing[ft]!.id === user.userId;
+      const k3FwForms = FW_FORMS.filter(f => canK3See(f));
+      const k3CanHw = canK3See('height-work');
+      const k3CanGp = canK3See('general-permit');
+
       if (countOnly) {
         const [subm, appr, rej] = await Promise.all([
           Promise.all([
-            ...FW_FORMS.map(f => countByQuery(f, `status = $1 AND current_stage = $2 AND (${TIPE_EXPR_FW}) = $3`, ['submitted', 2, 'internal'])),
-            ...FW_FORMS.map(f => countByQuery(f, `status = $1 AND current_stage = $2 AND (${TIPE_EXPR_FW}) = $3`, ['submitted', 3, 'eksternal'])),
-            countByQuery('height-work', `status = $1 AND current_stage = $2 AND (${TIPE_EXPR}) = $3`, ['submitted', 2, 'internal']),
-            countByQuery('height-work', `status = $1 AND current_stage = $2 AND (${TIPE_EXPR}) = $3`, ['submitted', 3, 'eksternal']),
-            countGeneralPermitByStage(2),
+            ...k3FwForms.map(f => countByQuery(f, `status = $1 AND current_stage = $2 AND (${TIPE_EXPR_FW}) = $3`, ['submitted', 2, 'internal'])),
+            ...k3FwForms.map(f => countByQuery(f, `status = $1 AND current_stage = $2 AND (${TIPE_EXPR_FW}) = $3`, ['submitted', 3, 'eksternal'])),
+            ...(k3CanHw ? [
+              countByQuery('height-work', `status = $1 AND current_stage = $2 AND (${TIPE_EXPR}) = $3`, ['submitted', 2, 'internal']),
+              countByQuery('height-work', `status = $1 AND current_stage = $2 AND (${TIPE_EXPR}) = $3`, ['submitted', 3, 'eksternal']),
+            ] : []),
+            ...(k3CanGp ? [countGeneralPermitByStage(2)] : []),
           ]),
           Promise.all([
             ...allFormTypes.map(f => countByQuery(f, `admin_k3_approved = TRUE`)),
@@ -724,11 +753,13 @@ export async function GET(req: NextRequest) {
       }
       if (statusFilter === 'submitted') {
         const results = await Promise.all([
-          ...FW_FORMS.map(f => query(...buildSelectQuery(f, `status = $1 AND current_stage = $2 AND (${TIPE_EXPR_FW}) = $3`, ['submitted', 2, 'internal']))),
-          ...FW_FORMS.map(f => query(...buildSelectQuery(f, `status = $1 AND current_stage = $2 AND (${TIPE_EXPR_FW}) = $3`, ['submitted', 3, 'eksternal']))),
-          query(...buildSelectQuery('height-work', `status = $1 AND current_stage = $2 AND (${TIPE_EXPR}) = $3`, ['submitted', 2, 'internal'])),
-          query(...buildSelectQuery('height-work', `status = $1 AND current_stage = $2 AND (${TIPE_EXPR}) = $3`, ['submitted', 3, 'eksternal'])),
-          queryGeneralPermitByStage(2),
+          ...k3FwForms.map(f => query(...buildSelectQuery(f, `status = $1 AND current_stage = $2 AND (${TIPE_EXPR_FW}) = $3`, ['submitted', 2, 'internal']))),
+          ...k3FwForms.map(f => query(...buildSelectQuery(f, `status = $1 AND current_stage = $2 AND (${TIPE_EXPR_FW}) = $3`, ['submitted', 3, 'eksternal']))),
+          ...(k3CanHw ? [
+            query(...buildSelectQuery('height-work', `status = $1 AND current_stage = $2 AND (${TIPE_EXPR}) = $3`, ['submitted', 2, 'internal'])),
+            query(...buildSelectQuery('height-work', `status = $1 AND current_stage = $2 AND (${TIPE_EXPR}) = $3`, ['submitted', 3, 'eksternal'])),
+          ] : []),
+          ...(k3CanGp ? [queryGeneralPermitByStage(2)] : []),
         ]);
         return NextResponse.json({ data: results.flat(), total: results.flat().length });
       }
@@ -748,14 +779,15 @@ export async function GET(req: NextRequest) {
 
     // ── SFO ──────────────────────────────────────────────────────
     if (userRole === 'sfo') {
+      const sfoAssignFilter = ` AND (NOT EXISTS (SELECT 1 FROM form_approver_assignments faa WHERE faa.id_form = f.id_form AND faa.role = 'sfo') OR EXISTS (SELECT 1 FROM form_approver_assignments faa WHERE faa.id_form = f.id_form AND faa.role = 'sfo' AND faa.user_id = $4))`;
       if (countOnly) {
         const [subm, appr, rej] = await Promise.all([
           Promise.all([
-            ...FW_FORMS.map(f => countByQuery(f, `status = $1 AND current_stage = $2 AND (${TIPE_EXPR_FW}) = $3`, ['submitted', 3, 'internal'])),
-            ...FW_FORMS.map(f => countByQuery(f, `status = $1 AND current_stage = $2 AND (${TIPE_EXPR_FW}) = $3`, ['submitted', 4, 'eksternal'])),
-            countByQuery('height-work', `status = $1 AND current_stage = $2 AND (${TIPE_EXPR}) = $3`, ['submitted', 3, 'internal']),
-            countByQuery('height-work', `status = $1 AND current_stage = $2 AND (${TIPE_EXPR}) = $3`, ['submitted', 4, 'eksternal']),
-            countGeneralPermitByStage(3),
+            ...FW_FORMS.map(f => countByQuery(f, `status = $1 AND current_stage = $2 AND (${TIPE_EXPR_FW}) = $3${sfoAssignFilter}`, ['submitted', 3, 'internal', user.userId])),
+            ...FW_FORMS.map(f => countByQuery(f, `status = $1 AND current_stage = $2 AND (${TIPE_EXPR_FW}) = $3${sfoAssignFilter}`, ['submitted', 4, 'eksternal', user.userId])),
+            countByQuery('height-work', `status = $1 AND current_stage = $2 AND (${TIPE_EXPR}) = $3${sfoAssignFilter}`, ['submitted', 3, 'internal', user.userId]),
+            countByQuery('height-work', `status = $1 AND current_stage = $2 AND (${TIPE_EXPR}) = $3${sfoAssignFilter}`, ['submitted', 4, 'eksternal', user.userId]),
+            countGeneralPermitByStage(3, null, null, null, null, 'sfo', user.userId),
           ]),
           Promise.all([
             ...allFormTypes.map(f => countByQuery(f, `sfo_approved = TRUE`)),
@@ -767,11 +799,11 @@ export async function GET(req: NextRequest) {
       }
       if (statusFilter === 'submitted') {
         const results = await Promise.all([
-          ...FW_FORMS.map(f => query(...buildSelectQuery(f, `status = $1 AND current_stage = $2 AND (${TIPE_EXPR_FW}) = $3`, ['submitted', 3, 'internal']))),
-          ...FW_FORMS.map(f => query(...buildSelectQuery(f, `status = $1 AND current_stage = $2 AND (${TIPE_EXPR_FW}) = $3`, ['submitted', 4, 'eksternal']))),
-          query(...buildSelectQuery('height-work', `status = $1 AND current_stage = $2 AND (${TIPE_EXPR}) = $3`, ['submitted', 3, 'internal'])),
-          query(...buildSelectQuery('height-work', `status = $1 AND current_stage = $2 AND (${TIPE_EXPR}) = $3`, ['submitted', 4, 'eksternal'])),
-          queryGeneralPermitByStage(3),
+          ...FW_FORMS.map(f => query(...buildSelectQuery(f, `status = $1 AND current_stage = $2 AND (${TIPE_EXPR_FW}) = $3${sfoAssignFilter}`, ['submitted', 3, 'internal', user.userId]))),
+          ...FW_FORMS.map(f => query(...buildSelectQuery(f, `status = $1 AND current_stage = $2 AND (${TIPE_EXPR_FW}) = $3${sfoAssignFilter}`, ['submitted', 4, 'eksternal', user.userId]))),
+          query(...buildSelectQuery('height-work', `status = $1 AND current_stage = $2 AND (${TIPE_EXPR}) = $3${sfoAssignFilter}`, ['submitted', 3, 'internal', user.userId])),
+          query(...buildSelectQuery('height-work', `status = $1 AND current_stage = $2 AND (${TIPE_EXPR}) = $3${sfoAssignFilter}`, ['submitted', 4, 'eksternal', user.userId])),
+          queryGeneralPermitByStage(3, null, null, null, null, 'sfo', user.userId),
         ]);
         return NextResponse.json({ data: results.flat(), total: results.flat().length });
       }
@@ -791,14 +823,15 @@ export async function GET(req: NextRequest) {
 
     // ── SMR (dahulu PGA / MR_PGA) ────────────────────────────────
     if (userRole === 'smr') {
+      const smrAssignFilter = ` AND (NOT EXISTS (SELECT 1 FROM form_approver_assignments faa WHERE faa.id_form = f.id_form AND faa.role = 'smr') OR EXISTS (SELECT 1 FROM form_approver_assignments faa WHERE faa.id_form = f.id_form AND faa.role = 'smr' AND faa.user_id = $4))`;
       if (countOnly) {
         const [subm, appr, rej] = await Promise.all([
           Promise.all([
-            ...FW_FORMS.map(f => countByQuery(f, `status = $1 AND current_stage = $2 AND (${TIPE_EXPR_FW}) = $3`, ['submitted', 4, 'internal'])),
-            ...FW_FORMS.map(f => countByQuery(f, `status = $1 AND current_stage = $2 AND (${TIPE_EXPR_FW}) = $3`, ['submitted', 5, 'eksternal'])),
-            countByQuery('height-work', `status = $1 AND current_stage = $2 AND (${TIPE_EXPR}) = $3`, ['submitted', 4, 'internal']),
-            countByQuery('height-work', `status = $1 AND current_stage = $2 AND (${TIPE_EXPR}) = $3`, ['submitted', 5, 'eksternal']),
-            countGeneralPermitByStage(4),
+            ...FW_FORMS.map(f => countByQuery(f, `status = $1 AND current_stage = $2 AND (${TIPE_EXPR_FW}) = $3${smrAssignFilter}`, ['submitted', 4, 'internal', user.userId])),
+            ...FW_FORMS.map(f => countByQuery(f, `status = $1 AND current_stage = $2 AND (${TIPE_EXPR_FW}) = $3${smrAssignFilter}`, ['submitted', 5, 'eksternal', user.userId])),
+            countByQuery('height-work', `status = $1 AND current_stage = $2 AND (${TIPE_EXPR}) = $3${smrAssignFilter}`, ['submitted', 4, 'internal', user.userId]),
+            countByQuery('height-work', `status = $1 AND current_stage = $2 AND (${TIPE_EXPR}) = $3${smrAssignFilter}`, ['submitted', 5, 'eksternal', user.userId]),
+            countGeneralPermitByStage(4, null, null, null, null, 'smr', user.userId),
           ]),
           Promise.all([
             ...FW_FORMS.map(f => countByQuery(f, `mr_pga_approved = TRUE`)),
@@ -811,11 +844,11 @@ export async function GET(req: NextRequest) {
       }
       if (statusFilter === 'submitted') {
         const results = await Promise.all([
-          ...FW_FORMS.map(f => query(...buildSelectQuery(f, `status = $1 AND current_stage = $2 AND (${TIPE_EXPR_FW}) = $3`, ['submitted', 4, 'internal']))),
-          ...FW_FORMS.map(f => query(...buildSelectQuery(f, `status = $1 AND current_stage = $2 AND (${TIPE_EXPR_FW}) = $3`, ['submitted', 5, 'eksternal']))),
-          query(...buildSelectQuery('height-work', `status = $1 AND current_stage = $2 AND (${TIPE_EXPR}) = $3`, ['submitted', 4, 'internal'])),
-          query(...buildSelectQuery('height-work', `status = $1 AND current_stage = $2 AND (${TIPE_EXPR}) = $3`, ['submitted', 5, 'eksternal'])),
-          queryGeneralPermitByStage(4),
+          ...FW_FORMS.map(f => query(...buildSelectQuery(f, `status = $1 AND current_stage = $2 AND (${TIPE_EXPR_FW}) = $3${smrAssignFilter}`, ['submitted', 4, 'internal', user.userId]))),
+          ...FW_FORMS.map(f => query(...buildSelectQuery(f, `status = $1 AND current_stage = $2 AND (${TIPE_EXPR_FW}) = $3${smrAssignFilter}`, ['submitted', 5, 'eksternal', user.userId]))),
+          query(...buildSelectQuery('height-work', `status = $1 AND current_stage = $2 AND (${TIPE_EXPR}) = $3${smrAssignFilter}`, ['submitted', 4, 'internal', user.userId])),
+          query(...buildSelectQuery('height-work', `status = $1 AND current_stage = $2 AND (${TIPE_EXPR}) = $3${smrAssignFilter}`, ['submitted', 5, 'eksternal', user.userId])),
+          queryGeneralPermitByStage(4, null, null, null, null, 'smr', user.userId),
         ]);
         return NextResponse.json({ data: results.flat(), total: results.flat().length });
       }
