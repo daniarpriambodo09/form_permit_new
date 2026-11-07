@@ -365,11 +365,13 @@ export default function ApprovalDetailPage({
   };
 
   const nextApproverTargetRole: "sfo" | "smr" | null =
-    user?.role === "admin_k3" || (user?.role === "admin" && Number(form?.current_stage) === 2)
-      ? "sfo"
-      : user?.role === "sfo" || (user?.role === "admin" && Number(form?.current_stage) === 3)
-        ? "smr"
-        : null;
+    user?.role === "admin"
+      ? null
+      : user?.role === "admin_k3"
+        ? "sfo"
+        : user?.role === "sfo"
+          ? "smr"
+          : null;
 
   const handleAction = async (action: "approve" | "reject", nextApproverUserId?: number) => {
     if (action === "reject" && !catatan.trim()) {
@@ -552,7 +554,7 @@ export default function ApprovalDetailPage({
     smr: 4,
   };
   const myExpectedStage = roleToStageNumber[userRole];
-  const isMyTurn = userRole === "admin" || (myExpectedStage !== undefined && currentDbStage === myExpectedStage && !isAlreadyApprovedByMe);
+  const isMyTurn = userRole !== "admin" && (myExpectedStage !== undefined && currentDbStage === myExpectedStage && !isAlreadyApprovedByMe);
 
   // Height-work inspection state
   const heightWorkAdminK3Stage = 2;
@@ -832,6 +834,28 @@ export default function ApprovalDetailPage({
                     {form.catatan_reject}
                   </div>
                 )}
+              </div>
+            </div>
+          </div>
+        ) : userRole === "admin" ? (
+          <div className="bg-white rounded-2xl border-2 border-blue-200 p-5 sm:p-6 shadow-2xs">
+            <div className="flex items-start gap-4">
+              <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+                <Shield className="w-6 h-6" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h3 className="font-bold text-slate-900 text-base sm:text-lg">
+                  Mode Administrator (Hanya Lihat & Kelola)
+                </h3>
+                <p className="text-xs sm:text-sm text-slate-600 mt-1">
+                  Anda login sebagai <strong>Administrator</strong>. Role Administrator memiliki akses melihat seluruh data form dan mengelola/menghapus form, namun tidak melakukan persetujuan (approval).
+                </p>
+                <div className="mt-3 pt-3 border-t border-slate-100 text-xs text-slate-500 flex items-center gap-1.5">
+                  <Clock className="w-4 h-4 text-blue-500 shrink-0" />
+                  <span>
+                    Status persetujuan form: Menunggu persetujuan dari <strong>{waitingRoleName}</strong> (Tahap {currentDbStage}).
+                  </span>
+                </div>
               </div>
             </div>
           </div>

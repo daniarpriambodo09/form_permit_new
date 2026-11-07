@@ -12,7 +12,7 @@ function getUser(req: NextRequest) {
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const user = getUser(req);
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  if (user.role !== "security" && user.role !== "admin") {
+  if (user.role !== "security") {
     return NextResponse.json({ error: "Hanya Security yang dapat menandatangani." }, { status: 403 });
   }
 

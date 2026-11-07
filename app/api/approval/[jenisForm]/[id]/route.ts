@@ -200,9 +200,14 @@ export async function PATCH(
 
   const userRole = user.role as UserRole;
 
-  if (userRole === 'firewatch' || userRole === 'worker') {
+  if (userRole === 'firewatch' || userRole === 'worker' || userRole === 'admin') {
     return NextResponse.json(
-      { error: 'Role Anda tidak memiliki hak untuk melakukan approval.' },
+      {
+        error:
+          userRole === 'admin'
+            ? 'Role Admin hanya memiliki hak akses melihat/mengelola, tidak untuk menyetujui form.'
+            : 'Role Anda tidak memiliki hak untuk melakukan approval.',
+      },
       { status: 403 }
     );
   }
@@ -280,7 +285,7 @@ export async function PATCH(
     const tipePerusahaan = form.tipe_perusahaan;
     const currentStage = form.current_stage;
 
-    const canApprove = userRole === 'admin' || canUserApproveAtStage(userRole, currentStage, formType, tipePerusahaan);
+    const canApprove = canUserApproveAtStage(userRole, currentStage, formType, tipePerusahaan);
     if (!canApprove) {
       const stageMap = getStageToRoleMap(formType, tipePerusahaan);
       const neededRole = stageMap[currentStage] ?? '?';
@@ -355,7 +360,7 @@ export async function PATCH(
     }
 
     const cols = getRoleApprovalColumns(userRole, formType, isLastStage);
-    if (!cols && userRole !== 'admin') {
+    if (!cols) {
       return NextResponse.json({ error: 'Tidak dapat menentukan kolom approval untuk role ini' }, { status: 500 });
     }
 

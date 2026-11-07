@@ -232,11 +232,13 @@ export default function ExternalApprovalPage({ params }: { params: Promise<{ id:
   };
 
   const nextApproverTargetRole: "sfo" | "smr" | null =
-    user?.role === "admin_k3" || (isAdmin && Number(data?.general?.current_stage) === 2)
-      ? "sfo"
-      : user?.role === "sfo" || (isAdmin && Number(data?.general?.current_stage) === 3)
-        ? "smr"
-        : null;
+    isAdmin
+      ? null
+      : user?.role === "admin_k3"
+        ? "sfo"
+        : user?.role === "sfo"
+          ? "smr"
+          : null;
 
   // ── SFO / Admin: Approve Form Penilaian Sub Kontraktor ────────
   const approvePenilaianSubkontraktor = async (nextApproverUserId?: number) => {
@@ -476,9 +478,10 @@ export default function ExternalApprovalPage({ params }: { params: Promise<{ id:
     );
 
   const canApproveJsa = Boolean(
+    !isAdmin &&
     jsaApproval &&
     jsaApproval.status === "submitted" &&
-    (user?.role === jsaRole || isAdmin) &&
+    user?.role === jsaRole &&
     (jsaRole !== "spv" || isAssignedSpv)
   );
 
@@ -489,10 +492,11 @@ export default function ExternalApprovalPage({ params }: { params: Promise<{ id:
   const isPenilaianSfoApproved = Boolean(penilaianData?.mengetahui?.sfo?.nama);
 
   const currentStage: number = general.current_stage ?? 1;
-  const isMyStageRole = STAGE_ROLE[currentStage] === user.role || isAdmin;
+  const isMyStageRole = !isAdmin && STAGE_ROLE[currentStage] === user.role;
   const canActOnGeneralPermit =
+    !isAdmin &&
     general.status === "submitted" &&
-    ((currentStage >= 1 && currentStage <= 4) || (currentStage === 5 && isAdmin)) &&
+    currentStage >= 1 && currentStage <= 4 &&
     isMyStageRole &&
     (currentStage !== 1 || isAssignedSpv);
 
@@ -874,6 +878,25 @@ export default function ExternalApprovalPage({ params }: { params: Promise<{ id:
                 })}
               </div>
             </div>
+
+            {/* ── Mode Administrator Info Banner ── */}
+            {isAdmin && (
+              <div className="pt-3 border-t border-slate-100">
+                <div className="bg-blue-50/80 rounded-xl border border-blue-200/90 p-4">
+                  <div className="flex items-start gap-3">
+                    <Shield className="w-5 h-5 text-blue-600 shrink-0 mt-0.5" />
+                    <div>
+                      <h4 className="font-bold text-slate-900 text-xs sm:text-sm">
+                        Mode Administrator (Hanya Lihat & Kelola)
+                      </h4>
+                      <p className="text-xs text-slate-600 mt-0.5">
+                        Anda login sebagai <strong>Administrator</strong>. Role Administrator memiliki akses melihat seluruh rincian dan mengelola/menghapus form izin, namun tidak melakukan persetujuan (approval).
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* ── Panel Keputusan Approval Form Induk ── */}
             {canActOnGeneralPermit && (
@@ -1713,7 +1736,7 @@ export default function ExternalApprovalPage({ params }: { params: Promise<{ id:
                       />
 
                       {/* SFO Approval Action Box */}
-                      {(user?.role === "sfo" || isAdmin) && (
+                      {(user?.role === "sfo") && (
                         <div className="border border-purple-200 rounded-xl p-4 bg-purple-50/70 flex items-center justify-between flex-wrap gap-3">
                           <div>
                             <p className="text-xs sm:text-sm font-bold text-slate-800">Persetujuan Penilaian Subkontraktor oleh SFO</p>

@@ -548,13 +548,22 @@ export async function GET(req: NextRequest) {
 
     await ensureApproverAssignmentTable();
 
-    // ── ADMIN: lihat semua ──────────────────────────────────────
+    // ── ADMIN: lihat semua (termasuk general-permit / form_ijin_kerja) ──
     if (userRole === 'admin') {
       if (countOnly) {
         const [submitted, approved, rejected] = await Promise.all([
-          Promise.all(allFormTypes.map(f => countByQuery(f, `status = $1`, ['submitted']))),
-          Promise.all(allFormTypes.map(f => countByQuery(f, `status = $1`, ['approved']))),
-          Promise.all(allFormTypes.map(f => countByQuery(f, `status = $1`, ['rejected']))),
+          Promise.all([
+            ...allFormTypes.map(f => countByQuery(f, `status = $1`, ['submitted'])),
+            queryOne<{ count: string }>(`SELECT COUNT(*) AS count FROM form_ijin_kerja WHERE status = 'submitted'`).then(r => Number(r?.count || 0)),
+          ]),
+          Promise.all([
+            ...allFormTypes.map(f => countByQuery(f, `status = $1`, ['approved'])),
+            queryOne<{ count: string }>(`SELECT COUNT(*) AS count FROM form_ijin_kerja WHERE status = 'approved'`).then(r => Number(r?.count || 0)),
+          ]),
+          Promise.all([
+            ...allFormTypes.map(f => countByQuery(f, `status = $1`, ['rejected'])),
+            queryOne<{ count: string }>(`SELECT COUNT(*) AS count FROM form_ijin_kerja WHERE status = 'rejected'`).then(r => Number(r?.count || 0)),
+          ]),
         ]);
         return NextResponse.json({
           counts: {
@@ -562,10 +571,30 @@ export async function GET(req: NextRequest) {
           }
         });
       }
-      const results = await Promise.all(
-        allFormTypes.map(f => query(...buildSelectQuery(f, `status = $1`, [statusFilter])))
-      );
-      return NextResponse.json({ data: results.flat(), total: results.flat().length });
+      const [results, gpResults] = await Promise.all([
+        Promise.all(allFormTypes.map(f => query(...buildSelectQuery(f, `status = $1`, [statusFilter])))),
+        query(
+          `SELECT gp.id_form, gp.tanggal, gp.tanggal_pelaksanaan, gp.status, gp.current_stage,
+                  gp.nama_kontraktor_pekerja AS nama_kontraktor_nik,
+                  COALESCE(gp.nama_kontraktor_pekerja, '') AS pemohon,
+                  gp.deskripsi_pekerjaan, gp.tgl_mulai_kerja,
+                  gp.lokasi_pekerjaan, gp.catatan_reject, gp.approved_by, gp.approved_at,
+                  gp.spv_approved, gp.spv_approved_by,
+                  gp.admin_k3_approved, gp.admin_k3_approved_by,
+                  gp.security_approved, gp.security_approved_by,
+                  gp.sfo_approved, gp.sfo_approved_by,
+                  gp.pga_approved AS mr_pga_approved, gp.pga_approved_by AS mr_pga_approved_by,
+                  NULL::boolean AS kontraktor_approved,
+                  NULL::text AS tipe_perusahaan, NULL::text AS id_ijin_kerja,
+                  'general-permit' AS jenis_form
+             FROM form_ijin_kerja gp
+            WHERE gp.status = $1
+            ORDER BY gp.tanggal ASC`,
+          [statusFilter]
+        ),
+      ]);
+      const combined = [...results.flat(), ...gpResults];
+      return NextResponse.json({ data: combined, total: combined.length });
     }
 
     // ── WORKER ──────────────────────────────────────────────────
@@ -872,5 +901,117 @@ export async function GET(req: NextRequest) {
   } catch (err: any) {
     console.error('[GET /api/approval]', err);
     return NextResponse.json({ error: err.message }, { status: 500 });
+  }
+}
+
+// ── DELETE: Batch / Single Delete Form oleh Role Admin ───────
+export async function DELETE(req: NextRequest) {
+  const user = getUser(req);
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+  // Hanya role admin yang berhak menghapus form lewat endpoint approval ini
+  if (user.role !== 'admin') {
+    return NextResponse.json(
+      { error: 'Hanya Administrator yang memiliki wewenang untuk menghapus form.' },
+      { status: 403 }
+    );
+  }
+
+  try {
+    const body = await req.json();
+    const items = body.items as Array<{ id_form: string; jenis_form?: string }>;
+
+    if (!Array.isArray(items) || items.length === 0) {
+      return NextResponse.json(
+        { error: 'Daftar form yang akan dihapus tidak boleh kosong.' },
+        { status: 400 }
+      );
+    }
+
+    let deletedCount = 0;
+
+    for (const item of items) {
+      const id = String(item.id_form || '').trim();
+      if (!id) continue;
+
+      let jenis = item.jenis_form;
+      if (!jenis) {
+        if (id.startsWith('HW-')) jenis = 'hot-work';
+        else if (id.startsWith('WS-')) jenis = 'workshop';
+        else if (id.startsWith('HAW-')) jenis = 'height-work';
+        else if (id.startsWith('WP-')) jenis = 'general-permit';
+      }
+
+      await query('BEGIN');
+      try {
+        if (jenis === 'general-permit' || jenis === 'external-permit' || id.startsWith('WP-')) {
+          // 1. Delete child inspeksi_scaffolding for linked height work
+          await query(
+            `DELETE FROM inspeksi_scaffolding 
+             WHERE id_ijin_kerja = $1 
+                OR id_form IN (SELECT id_form FROM form_kerja_ketinggian WHERE id_ijin_kerja = $1)`,
+            [id]
+          );
+
+          // 2. Delete child approver assignments
+          await query(
+            `DELETE FROM form_approver_assignments 
+             WHERE id_form = $1 
+                OR id_form IN (
+                  SELECT id_form FROM form_kerja_panas WHERE id_ijin_kerja = $1
+                  UNION
+                  SELECT id_form FROM form_kerja_ketinggian WHERE id_ijin_kerja = $1
+                  UNION
+                  SELECT id_form FROM form_kerja_workshop WHERE id_ijin_kerja = $1
+                )`,
+            [id]
+          );
+
+          // 3. Delete child linked forms
+          await query(`DELETE FROM form_kerja_panas WHERE id_ijin_kerja = $1`, [id]);
+          await query(`DELETE FROM form_kerja_ketinggian WHERE id_ijin_kerja = $1`, [id]);
+          await query(`DELETE FROM form_kerja_workshop WHERE id_ijin_kerja = $1`, [id]);
+
+          // 4. Delete parent form_ijin_kerja
+          await query(`DELETE FROM form_ijin_kerja WHERE id_form = $1`, [id]);
+        } else if (jenis === 'height-work' || id.startsWith('HAW-')) {
+          await query(`DELETE FROM inspeksi_scaffolding WHERE id_form = $1`, [id]);
+          await query(`DELETE FROM form_approver_assignments WHERE id_form = $1`, [id]);
+          await query(`DELETE FROM form_kerja_ketinggian WHERE id_form = $1`, [id]);
+        } else if (jenis === 'hot-work' || id.startsWith('HW-')) {
+          await query(`DELETE FROM form_approver_assignments WHERE id_form = $1`, [id]);
+          await query(`DELETE FROM form_kerja_panas WHERE id_form = $1`, [id]);
+        } else if (jenis === 'workshop' || id.startsWith('WS-')) {
+          await query(`DELETE FROM form_approver_assignments WHERE id_form = $1`, [id]);
+          await query(`DELETE FROM form_kerja_workshop WHERE id_form = $1`, [id]);
+        } else {
+          await query(`DELETE FROM inspeksi_scaffolding WHERE id_form = $1 OR id_ijin_kerja = $1`, [id]);
+          await query(`DELETE FROM form_approver_assignments WHERE id_form = $1`, [id]);
+          await query(`DELETE FROM form_kerja_panas WHERE id_form = $1 OR id_ijin_kerja = $1`, [id]);
+          await query(`DELETE FROM form_kerja_ketinggian WHERE id_form = $1 OR id_ijin_kerja = $1`, [id]);
+          await query(`DELETE FROM form_kerja_workshop WHERE id_form = $1 OR id_ijin_kerja = $1`, [id]);
+          await query(`DELETE FROM form_ijin_kerja WHERE id_form = $1`, [id]);
+        }
+
+        await query('COMMIT');
+        deletedCount++;
+      } catch (itemErr) {
+        await query('ROLLBACK');
+        console.error(`Error deleting form ${id}:`, itemErr);
+        throw itemErr;
+      }
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: `${deletedCount} form berhasil dihapus.`,
+      deletedCount,
+    });
+  } catch (err: any) {
+    console.error('[DELETE /api/approval]', err);
+    return NextResponse.json(
+      { error: err.message || 'Gagal menghapus form terpilih.' },
+      { status: 500 }
+    );
   }
 }

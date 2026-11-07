@@ -11,6 +11,7 @@ import {
   ClipboardCheck, CheckCircle2, AlertCircle, Check, X,
   Building2, MapPin, Calendar, Search, Filter,
   Flame, Wrench, Layers, CalendarClock, ChevronRight,
+  Trash2, AlertTriangle,
 } from "lucide-react";
 import { useApproverAuth } from "@/hooks/useApproverAuth";
 import AuthLoadingSpinner from "@/components/AuthLoadingSpinner";
@@ -203,7 +204,7 @@ const roleLabelMap: Record<string, string> = {
   admin_k3: "Admin K3",
   sfo: "SFO",
   smr: "SMR",
-  admin: "Admin K3 / Admin",
+  admin: "Administrator",
   security: "Security",
   pengawas: "Pengawas Dept",
   purchasing: "Purchasing",
@@ -339,6 +340,10 @@ export default function ApprovalPage() {
   const [filterDate, setFilterDate] = useState("");
   const [formCounts, setFormCounts] = useState<FormCounts>({ submitted: 0, approved: 0, rejected: 0 });
   const [exportLoading, setExportLoading] = useState(false); // ADDED: loading state download excel
+  const [selectedForms, setSelectedForms] = useState<Array<{ id_form: string; jenis_form: string }>>([]);
+  const [deleting, setDeleting] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<Array<{ id_form: string; jenis_form: string }>>([]);
 
   // Muat data hanya setelah auth selesai & berhasil
   useEffect(() => {
@@ -380,7 +385,53 @@ export default function ApprovalPage() {
 
   const handleTabChange = (tab: string) => {
     setActiveTab(tab);
+    setSelectedForms([]);
     loadForms(tab);
+  };
+
+  const isSelected = (id: string) => selectedForms.some((f) => f.id_form === id);
+
+  const toggleSelectForm = (id_form: string, jenis_form: string) => {
+    setSelectedForms((prev) =>
+      prev.some((f) => f.id_form === id_form)
+        ? prev.filter((f) => f.id_form !== id_form)
+        : [...prev, { id_form, jenis_form }]
+    );
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedForms.length === filtered.length) {
+      setSelectedForms([]);
+    } else {
+      setSelectedForms(filtered.map((f) => ({ id_form: f.id_form, jenis_form: f.jenis_form })));
+    }
+  };
+
+  const handleConfirmDelete = async () => {
+    if (deleteTarget.length === 0) return;
+    setDeleting(true);
+    try {
+      const res = await fetch("/api/approval", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ items: deleteTarget }),
+      });
+      const result = await res.json();
+      if (!res.ok) {
+        alert(result.error || "Gagal menghapus form.");
+        return;
+      }
+      setSelectedForms((prev) => prev.filter((s) => !deleteTarget.some((t) => t.id_form === s.id_form)));
+      setShowDeleteModal(false);
+      setDeleteTarget([]);
+      await handleRefresh();
+    } catch (err: any) {
+      console.error("Delete error:", err);
+      alert("Terjadi kesalahan saat menghapus form.");
+    } finally {
+      setDeleting(false);
+    }
   };
 
   const handleRefresh = async () => {
@@ -786,6 +837,39 @@ export default function ApprovalPage() {
                     Menampilkan <strong className="text-slate-800 font-bold">{filtered.length}</strong> dari {forms.length} formulir
                   </span>
                 </div>
+
+                {/* Admin Select All Bar */}
+                {isAdmin && filtered.length > 0 && (
+                  <div className="flex items-center justify-between bg-slate-50/90 border border-slate-200/90 rounded-xl px-4 py-2.5 text-xs pt-3 mt-3 border-t">
+                    <label className="flex items-center gap-2.5 cursor-pointer font-semibold text-slate-700 select-none">
+                      <input
+                        type="checkbox"
+                        checked={selectedForms.length > 0 && selectedForms.length === filtered.length}
+                        onChange={toggleSelectAll}
+                        className="w-4 h-4 rounded border-slate-300 text-orange-600 focus:ring-orange-500 cursor-pointer"
+                      />
+                      <span>Pilih Semua ({filtered.length} Formulir)</span>
+                    </label>
+
+                    {selectedForms.length > 0 && (
+                      <div className="flex items-center gap-2">
+                        <span className="text-orange-600 font-bold">
+                          {selectedForms.length} dipilih
+                        </span>
+                        <button
+                          onClick={() => {
+                            setDeleteTarget(selectedForms);
+                            setShowDeleteModal(true);
+                          }}
+                          className="inline-flex items-center gap-1.5 px-3 py-1 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-semibold shadow-xs transition-colors cursor-pointer"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                          <span>Hapus ({selectedForms.length})</span>
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* List Form Permit */}
@@ -840,6 +924,18 @@ export default function ApprovalPage() {
                         {/* Baris 1: Header Card (Icon, Kode Form, Badge Jenis, Badge Status, Tombol REVIEW) */}
                         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                           <div className="flex items-center gap-3 min-w-0">
+                            {isAdmin && (
+                              <div className="flex items-center shrink-0 pr-0.5">
+                                <input
+                                  type="checkbox"
+                                  checked={isSelected(form.id_form)}
+                                  onChange={() => toggleSelectForm(form.id_form, form.jenis_form)}
+                                  className="w-4 h-4 rounded border-slate-300 text-orange-600 focus:ring-orange-500 cursor-pointer"
+                                  title={`Pilih ${form.id_form}`}
+                                />
+                              </div>
+                            )}
+
                             <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${meta.iconBg}`}>
                               <PermitIcon className="w-4 h-4" />
                             </div>
@@ -878,13 +974,26 @@ export default function ApprovalPage() {
 
                           {/* Right: Action Button Ringkas -> Tombol REVIEW */}
                           <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
+                            {isAdmin && (
+                              <button
+                                onClick={() => {
+                                  setDeleteTarget([{ id_form: form.id_form, jenis_form: form.jenis_form }]);
+                                  setShowDeleteModal(true);
+                                }}
+                                className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer border border-transparent hover:border-rose-200"
+                                title={`Hapus form ${form.id_form}`}
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            )}
+
                             <Link
                               href={reviewUrl}
                               className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-lg text-xs font-semibold transition-colors cursor-pointer shadow-xs"
                               title="Buka Halaman Review Form & Approval"
                             >
                               <Eye className="w-3.5 h-3.5" />
-                              <span>{activeTab === "submitted" ? "Review & Setujui" : "Lihat Detail"}</span>
+                              <span>{isAdmin ? "Lihat Detail" : activeTab === "submitted" ? "Review & Setujui" : "Lihat Detail"}</span>
                               <ChevronRight className="w-3.5 h-3.5" />
                             </Link>
                           </div>
@@ -980,6 +1089,109 @@ export default function ApprovalPage() {
               )}
         </main>
       </div>
+      {/* Sticky Action Bar for Bulk Delete */}
+      {isAdmin && selectedForms.length > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 bg-slate-900/95 text-white backdrop-blur-md border border-slate-700 shadow-2xl rounded-2xl px-5 py-3.5 flex items-center gap-4 animate-in fade-in slide-in-from-bottom-4">
+          <div className="flex items-center gap-2.5 text-xs sm:text-sm font-semibold">
+            <span className="w-6 h-6 rounded-full bg-rose-500 text-white flex items-center justify-center font-bold text-xs">
+              {selectedForms.length}
+            </span>
+            <span>Formulir Terpilih</span>
+          </div>
+
+          <div className="h-4 w-px bg-slate-700" />
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setSelectedForms([])}
+              className="px-3 py-1.5 text-xs font-medium text-slate-300 hover:text-white hover:bg-slate-800 rounded-lg transition-colors cursor-pointer"
+            >
+              Batal
+            </button>
+            <button
+              onClick={() => {
+                setDeleteTarget(selectedForms);
+                setShowDeleteModal(true);
+              }}
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-semibold shadow-sm transition-colors cursor-pointer"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              <span>Hapus ({selectedForms.length}) Form</span>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal Konfirmasi Hapus Form oleh Admin ── */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden border border-slate-200 animate-in zoom-in-95">
+            <div className="p-5 sm:p-6 space-y-4">
+              <div className="flex items-center gap-3 text-rose-600">
+                <div className="w-10 h-10 rounded-xl bg-rose-100 flex items-center justify-center shrink-0">
+                  <AlertTriangle className="w-5 h-5 text-rose-600" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-slate-900 text-base">Konfirmasi Hapus Formulir</h3>
+                  <p className="text-xs text-slate-500">Tindakan ini tidak dapat dibatalkan</p>
+                </div>
+              </div>
+
+              <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
+                Anda akan menghapus <strong>{deleteTarget.length} formulir</strong> izin kerja berikut secara permanen dari basis data:
+              </p>
+
+              <div className="max-h-36 overflow-y-auto bg-slate-50 rounded-xl p-3 border border-slate-200 space-y-1.5 text-xs font-mono text-slate-700">
+                {deleteTarget.map((item, idx) => (
+                  <div key={idx} className="flex items-center justify-between">
+                    <span className="font-bold text-slate-900">{item.id_form}</span>
+                    <span className="text-[11px] font-sans text-slate-500">{jenisLabel[item.jenis_form] || item.jenis_form}</span>
+                  </div>
+                ))}
+              </div>
+
+              <div className="p-3 bg-amber-50 rounded-xl border border-amber-200 text-amber-800 text-xs flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                <span>
+                  Seluruh data terkait seperti formulir perizinan khusus terhubung, berkas inspeksi, dan penugasan approver akan ikut dihapus.
+                </span>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  disabled={deleting}
+                  onClick={() => {
+                    setShowDeleteModal(false);
+                    setDeleteTarget([]);
+                  }}
+                  className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer disabled:opacity-50"
+                >
+                  Batal
+                </button>
+                <button
+                  type="button"
+                  disabled={deleting}
+                  onClick={handleConfirmDelete}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-semibold shadow-xs transition-colors cursor-pointer disabled:opacity-50"
+                >
+                  {deleting ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      <span>Menghapus...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>Ya, Hapus Sekarang</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

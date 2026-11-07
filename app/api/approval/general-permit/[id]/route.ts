@@ -63,6 +63,13 @@ export async function PATCH(
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     const userRole = user.role as UserRole;
 
+    if (userRole === "admin") {
+        return NextResponse.json(
+            { error: "Role Admin hanya memiliki hak akses melihat/mengelola, tidak untuk menyetujui form." },
+            { status: 403 }
+        );
+    }
+
     const { id } = await params;
     const body = await req.json();
     const action = body.action as "approve" | "reject";
@@ -120,14 +127,14 @@ export async function PATCH(
 
         // ── APPROVE ────────────────────────────────────────────────
         const stageInfo = STAGE_ROLE_MAP[currentStage];
-        if (!stageInfo && userRole !== "admin") {
+        if (!stageInfo) {
             return NextResponse.json(
                 { error: "Stage form ini tidak dapat diproses lewat endpoint ini." },
                 { status: 400 }
             );
         }
 
-        const canApprove = userRole === "admin" || (stageInfo && userRole === stageInfo.role);
+        const canApprove = Boolean(stageInfo && userRole === stageInfo.role);
         if (!canApprove) {
             return NextResponse.json(
                 { error: `Stage ini membutuhkan role "${stageInfo?.role}". Anda adalah "${userRole}".` },

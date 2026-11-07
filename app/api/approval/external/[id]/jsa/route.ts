@@ -67,7 +67,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     }
 
     const requiredRole = STAGE_ROLES[approval.currentStage - 1];
-    if (user.role !== requiredRole && user.role !== "admin") {
+    if (user.role !== requiredRole) {
       return NextResponse.json({ error: `Approval JSA tahap ini membutuhkan role ${requiredRole}.` }, { status: 403 });
     }
 

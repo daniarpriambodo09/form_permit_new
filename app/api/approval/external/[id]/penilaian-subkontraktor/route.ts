@@ -19,9 +19,9 @@ export async function PATCH(
   const user = getUser(req);
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  if (user.role !== "sfo" && user.role !== "admin") {
+  if (user.role !== "sfo") {
     return NextResponse.json(
-      { error: "Hanya role SFO atau Admin yang dapat menyetujui Penilaian Sub Kontraktor." },
+      { error: "Hanya role SFO yang dapat menyetujui Penilaian Sub Kontraktor." },
       { status: 403 }
     );
   }
