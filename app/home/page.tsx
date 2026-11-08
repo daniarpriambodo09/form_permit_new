@@ -212,19 +212,39 @@ export default function HomePage() {
           setRecentForms(list.slice(0, 5));
         }
       } else if (currentRole === "admin") {
-        // Fetch dashboard statistics untuk admin
-        const res = await fetch("/api/dashboard/stats", { credentials: "include" });
-        if (res.ok) {
-          const data = await res.json();
-          setStats({
-            total: data.totalForms || 0,
-            submitted: data.submitted || 0,
-            approved: data.approved || 0,
-            draftOrRejected: (data.draft || 0) + (data.rejected || 0),
-          });
-          const recent = Array.isArray(data.recentForms) ? data.recentForms : [];
-          setRecentForms(recent.slice(0, 5));
+        // Fetch approval counts & list untuk admin agar 100% sinkron dengan /approval
+        const [countRes, listRes] = await Promise.all([
+          fetch("/api/approval?countOnly=1", { credentials: "include" }),
+          fetch("/api/approval?status=submitted", { credentials: "include" }),
+        ]);
+
+        let submittedCount = 0;
+        let approvedCount = 0;
+        let rejectedCount = 0;
+
+        if (countRes.ok) {
+          const countData = await countRes.json();
+          submittedCount = countData.counts?.submitted ?? 0;
+          approvedCount = countData.counts?.approved ?? 0;
+          rejectedCount = countData.counts?.rejected ?? 0;
         }
+
+        if (listRes.ok) {
+          const listData = await listRes.json();
+          const items: RecentFormItem[] = Array.isArray(listData?.data)
+            ? listData.data
+            : Array.isArray(listData)
+            ? listData
+            : [];
+          setRecentForms(items.slice(0, 5));
+        }
+
+        setStats({
+          total: submittedCount + approvedCount + rejectedCount,
+          submitted: submittedCount,
+          approved: approvedCount,
+          draftOrRejected: rejectedCount,
+        });
       } else if (currentRole === "purchasing" || currentRole === "pengawas") {
         // Fetch data penilaian subkontraktor
         const res = await fetch("/api/penilaian-subkontraktor", { credentials: "include" });
@@ -514,7 +534,7 @@ export default function HomePage() {
                 <Link
                   href={
                     role === "admin"
-                      ? "/dashboard"
+                      ? "/approval"
                       : role === "pengawas"
                       ? "/pengawas"
                       : role === "purchasing"
@@ -551,7 +571,7 @@ export default function HomePage() {
                 <Link
                   href={
                     role === "admin"
-                      ? "/dashboard"
+                      ? "/approval?status=submitted"
                       : role === "pengawas"
                       ? "/pengawas"
                       : role === "purchasing"
@@ -593,7 +613,7 @@ export default function HomePage() {
                 <Link
                   href={
                     role === "admin"
-                      ? "/dashboard"
+                      ? "/approval?status=approved"
                       : role === "pengawas"
                       ? "/pengawas"
                       : role === "purchasing"
@@ -626,7 +646,7 @@ export default function HomePage() {
                 <Link
                   href={
                     role === "admin"
-                      ? "/dashboard"
+                      ? "/approval?status=rejected"
                       : role === "pengawas"
                       ? "/pengawas"
                       : role === "purchasing"

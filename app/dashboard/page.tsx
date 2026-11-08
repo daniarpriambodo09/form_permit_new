@@ -232,46 +232,54 @@ export default function DashboardPage() {
       ]);
 
       const all: Permit[] = [
-        ...(j1.data ?? []).map((x: any) => ({
-          id: x.id_form,
-          status: (x.status || "submitted") as PermitStatus,
-          jenisForm: "hot-work" as const,
-          tanggal: x.tanggal,
-          tanggalPelaksanaan: x.tanggal_pelaksanaan,
-          lokasi: x.lokasi_pekerjaan || "Area Pabrik",
-          pemohon: x.nama_kontraktor_nik || x.nama_pekerja_nik || "Internal Worker",
-          tipePerusahaan: x.tipe_perusahaan === "eksternal" || x.id_ijin_kerja ? "eksternal" : "internal",
-        })),
-        ...(j2.data ?? []).map((x: any) => ({
-          id: x.id_form,
-          status: (x.status || "submitted") as PermitStatus,
-          jenisForm: "workshop" as const,
-          tanggal: x.tanggal,
-          tanggalPelaksanaan: x.tanggal_pelaksanaan,
-          lokasi: x.lokasi_pekerjaan || "Workshop Area",
-          pemohon: x.nama_kontraktor_nik || x.nama_pekerja_nik || "Internal Worker",
-          tipePerusahaan: x.tipe_perusahaan === "eksternal" || x.id_ijin_kerja ? "eksternal" : "internal",
-        })),
-        ...(j3.data ?? []).map((x: any) => ({
-          id: x.id_form,
-          status: (x.status || "submitted") as PermitStatus,
-          jenisForm: "height-work" as const,
-          tanggal: x.tanggal,
-          tanggalPelaksanaan: x.tanggal_pelaksanaan,
-          lokasi: x.lokasi || "Area Ketinggian",
-          pemohon: x.petugas_ketinggian || "Internal Worker",
-          tipePerusahaan: x.tipe_perusahaan === "eksternal" || x.id_ijin_kerja ? "eksternal" : "internal",
-        })),
-        ...(j4.data ?? []).map((x: any) => ({
-          id: x.id_form,
-          status: (x.status || "submitted") as PermitStatus,
-          jenisForm: "general-permit" as const,
-          tanggal: x.tanggal,
-          tanggalPelaksanaan: x.tanggal_pelaksanaan || x.tgl_mulai_kerja,
-          lokasi: x.lokasi_pekerjaan || "Area Pabrik (Eksternal)",
-          pemohon: x.nama_kontraktor_pekerja || x.nama_pengawas_pic_subkont || "Kontraktor Eksternal",
-          tipePerusahaan: "eksternal" as const,
-        })),
+        ...(j1.data ?? [])
+          .filter((x: any) => (!x.id_ijin_kerja || String(x.id_ijin_kerja).trim() === "") && x.status !== "draft")
+          .map((x: any) => ({
+            id: x.id_form,
+            status: (x.status || "submitted") as PermitStatus,
+            jenisForm: "hot-work" as const,
+            tanggal: x.tanggal,
+            tanggalPelaksanaan: x.tanggal_pelaksanaan,
+            lokasi: x.lokasi_pekerjaan || "Area Pabrik",
+            pemohon: x.nama_kontraktor_nik || x.nama_pekerja_nik || "Internal Worker",
+            tipePerusahaan: x.tipe_perusahaan === "eksternal" ? "eksternal" : "internal",
+          })),
+        ...(j2.data ?? [])
+          .filter((x: any) => (!x.id_ijin_kerja || String(x.id_ijin_kerja).trim() === "") && x.status !== "draft")
+          .map((x: any) => ({
+            id: x.id_form,
+            status: (x.status || "submitted") as PermitStatus,
+            jenisForm: "workshop" as const,
+            tanggal: x.tanggal,
+            tanggalPelaksanaan: x.tanggal_pelaksanaan,
+            lokasi: x.lokasi_pekerjaan || "Workshop Area",
+            pemohon: x.nama_kontraktor_nik || x.nama_pekerja_nik || "Internal Worker",
+            tipePerusahaan: x.tipe_perusahaan === "eksternal" ? "eksternal" : "internal",
+          })),
+        ...(j3.data ?? [])
+          .filter((x: any) => (!x.id_ijin_kerja || String(x.id_ijin_kerja).trim() === "") && x.status !== "draft")
+          .map((x: any) => ({
+            id: x.id_form,
+            status: (x.status || "submitted") as PermitStatus,
+            jenisForm: "height-work" as const,
+            tanggal: x.tanggal,
+            tanggalPelaksanaan: x.tanggal_pelaksanaan,
+            lokasi: x.lokasi || "Area Ketinggian",
+            pemohon: x.petugas_ketinggian || "Internal Worker",
+            tipePerusahaan: x.tipe_perusahaan === "eksternal" ? "eksternal" : "internal",
+          })),
+        ...(j4.data ?? [])
+          .filter((x: any) => x.status !== "draft")
+          .map((x: any) => ({
+            id: x.id_form,
+            status: (x.status || "submitted") as PermitStatus,
+            jenisForm: "general-permit" as const,
+            tanggal: x.tanggal,
+            tanggalPelaksanaan: x.tanggal_pelaksanaan || x.tgl_mulai_kerja,
+            lokasi: x.lokasi_pekerjaan || "Area Pabrik (Eksternal)",
+            pemohon: x.nama_kontraktor_pekerja || x.nama_pengawas_pic_subkont || "Kontraktor Eksternal",
+            tipePerusahaan: "eksternal" as const,
+          })),
       ];
 
       setPermits(all);

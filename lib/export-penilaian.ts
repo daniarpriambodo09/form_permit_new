@@ -114,6 +114,31 @@ async function loadArialNarrow(doc: any): Promise<string> {
   return "helvetica";
 }
 
+let _logoCache: string | null = null;
+
+/**
+ * Helper untuk memuat logo safety_first.png sebagai base64
+ */
+async function loadLogoBase64(): Promise<string | null> {
+  if (_logoCache !== null) return _logoCache;
+  try {
+    const resp = await fetch("/images/safety_first.png");
+    if (!resp.ok) return null;
+    const blob = await resp.blob();
+    const b64 = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve((reader.result as string).split(",")[1]);
+      reader.onerror = () => reject(new Error("FileReader failed"));
+      reader.readAsDataURL(blob);
+    });
+    _logoCache = b64;
+    return b64;
+  } catch (e) {
+    console.warn("Logo safety_first gagal dimuat:", e);
+    return null;
+  }
+}
+
 // ═══════════════════════════════════════════════════════════════════
 // 1. EKSPOR KE EXCEL (.xlsx)
 // ═══════════════════════════════════════════════════════════════════
@@ -438,175 +463,350 @@ export async function exportPenilaianToPdf(
   });
 
   const fontName = await loadArialNarrow(doc);
+  const pageWidth = doc.internal.pageSize.getWidth(); // 210
+  const startX = 14;
+  const boxWidth = pageWidth - 28; // 182mm
 
-  const pageWidth = doc.internal.pageSize.getWidth();
-  let curY = 16;
+  // ── 1. Header Resmi Perusahaan & Kontrol Dokumen ──
+  const logoB64 = await loadLogoBase64();
+  if (logoB64) {
+    try {
+      doc.addImage(`data:image/png;base64,${logoB64}`, "PNG", startX, 11, 18, 18, undefined, "FAST");
+    } catch (e) {
+      console.warn("Gagal menyisipkan logo PDF:", e);
+    }
+  }
 
-  // ── Header Title & Document Number ──
+  const titleX = logoB64 ? startX + 22 : startX;
+
   doc.setFont(fontName, "bold");
-  doc.setFontSize(14);
+  doc.setFontSize(10.5);
   doc.setTextColor(15, 23, 42); // slate-900
-  doc.text("FORM PENILAIAN SUB KONTRAKTOR", pageWidth / 2, curY, { align: "center" });
+  doc.text("PT. JATIM AUTOCOMP INDONESIA", titleX, 15.5);
 
-  curY += 5;
-  doc.setFontSize(9.5);
-  doc.setFont(fontName, "bold");
-  doc.setTextColor(71, 85, 105); // slate-600
-  doc.text("JAI/F-08/P.SHE-19 Rev. 1", pageWidth / 2, curY, { align: "center" });
+  doc.setFontSize(13.5);
+  doc.setTextColor(15, 40, 80); // navy
+  doc.text("FORM PENILAIAN SUB KONTRAKTOR", titleX, 21.5);
 
-  curY += 4.5;
-  doc.setFontSize(8.5);
   doc.setFont(fontName, "normal");
+  doc.setFontSize(8);
   doc.setTextColor(100, 116, 139); // slate-500
-  doc.text("Lampiran Evaluasi & Pengawasan Ijin Kerja Eksternal — PT. Jatim Autocomp Indonesia", pageWidth / 2, curY, {
-    align: "center",
-  });
+  doc.text("Lampiran Evaluasi & Pengawasan Ijin Kerja Eksternal", titleX, 26.5);
 
-  curY += 6;
+  // Box Kontrol Dokumen di Kanan Atas
+  const docBoxW = 48;
+  const docBoxH = 17;
+  const docBoxX = startX + boxWidth - docBoxW;
+  doc.setFillColor(248, 250, 252);
+  doc.setDrawColor(203, 213, 225);
+  doc.setLineWidth(0.2);
+  doc.roundedRect(docBoxX, 11, docBoxW, docBoxH, 1.5, 1.5, "FD");
+
+  doc.setFontSize(7.5);
+  doc.setFont(fontName, "bold");
+  doc.setTextColor(30, 41, 59);
+  doc.text("No. Dok : JAI/F-08/P.SHE-19", docBoxX + 3, 16);
+
+  doc.setFont(fontName, "normal");
+  doc.setFontSize(7);
+  doc.setTextColor(71, 85, 105);
+  doc.text("Revisi    : 01", docBoxX + 3, 20.5);
+  doc.text("Halaman : 1 dari 1", docBoxX + 3, 25);
 
   // Garis Aksen Ganda Elegan
   doc.setDrawColor(5, 150, 105); // emerald-600
-  doc.setLineWidth(0.6);
-  doc.line(14, curY, pageWidth - 14, curY);
+  doc.setLineWidth(0.8);
+  doc.line(startX, 31.5, startX + boxWidth, 31.5);
   doc.setDrawColor(226, 232, 240); // slate-200
-  doc.setLineWidth(0.2);
-  doc.line(14, curY + 1, pageWidth - 14, curY + 1);
+  doc.setLineWidth(0.25);
+  doc.line(startX, 32.8, startX + boxWidth, 32.8);
 
-  curY += 6;
+  // ── 2. Informasi Ijin Kerja & Subkontraktor (Metadata Card) ──
+  const metaY = 36;
+  const metaH = 27;
+  doc.setFillColor(248, 250, 252);
+  doc.setDrawColor(203, 213, 225);
+  doc.setLineWidth(0.25);
+  doc.roundedRect(startX, metaY, boxWidth, metaH, 2, 2, "FD");
 
-  // ── Metadata Box ──
-  const startX = 14;
-  const boxWidth = pageWidth - 28;
-  const boxHeight = 24;
+  // Header Strip Metadata Box
+  doc.setFillColor(241, 245, 249);
+  doc.roundedRect(startX, metaY, boxWidth, 6, 2, 2, "F");
+  doc.rect(startX, metaY + 4, boxWidth, 2, "F");
+  doc.setDrawColor(226, 232, 240);
+  doc.line(startX, metaY + 6, startX + boxWidth, metaY + 6);
 
-  doc.setFillColor(248, 250, 252); // slate-50
-  doc.setDrawColor(226, 232, 240); // slate-200
-  doc.roundedRect(startX, curY, boxWidth, boxHeight, 2, 2, "FD");
+  doc.setFont(fontName, "bold");
+  doc.setFontSize(7.5);
+  doc.setTextColor(51, 65, 85);
+  doc.text("INFORMASI IJIN KERJA & SUB KONTRAKTOR", startX + 4, metaY + 4.3);
 
   const periodeText = formatPeriodeDDMMYYYY(
     meta.izin_kerja_tanggal_dari,
     meta.izin_kerja_tanggal_sampai
   );
 
-  const infoListLeft = [
-    ["No. Ijin Kerja Eksternal", meta.id_form],
-    ["Nama Sub Kontraktor", meta.nama_kontraktor_pekerja || "-"],
-  ];
-  const infoListRight = [
-    ["Lokasi Pekerjaan", meta.lokasi_pekerjaan || "-"],
-    ["Periode Pelaksanaan", periodeText],
-  ];
+  // Kolom Kiri
+  const colLeftLabelX = startX + 4;
+  const colLeftValX = startX + 44;
 
-  let metaY = curY + 5.5;
-  doc.setFontSize(8.5);
+  doc.setFontSize(8);
+  doc.setFont(fontName, "bold");
+  doc.setTextColor(71, 85, 105);
+  doc.text("No. Ijin Kerja Eksternal", colLeftLabelX, metaY + 12);
+  doc.setFont(fontName, "bold");
+  doc.setTextColor(15, 40, 80);
+  doc.text(`:  ${meta.id_form}`, colLeftValX, metaY + 12);
 
-  infoListLeft.forEach(([lbl, val]) => {
-    doc.setFont(fontName, "bold");
-    doc.setTextColor(30, 41, 59);
-    doc.text(lbl, startX + 4, metaY);
-    doc.setFont(fontName, "normal");
-    doc.text(`:  ${val}`, startX + 42, metaY);
-    metaY += 6;
-  });
+  doc.setFont(fontName, "bold");
+  doc.setTextColor(71, 85, 105);
+  doc.text("Nama Sub Kontraktor", colLeftLabelX, metaY + 20);
+  doc.setFont(fontName, "normal");
+  doc.setTextColor(15, 23, 42);
+  doc.text(`:  ${meta.nama_kontraktor_pekerja || "-"}`, colLeftValX, metaY + 20);
 
-  metaY = curY + 5.5;
-  const rightColX = startX + boxWidth / 2 + 2;
-  infoListRight.forEach(([lbl, val]) => {
-    doc.setFont(fontName, "bold");
-    doc.setTextColor(30, 41, 59);
-    doc.text(lbl, rightColX, metaY);
-    doc.setFont(fontName, "normal");
-    doc.text(`:  ${val}`, rightColX + 34, metaY);
-    metaY += 6;
-  });
+  // Kolom Kanan
+  const colRightLabelX = startX + boxWidth / 2 + 2;
+  const colRightValX = colRightLabelX + 38;
 
-  curY += boxHeight + 6;
+  doc.setFont(fontName, "bold");
+  doc.setTextColor(71, 85, 105);
+  doc.text("Lokasi Pekerjaan", colRightLabelX, metaY + 12);
+  doc.setFont(fontName, "normal");
+  doc.setTextColor(15, 23, 42);
+  doc.text(`:  ${meta.lokasi_pekerjaan || "-"}`, colRightValX, metaY + 12);
 
-  // ── Tabel Hasil Penilaian Harian ──
+  doc.setFont(fontName, "bold");
+  doc.setTextColor(71, 85, 105);
+  doc.text("Periode Pelaksanaan", colRightLabelX, metaY + 20);
+  doc.setFont(fontName, "normal");
+  doc.setTextColor(15, 23, 42);
+  doc.text(`:  ${periodeText}`, colRightValX, metaY + 20);
+
+  // ── 3. Tabel Checklist Penilaian Harian ──
+  let curY = metaY + metaH + 6; // ~69
   const entries = data.entries || [];
   const entriesCount = entries.length;
 
   doc.setFont(fontName, "bold");
   doc.setFontSize(10);
   doc.setTextColor(15, 23, 42);
-  doc.text(`Hasil Penilaian Harian (${entriesCount} Hari Evaluasi)`, 14, curY);
+  doc.text(`Hasil Penilaian Harian (${entriesCount} Hari Evaluasi)`, startX, curY);
 
-  curY += 3.5;
+  curY += 3.8;
 
   // Ukuran Kolom Tabel
-  const itemColW = 58;
-  const descColW = 46;
-  const remainW = boxWidth - itemColW - descColW;
-  const dayColW = entriesCount > 0 ? remainW / entriesCount : remainW;
+  const noColW = 8;
+  const itemColW = 48;
+  const descColW = 62;
+  const remainW = boxWidth - noColW - itemColW - descColW; // 64mm
+  const maxDayCols = Math.max(1, entriesCount);
+  const dayColW = remainW / maxDayCols;
 
-  // Header row
+  // Header Tabel
+  const tableHeaderH = 7.5;
   doc.setFillColor(30, 41, 59); // slate-800
-  doc.rect(startX, curY, boxWidth, 7, "F");
+  doc.rect(startX, curY, boxWidth, tableHeaderH, "F");
 
-  doc.setFontSize(8);
+  doc.setFontSize(7.5);
   doc.setFont(fontName, "bold");
   doc.setTextColor(255, 255, 255);
-  doc.text("Item Pengecekan", startX + 3, curY + 4.8);
-  doc.text("Keterangan / Standar", startX + itemColW + 3, curY + 4.8);
 
-  // Menggunakan "H-1", "H-2", ... tanpa teks tanggal yang bertumpuk
-  entries.forEach((_, i) => {
-    const x = startX + itemColW + descColW + i * dayColW;
-    doc.text(`H-${i + 1}`, x + dayColW / 2, curY + 4.8, { align: "center" });
-  });
+  doc.text("No", startX + noColW / 2, curY + 5, { align: "center" });
+  doc.text("Item Pengecekan", startX + noColW + 2.5, curY + 5);
+  doc.text("Keterangan / Standar Evaluasi", startX + noColW + itemColW + 2.5, curY + 5);
 
-  curY += 7;
+  if (entriesCount > 0) {
+    entries.forEach((_, i) => {
+      const x = startX + noColW + itemColW + descColW + i * dayColW;
+      doc.text(`H-${i + 1}`, x + dayColW / 2, curY + 5, { align: "center" });
+    });
+  } else {
+    const x = startX + noColW + itemColW + descColW;
+    doc.text("H-1", x + remainW / 2, curY + 5, { align: "center" });
+  }
 
-  // Rows Data Checklist
-  ITEM_LABELS.forEach((item, idx) => {
-    const rowH = 6.8;
-    if (idx % 2 === 1) {
+  // Garis Pemisah Kolom Header
+  doc.setDrawColor(71, 85, 105);
+  doc.setLineWidth(0.2);
+  doc.line(startX + noColW, curY, startX + noColW, curY + tableHeaderH);
+  doc.line(startX + noColW + itemColW, curY, startX + noColW + itemColW, curY + tableHeaderH);
+  doc.line(startX + noColW + itemColW + descColW, curY, startX + noColW + itemColW + descColW, curY + tableHeaderH);
+  if (entriesCount > 1) {
+    for (let i = 1; i < entriesCount; i++) {
+      const x = startX + noColW + itemColW + descColW + i * dayColW;
+      doc.line(x, curY, x, curY + tableHeaderH);
+    }
+  }
+
+  curY += tableHeaderH;
+
+  // Mapping rating label pendek agar pas di kolom harian
+  const RATING_SHORT_MAP: Record<string, string> = {
+    baik_sekali: "B. Sekali",
+    baik: "Baik",
+    sedang: "Sedang",
+    kurang: "Kurang",
+  };
+
+  // Baris Data Item Checklist
+  const rowH = 8.5; // Tinggi baris proporsional untuk 2 baris deskripsi
+  ITEM_LABELS.forEach((item, itemIdx) => {
+    const isEven = itemIdx % 2 === 1;
+
+    // Background baris
+    if (isEven) {
       doc.setFillColor(248, 250, 252);
+      doc.rect(startX, curY, boxWidth, rowH, "F");
+    } else {
+      doc.setFillColor(255, 255, 255);
       doc.rect(startX, curY, boxWidth, rowH, "F");
     }
 
-    doc.setDrawColor(226, 232, 240);
+    // Border sel luar
+    doc.setDrawColor(203, 213, 225);
+    doc.setLineWidth(0.2);
     doc.rect(startX, curY, boxWidth, rowH);
 
+    // Garis pemisah kolom vertikal
+    doc.line(startX + noColW, curY, startX + noColW, curY + rowH);
+    doc.line(startX + noColW + itemColW, curY, startX + noColW + itemColW, curY + rowH);
+    doc.line(startX + noColW + itemColW + descColW, curY, startX + noColW + itemColW + descColW, curY + rowH);
+    if (entriesCount > 1) {
+      for (let i = 1; i < entriesCount; i++) {
+        const x = startX + noColW + itemColW + descColW + i * dayColW;
+        doc.line(x, curY, x, curY + rowH);
+      }
+    }
+
+    // Nomor
     doc.setFontSize(7.5);
     doc.setFont(fontName, "normal");
+    doc.setTextColor(71, 85, 105);
+    doc.text(String(itemIdx + 1), startX + noColW / 2, curY + 5.2, { align: "center" });
+
+    // Item Pengecekan
+    doc.setFont(fontName, "bold");
     doc.setTextColor(15, 23, 42);
-    doc.text(item.label, startX + 3, curY + 4.5);
+    const itemLines = doc.splitTextToSize(item.label, itemColW - 5);
+    if (itemLines.length === 1) {
+      doc.text(itemLines[0], startX + noColW + 2.5, curY + 5.2);
+    } else {
+      doc.text(itemLines[0], startX + noColW + 2.5, curY + 3.6);
+      doc.text(itemLines[1], startX + noColW + 2.5, curY + 6.8);
+    }
 
-    doc.setTextColor(100, 116, 139);
-    doc.text(item.desc ? item.desc.slice(0, 28) : "-", startX + itemColW + 3, curY + 4.5);
+    // Keterangan / Standar (Ditampilkan utuh tanpa dipotong!)
+    doc.setFont(fontName, "normal");
+    doc.setFontSize(6.8);
+    doc.setTextColor(71, 85, 105);
+    const descLines = doc.splitTextToSize(item.desc || "-", descColW - 5);
+    if (descLines.length === 1) {
+      doc.text(descLines[0], startX + noColW + itemColW + 2.5, curY + 5.2);
+    } else {
+      doc.text(descLines[0], startX + noColW + itemColW + 2.5, curY + 3.6);
+      doc.text(descLines[1], startX + noColW + itemColW + 2.5, curY + 6.8);
+    }
 
-    entries.forEach((entry, i) => {
-      const val = entry.items?.[item.key] || "";
-      const textVal = RATING_LABEL_MAP[val] || "-";
-      const x = startX + itemColW + descColW + i * dayColW + dayColW / 2;
+    // Kolom Evaluasi Hari
+    if (entriesCount > 0) {
+      entries.forEach((entry, i) => {
+        const val = entry.items?.[item.key] || "";
+        const textVal = RATING_SHORT_MAP[val] || "-";
+        const x = startX + noColW + itemColW + descColW + i * dayColW + dayColW / 2;
 
-      if (val === "baik_sekali" || val === "baik") {
-        doc.setFont(fontName, "bold");
-        doc.setTextColor(5, 150, 105); // emerald
-      } else if (val === "sedang") {
-        doc.setFont(fontName, "bold");
-        doc.setTextColor(217, 119, 6); // amber
-      } else if (val === "kurang") {
-        doc.setFont(fontName, "bold");
-        doc.setTextColor(220, 38, 38); // rose
-      } else {
-        doc.setFont(fontName, "normal");
-        doc.setTextColor(148, 163, 184);
-      }
-      doc.text(textVal, x, curY + 4.5, { align: "center" });
-    });
+        if (val === "baik_sekali" || val === "baik") {
+          doc.setFont(fontName, "bold");
+          doc.setFontSize(7);
+          doc.setTextColor(5, 150, 105); // emerald-600
+        } else if (val === "sedang") {
+          doc.setFont(fontName, "bold");
+          doc.setFontSize(7);
+          doc.setTextColor(217, 119, 6); // amber-600
+        } else if (val === "kurang") {
+          doc.setFont(fontName, "bold");
+          doc.setFontSize(7);
+          doc.setTextColor(220, 38, 38); // red-600
+        } else {
+          doc.setFont(fontName, "normal");
+          doc.setFontSize(7);
+          doc.setTextColor(148, 163, 184); // slate-400
+        }
+        doc.text(textVal, x, curY + 5.2, { align: "center" });
+      });
+    } else {
+      const x = startX + noColW + itemColW + descColW + remainW / 2;
+      doc.setFont(fontName, "normal");
+      doc.setFontSize(7);
+      doc.setTextColor(148, 163, 184);
+      doc.text("-", x, curY + 5.2, { align: "center" });
+    }
 
     curY += rowH;
   });
 
-  curY += 7;
+  // Baris Catatan / Temuan Lapangan
+  const catatanRowH = 8.5;
+  doc.setFillColor(241, 245, 249);
+  doc.rect(startX, curY, boxWidth, catatanRowH, "F");
+  doc.setDrawColor(203, 213, 225);
+  doc.rect(startX, curY, boxWidth, catatanRowH);
 
-  // ── Verifikasi dan Persetujuan (Digital) dengan Kode QR ──
+  // Garis kolom
+  doc.line(startX + noColW + itemColW, curY, startX + noColW + itemColW, curY + catatanRowH);
+  doc.line(startX + noColW + itemColW + descColW, curY, startX + noColW + itemColW + descColW, curY + catatanRowH);
+  if (entriesCount > 1) {
+    for (let i = 1; i < entriesCount; i++) {
+      const x = startX + noColW + itemColW + descColW + i * dayColW;
+      doc.line(x, curY, x, curY + catatanRowH);
+    }
+  }
+
+  doc.setFont(fontName, "bold");
+  doc.setFontSize(7.5);
+  doc.setTextColor(51, 65, 85);
+  doc.text("Catatan / Temuan", startX + 4, curY + 5.2);
+
+  doc.setFont(fontName, "italic");
+  doc.setFontSize(6.8);
+  doc.setTextColor(100, 116, 139);
+  doc.text("Evaluasi catatan lapangan per hari", startX + noColW + itemColW + 2.5, curY + 5.2);
+
+  if (entriesCount > 0) {
+    entries.forEach((entry, i) => {
+      const x = startX + noColW + itemColW + descColW + i * dayColW + dayColW / 2;
+      const cText = entry.catatan ? (entry.catatan.length > 7 ? entry.catatan.slice(0, 6) + "…" : entry.catatan) : "-";
+      doc.setFont(fontName, "normal");
+      doc.setFontSize(6.5);
+      doc.setTextColor(71, 85, 105);
+      doc.text(cText, x, curY + 5.2, { align: "center" });
+    });
+  }
+
+  curY += catatanRowH + 3.5;
+
+  // ── Legend Kriteria Penilaian ──
+  doc.setFillColor(248, 250, 252);
+  doc.setDrawColor(226, 232, 240);
+  doc.roundedRect(startX, curY, boxWidth, 5.8, 1, 1, "FD");
+
+  doc.setFont(fontName, "normal");
+  doc.setFontSize(6.5);
+  doc.setTextColor(71, 85, 105);
+  doc.text(
+    "Kriteria Penilaian :   [ B. Sekali ] Baik Sekali     •     [ Baik ] Sesuai Standar     •     [ Sedang ] Perlu Evaluasi     •     [ Kurang ] Tidak Sesuai",
+    startX + boxWidth / 2,
+    curY + 3.8,
+    { align: "center" }
+  );
+
+  curY += 9;
+
+  // ── 4. Verifikasi dan Persetujuan (Digital) ──
   doc.setFont(fontName, "bold");
   doc.setFontSize(10);
   doc.setTextColor(15, 23, 42);
-  doc.text("Verifikasi dan Persetujuan (Digital)", 14, curY);
+  doc.text("Verifikasi dan Persetujuan (Digital)", startX, curY);
 
   curY += 4;
 
@@ -630,8 +830,8 @@ export async function exportPenilaianToPdf(
   ];
 
   const cardGap = 4;
-  const cardW = (boxWidth - cardGap * 2) / 3;
-  const cardH = 38; // Lebih tinggi agar QR code dan informasi tertata rapi
+  const cardW = (boxWidth - cardGap * 2) / 3; // 58mm
+  const cardH = 45; // Tinggi card nyaman dan proporsional
 
   for (let i = 0; i < signBoxes.length; i++) {
     const box = signBoxes[i];
@@ -640,74 +840,144 @@ export async function exportPenilaianToPdf(
 
     // Bingkai Card
     doc.setDrawColor(203, 213, 225);
+    doc.setLineWidth(0.25);
     doc.setFillColor(hasApproved ? 255 : 248, hasApproved ? 255 : 250, hasApproved ? 255 : 252);
     doc.roundedRect(x, curY, cardW, cardH, 2, 2, "FD");
 
     // Header Strip Card
     doc.setFillColor(241, 245, 249);
-    doc.roundedRect(x, curY, cardW, 6.5, 2, 2, "F");
+    doc.roundedRect(x, curY, cardW, 7, 2, 2, "F");
+    doc.rect(x, curY + 4, cardW, 3, "F");
     doc.setDrawColor(226, 232, 240);
-    doc.line(x, curY + 6.5, x + cardW, curY + 6.5);
+    doc.line(x, curY + 7, x + cardW, curY + 7);
 
     doc.setFontSize(8.5);
     doc.setFont(fontName, "bold");
     doc.setTextColor(30, 41, 59);
-    doc.text(box.title, x + cardW / 2, curY + 4.6, { align: "center" });
+    doc.text(box.title, x + cardW / 2, curY + 5, { align: "center" });
 
     if (hasApproved) {
       // ── Sisipkan QR Code Verifikasi ──
-      const qrSize = 18;
-      const qrX = x + 4;
+      const qrSize = 20;
+      const qrX = x + 3.5;
       const qrY = curY + 10;
+
+      // Frame halus di sekeliling QR
+      doc.setDrawColor(226, 232, 240);
+      doc.rect(qrX - 0.5, qrY - 0.5, qrSize + 1, qrSize + 1);
 
       try {
         const verifyUrl = getVerifyUrl(meta.id_form, box.roleKey);
-        const qrDataUrl = await makeQR(verifyUrl, 180);
+        const qrDataUrl = await makeQR(verifyUrl, 200);
         doc.addImage(qrDataUrl, "PNG", qrX, qrY, qrSize, qrSize);
       } catch (err) {
         console.error("Gagal menyisipkan QR PDF:", err);
       }
 
-      // ── Teks Keterangan di Samping QR ──
-      const textX = qrX + qrSize + 3;
-      const textMaxW = cardW - qrSize - 9;
+      // ── Info Approver di Samping QR ──
+      const rightX = x + 26.5;
 
-      doc.setFontSize(7.5);
-      doc.setFont(fontName, "bold");
-      doc.setTextColor(5, 150, 105); // emerald-600
-      doc.text("✓ DISETUJUI", textX, curY + 13);
+      // Badge Pill DISETUJUI (Menggunakan rounded rectangle vektor, tanpa karakter unicode rusak)
+      doc.setFillColor(236, 253, 245); // emerald-50
+      doc.setDrawColor(16, 185, 129); // emerald-500
+      doc.setLineWidth(0.2);
+      doc.roundedRect(rightX, curY + 10, 27, 4.6, 1, 1, "FD");
 
       doc.setFont(fontName, "bold");
-      doc.setFontSize(7.5);
+      doc.setFontSize(7);
+      doc.setTextColor(4, 120, 87); // emerald-700
+      doc.text("DISETUJUI", rightX + 13.5, curY + 13.4, { align: "center" });
+
+      // Nama Approver
+      doc.setFont(fontName, "bold");
+      doc.setFontSize(8);
       doc.setTextColor(15, 23, 42);
-      const displayName = box.data.nama.length > 14 ? box.data.nama.slice(0, 13) + "…" : box.data.nama;
-      doc.text(displayName, textX, curY + 18);
+      const displayName = box.data.nama.length > 15 ? box.data.nama.slice(0, 14) + "…" : box.data.nama;
+      doc.text(displayName, rightX, curY + 18.5);
+
+      // NIK
+      doc.setFont(fontName, "normal");
+      doc.setFontSize(7);
+      doc.setTextColor(71, 85, 105);
+      doc.text(`NIK: ${box.data.nik || "-"}`, rightX, curY + 23);
+
+      // Tanggal
+      const tglFormatted = formatTanggalDDMMYYYY(box.data.tanggal);
+      doc.text(`Tgl: ${tglFormatted}`, rightX, curY + 27.2);
+
+      // Scan subtext
+      doc.setFontSize(5.8);
+      doc.setTextColor(148, 163, 184);
+      doc.text("Scan QR utk verifikasi", rightX, curY + 31);
+    } else {
+      // ── Status Belum Disetujui ──
+      doc.setFillColor(254, 243, 199); // amber-100
+      doc.setDrawColor(245, 158, 11); // amber-500
+      doc.setLineWidth(0.2);
+      doc.roundedRect(x + (cardW - 28) / 2, curY + 14, 28, 5, 1, 1, "FD");
+
+      doc.setFont(fontName, "bold");
+      doc.setFontSize(7);
+      doc.setTextColor(180, 83, 9); // amber-700
+      doc.text("MENUNGGU", x + cardW / 2, curY + 17.6, { align: "center" });
 
       doc.setFont(fontName, "normal");
-      doc.setFontSize(6.5);
-      doc.setTextColor(100, 116, 139);
-      if (box.data.nik) {
-        doc.text(`NIK: ${box.data.nik}`, textX, curY + 22.5);
-      }
-      const tglFormatted = formatTanggalDDMMYYYY(box.data.tanggal);
-      doc.text(`Tgl: ${tglFormatted}`, textX, curY + 26.5);
-
-      // Verifikasi Digital Badge
-      doc.setFontSize(5.5);
-      doc.setTextColor(148, 163, 184);
-      doc.text("Verifikasi Digital", textX, curY + 30.5);
-    } else {
-      // Menunggu Persetujuan
       doc.setFontSize(7.5);
-      doc.setFont(fontName, "italic");
-      doc.setTextColor(148, 163, 184);
-      doc.text("Belum Disetujui", x + cardW / 2, curY + 19, { align: "center" });
+      doc.setTextColor(100, 116, 139);
+      doc.text("Belum Disetujui", x + cardW / 2, curY + 25, { align: "center" });
+
       doc.setFontSize(6.5);
-      doc.text("(Menunggu Otorisasi)", x + cardW / 2, curY + 23.5, { align: "center" });
+      doc.setTextColor(148, 163, 184);
+      doc.text("(Menunggu Tanda Tangan)", x + cardW / 2, curY + 29.5, { align: "center" });
     }
+
+    // Card Footer Strip
+    doc.setDrawColor(226, 232, 240);
+    doc.line(x + 3, curY + cardH - 6.5, x + cardW - 3, curY + cardH - 6.5);
+    doc.setFontSize(6);
+    doc.setFont(fontName, "normal");
+    doc.setTextColor(148, 163, 184);
+    doc.text("• Otorisasi Digital PT JAI •", x + cardW / 2, curY + cardH - 2.5, { align: "center" });
   }
 
-  // ── Footer Note ──
+  curY += cardH + 6;
+
+  // ── 5. Kotak Ketentuan & Catatan K3 (Safety Health Environment) ──
+  const noteBoxH = 17;
+  doc.setFillColor(240, 253, 244); // emerald-50
+  doc.setDrawColor(167, 243, 208); // emerald-200
+  doc.setLineWidth(0.25);
+  doc.roundedRect(startX, curY, boxWidth, noteBoxH, 1.5, 1.5, "FD");
+
+  // Garis Aksen Hijau di Kiri Kotak Catatan
+  doc.setFillColor(5, 150, 105);
+  doc.roundedRect(startX, curY, 2.5, noteBoxH, 1.5, 1.5, "F");
+  doc.rect(startX + 1.5, curY, 1, noteBoxH, "F");
+
+  doc.setFont(fontName, "bold");
+  doc.setFontSize(7.5);
+  doc.setTextColor(6, 95, 70); // emerald-800
+  doc.text("Ketentuan & Catatan K3 (Safety Health Environment):", startX + 6, curY + 5);
+
+  doc.setFont(fontName, "normal");
+  doc.setFontSize(6.8);
+  doc.setTextColor(51, 65, 85);
+  doc.text(
+    "1. Form evaluasi ini merupakan instrumen resmi pengawasan keselamatan & kesehatan kerja (K3) PT. Jatim Autocomp Indonesia.",
+    startX + 6,
+    curY + 9.5
+  );
+  doc.text(
+    "2. Hasil evaluasi harian wajib menjadi acuan perbaikan langsung oleh Sub Kontraktor dan mempengaruhi kelayakan ijin kerja berikutnya.",
+    startX + 6,
+    curY + 13.8
+  );
+
+  // ── 6. Footer Resmi Halaman ──
+  doc.setDrawColor(226, 232, 240);
+  doc.setLineWidth(0.2);
+  doc.line(startX, 282, startX + boxWidth, 282);
+
   doc.setFontSize(7);
   doc.setFont(fontName, "normal");
   doc.setTextColor(148, 163, 184);
