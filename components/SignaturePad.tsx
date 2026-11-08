@@ -33,10 +33,10 @@ export default function SignaturePad({
     const ctx = getCtx();
     if (ctx) {
       ctx.scale(ratio, ratio);
-      ctx.lineWidth = 2.5;
+      ctx.lineWidth = 2.8;
       ctx.lineCap = "round";
       ctx.lineJoin = "round";
-      ctx.strokeStyle = "#0f172a";
+      ctx.strokeStyle = "#090e17";
     }
   }, []);
 
@@ -94,18 +94,25 @@ export default function SignaturePad({
 
   return (
     <div className="space-y-2">
-      <p className="text-sm font-semibold text-slate-700">{label}</p>
-      <div className="relative border-2 border-dashed border-slate-300 rounded-xl bg-white overflow-hidden">
+      <div className="flex items-center justify-between">
+        <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">{label}</p>
+        <span className="text-[11px] text-slate-400 dark:text-slate-400 font-medium">Latar Putih Kontras Tinggi</span>
+      </div>
+      <div
+        style={{ backgroundColor: "#ffffff" }}
+        className="signature-pad-canvas-container relative border-2 border-dashed border-slate-300 dark:border-slate-400 rounded-xl overflow-hidden shadow-xs !bg-white"
+      >
         <canvas
           ref={canvasRef}
-          className="w-full h-48 touch-none cursor-crosshair"
+          style={{ backgroundColor: "#ffffff" }}
+          className="w-full h-48 touch-none cursor-crosshair !bg-white block"
           onPointerDown={handlePointerDown}
           onPointerMove={handlePointerMove}
           onPointerUp={handlePointerUp}
           onPointerLeave={handlePointerUp}
         />
         {isEmpty && (
-          <p className="absolute inset-0 flex items-center justify-center text-slate-300 text-sm pointer-events-none">
+          <p className="absolute inset-0 flex items-center justify-center text-slate-400 text-sm pointer-events-none select-none font-medium">
             Tanda tangan di sini (mouse / sentuh layar)
           </p>
         )}
@@ -115,7 +122,7 @@ export default function SignaturePad({
           type="button"
           onClick={handleClear}
           disabled={disabled || isEmpty}
-          className="flex items-center gap-1.5 px-3 py-2 border border-slate-200 rounded-lg text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-40 transition-colors"
+          className="flex items-center gap-1.5 px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-40 transition-colors cursor-pointer"
         >
           <Eraser className="w-3.5 h-3.5" /> Hapus
         </button>
@@ -123,7 +130,7 @@ export default function SignaturePad({
           type="button"
           onClick={handleConfirm}
           disabled={disabled || isEmpty}
-          className="flex items-center gap-1.5 px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-green-300 text-white rounded-lg text-xs font-semibold transition-colors ml-auto"
+          className="flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-300 dark:disabled:bg-emerald-900/40 text-white rounded-lg text-xs font-semibold transition-colors ml-auto shadow-xs cursor-pointer"
         >
           <Check className="w-3.5 h-3.5" /> {confirmLabel}
         </button>

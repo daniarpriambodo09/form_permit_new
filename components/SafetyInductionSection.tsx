@@ -489,15 +489,18 @@ export default function SafetyInductionSection({
 
           {activeKontraktorSig ? (
             <div className="flex items-center gap-3">
-              <div className="p-1 bg-white border border-emerald-200 rounded-lg shadow-2xs">
+              <div 
+                style={{ backgroundColor: "#ffffff" }}
+                className="signature-display-box p-1.5 bg-white border border-emerald-200 rounded-lg shadow-2xs !bg-white"
+              >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={activeKontraktorSig}
                   alt="TTD Koordinator"
-                  className="h-12 w-auto object-contain px-2"
+                  className="h-12 w-auto object-contain px-2 bg-white rounded"
                 />
               </div>
-              <p className="text-[11px] text-slate-500">
+              <p className="text-[11px] text-slate-500 dark:text-slate-400">
                 Tanda tangan digital telah terhubung dan diverifikasi dari form induk.
               </p>
             </div>

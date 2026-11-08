@@ -5,6 +5,7 @@ import type { Metadata } from "next"
 import { Analytics } from "@vercel/analytics/next"
 import "./globals.css"
 import { ThemeProvider } from "@/components/ThemeProvider"
+import ZoomController from "@/components/ZoomController"
 
 export const metadata: Metadata = {
   title: "Sistem Izin Kerja Digital - PT. Jatim Autocomp Indonesia",
@@ -43,13 +44,16 @@ export default function RootLayout({
             __html: `
               try {
                 const saved = localStorage.getItem('theme');
-                const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-                if (saved === 'dark' || (!saved && prefersDark)) {
+                if (saved === 'dark') {
                   document.documentElement.classList.add('dark');
                   document.documentElement.setAttribute('data-theme', 'dark');
                 } else {
                   document.documentElement.classList.remove('dark');
                   document.documentElement.setAttribute('data-theme', 'light');
+                }
+                const path = window.location.pathname;
+                if (path === '/' || path === '/login' || path.startsWith('/login/')) {
+                  document.documentElement.classList.add('no-zoom');
                 }
               } catch (_) {}
             `,
@@ -58,6 +62,7 @@ export default function RootLayout({
       </head>
       <body className={`font-sans antialiased min-h-screen`}>
         <ThemeProvider>
+          <ZoomController />
           {children}
         </ThemeProvider>
         <Analytics />

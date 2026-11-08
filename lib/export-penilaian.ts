@@ -1,13 +1,13 @@
 // lib/export-penilaian.ts
-// Utility untuk ekspor Lampiran Penilaian Sub Kontraktor ke format Excel (.xlsx) dan PDF (.pdf).
+// Utility untuk ekspor Lampiran Penilaian Sub Kontraktor (JAI/F-08/P.SHE-19 Rev. 1)
+// ke format Excel (.xlsx) dan PDF (.pdf) dengan font Arial Narrow dan Kode QR verifikasi.
 
 import {
   type PenilaianSubkontraktorData,
   ITEM_LABELS,
-  RATING_OPTIONS,
 } from "@/components/PenilaianSubkontraktorSection";
 
-interface FormExportMeta {
+export interface FormExportMeta {
   id_form: string;
   nama_kontraktor_pekerja: string;
   pimpinan_kontraktor?: string;
@@ -25,76 +25,178 @@ const RATING_LABEL_MAP: Record<string, string> = {
 };
 
 /**
- * Ekspor Lampiran Penilaian Sub Kontraktor ke Excel (.xlsx) menggunakan ExcelJS
+ * Format tanggal dari berbagai format (ISO, YYYY-MM-DD, dsb.) ke format DD-MM-YYYY (HH-MM-YYYY).
+ * Menghapus segala keterangan jam/timezone seperti T00:00:00.000Z.
  */
+export function formatTanggalDDMMYYYY(raw?: string | null): string {
+  if (!raw) return "-";
+  const str = String(raw).trim();
+  if (!str) return "-";
+  // Tangani format YYYY-MM-DD atau ISO 8601
+  const match = str.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (match) {
+    const [_, y, m, d] = match;
+    return `${d}-${m}-${y}`;
+  }
+  const dateObj = new Date(str);
+  if (!isNaN(dateObj.getTime())) {
+    const d = String(dateObj.getDate()).padStart(2, "0");
+    const m = String(dateObj.getMonth() + 1).padStart(2, "0");
+    const y = dateObj.getFullYear();
+    return `${d}-${m}-${y}`;
+  }
+  return str;
+}
+
+/**
+ * Format periode tanggal: HH-MM-YYYY s/d HH-MM-YYYY (tanpa sisa timestamp ISO).
+ */
+export function formatPeriodeDDMMYYYY(start?: string | null, end?: string | null): string {
+  const s = formatTanggalDDMMYYYY(start);
+  const e = formatTanggalDDMMYYYY(end);
+  if (s === "-" && e === "-") return "-";
+  if (s !== "-" && e !== "-") return `${s} s/d ${e}`;
+  return s !== "-" ? s : e;
+}
+
+/**
+ * Helper untuk membuat gambar Data URL QR Code
+ */
+async function makeQR(text: string, px = 200): Promise<string> {
+  const QR = (await import("qrcode")).default;
+  return QR.toDataURL(text, {
+    width: px,
+    margin: 1,
+    color: { dark: "#0f172a", light: "#ffffff" },
+  });
+}
+
+/**
+ * Buat URL verifikasi digital resmi untuk approval penilaian
+ */
+function getVerifyUrl(idForm: string, roleKey: string): string {
+  const origin = typeof window !== "undefined" && window.location.origin ? window.location.origin : "http://localhost:3100";
+  return `${origin}/approval-verification/general-permit/${encodeURIComponent(idForm)}?doc=penilaian-subkontraktor&approver=${encodeURIComponent(roleKey)}`;
+}
+
+/**
+ * Helper untuk memuat font Arial Narrow ke jsPDF di browser
+ */
+async function loadArialNarrow(doc: any): Promise<string> {
+  try {
+    const [regRes, boldRes] = await Promise.all([
+      fetch("/fonts/ARIALN.TTF"),
+      fetch("/fonts/ARIALNB.TTF"),
+    ]);
+    if (regRes.ok && boldRes.ok) {
+      const [regBuf, boldBuf] = await Promise.all([
+        regRes.arrayBuffer(),
+        boldRes.arrayBuffer(),
+      ]);
+      const toB64 = (buf: ArrayBuffer) => {
+        let binary = "";
+        const bytes = new Uint8Array(buf);
+        const len = bytes.byteLength;
+        for (let i = 0; i < len; i += 8192) {
+          binary += String.fromCharCode.apply(null, Array.from(bytes.subarray(i, i + 8192)));
+        }
+        return btoa(binary);
+      };
+      doc.addFileToVFS("ArialNarrow.ttf", toB64(regBuf));
+      doc.addFont("ArialNarrow.ttf", "ArialNarrow", "normal");
+      doc.addFileToVFS("ArialNarrow-Bold.ttf", toB64(boldBuf));
+      doc.addFont("ArialNarrow-Bold.ttf", "ArialNarrow", "bold");
+      return "ArialNarrow";
+    }
+  } catch (err) {
+    console.warn("Could not load Arial Narrow font, falling back to helvetica:", err);
+  }
+  return "helvetica";
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// 1. EKSPOR KE EXCEL (.xlsx)
+// ═══════════════════════════════════════════════════════════════════
 export async function exportPenilaianToExcel(
   meta: FormExportMeta,
   data: PenilaianSubkontraktorData
 ): Promise<void> {
   const ExcelJS = (await import("exceljs")).default;
   const workbook = new ExcelJS.Workbook();
-  workbook.creator = "PT. JAI Permit System";
+  workbook.creator = "PT. JAI Form Permit System";
   workbook.created = new Date();
 
   const sheet = workbook.addWorksheet("Penilaian Subkontraktor", {
     views: [{ showGridLines: true }],
   });
 
-  // ── 1. Judul & Header ──
+  const FONT_FAMILY = "Arial Narrow";
+
+  // ── 1. Judul & Header Dokumen ──
   sheet.mergeCells("A1:G1");
   const titleCell = sheet.getCell("A1");
   titleCell.value = "FORM PENILAIAN SUB KONTRAKTOR - JAI/F-08/P.SHE-19 Rev. 1";
-  titleCell.font = { name: "Arial", size: 14, bold: true, color: { argb: "FF0F172A" } };
+  titleCell.font = { name: FONT_FAMILY, size: 14, bold: true, color: { argb: "FF0F172A" } };
   titleCell.alignment = { horizontal: "center", vertical: "middle" };
-  sheet.getRow(1).height = 28;
+  sheet.getRow(1).height = 30;
 
-  // ── 2. Informasi Form ──
+  sheet.mergeCells("A2:G2");
+  const subTitleCell = sheet.getCell("A2");
+  subTitleCell.value = "Lampiran Evaluasi & Pengawasan Ijin Kerja Eksternal — PT. Jatim Autocomp Indonesia";
+  subTitleCell.font = { name: FONT_FAMILY, size: 9.5, italic: true, color: { argb: "FF64748B" } };
+  subTitleCell.alignment = { horizontal: "center", vertical: "middle" };
+  sheet.getRow(2).height = 18;
+
+  // ── 2. Informasi Form (Metadata) ──
+  const periodeStr = formatPeriodeDDMMYYYY(
+    meta.izin_kerja_tanggal_dari,
+    meta.izin_kerja_tanggal_sampai
+  );
+
   const infoRows = [
     ["No. Ijin Kerja Eksternal", `: ${meta.id_form}`],
     ["Nama Sub Kontraktor", `: ${meta.nama_kontraktor_pekerja || "-"}`],
     ["Lokasi Pekerjaan", `: ${meta.lokasi_pekerjaan || "-"}`],
-    [
-      "Periode Pekerjaan",
-      `: ${meta.izin_kerja_tanggal_dari || "-"} s/d ${meta.izin_kerja_tanggal_sampai || "-"}`,
-    ],
+    ["Periode Pekerjaan", `: ${periodeStr}`],
   ];
 
-  let curRow = 3;
+  let curRow = 4;
   for (const [k, v] of infoRows) {
     sheet.getCell(`A${curRow}`).value = k;
-    sheet.getCell(`A${curRow}`).font = { name: "Arial", size: 10, bold: true };
+    sheet.getCell(`A${curRow}`).font = { name: FONT_FAMILY, size: 10, bold: true, color: { argb: "FF1E293B" } };
     sheet.getCell(`B${curRow}`).value = v;
-    sheet.getCell(`B${curRow}`).font = { name: "Arial", size: 10 };
+    sheet.getCell(`B${curRow}`).font = { name: FONT_FAMILY, size: 10, color: { argb: "FF0F172A" } };
+    sheet.getRow(curRow).height = 19;
     curRow++;
   }
 
   curRow += 1;
 
-  // ── 3. Tabel Checklist ──
+  // ── 3. Tabel Checklist Penilaian ──
   const entries = data.entries || [];
   const headerCols = ["No", "Item Pengecekan", "Keterangan / Standar"];
-  entries.forEach((e, idx) => {
-    headerCols.push(`Hari ${idx + 1}\n(${e.tanggal || "-"})`);
+  entries.forEach((_, idx) => {
+    headerCols.push(`H-${idx + 1}`);
   });
 
   const tableHeaderRow = sheet.getRow(curRow);
   tableHeaderRow.values = headerCols;
-  tableHeaderRow.height = 30;
+  tableHeaderRow.height = 28;
 
   for (let c = 1; c <= headerCols.length; c++) {
     const cell = tableHeaderRow.getCell(c);
-    cell.font = { name: "Arial", size: 10, bold: true, color: { argb: "FFFFFFFF" } };
+    cell.font = { name: FONT_FAMILY, size: 10, bold: true, color: { argb: "FFFFFFFF" } };
     cell.fill = {
       type: "pattern",
       pattern: "solid",
-      fgColor: { argb: "FF1E293B" }, // dark slate
+      fgColor: { argb: "FF1E293B" }, // dark navy
     };
     cell.alignment = { horizontal: "center", vertical: "middle", wrapText: true };
     cell.border = {
-      top: { style: "thin" },
-      left: { style: "thin" },
-      bottom: { style: "thin" },
-      right: { style: "thin" },
+      top: { style: "thin", color: { argb: "FF94A3B8" } },
+      left: { style: "thin", color: { argb: "FF94A3B8" } },
+      bottom: { style: "thin", color: { argb: "FF94A3B8" } },
+      right: { style: "thin", color: { argb: "FF94A3B8" } },
     };
   }
 
@@ -110,16 +212,25 @@ export async function exportPenilaianToExcel(
 
     const row = sheet.getRow(curRow);
     row.values = rowValues;
-    row.height = 24;
+    row.height = 22;
+
+    const isEven = itemIdx % 2 === 1;
 
     for (let c = 1; c <= headerCols.length; c++) {
       const cell = row.getCell(c);
-      cell.font = { name: "Arial", size: 9 };
+      cell.font = { name: FONT_FAMILY, size: 9.5 };
+      if (isEven) {
+        cell.fill = {
+          type: "pattern",
+          pattern: "solid",
+          fgColor: { argb: "FFF8FAFC" },
+        };
+      }
       cell.border = {
-        top: { style: "thin" },
-        left: { style: "thin" },
-        bottom: { style: "thin" },
-        right: { style: "thin" },
+        top: { style: "thin", color: { argb: "FFE2E8F0" } },
+        left: { style: "thin", color: { argb: "FFE2E8F0" } },
+        bottom: { style: "thin", color: { argb: "FFE2E8F0" } },
+        right: { style: "thin", color: { argb: "FFE2E8F0" } },
       };
       if (c === 1) {
         cell.alignment = { horizontal: "center", vertical: "middle" };
@@ -127,9 +238,13 @@ export async function exportPenilaianToExcel(
         cell.alignment = { horizontal: "center", vertical: "middle" };
         const textVal = String(cell.value || "");
         if (textVal === "Baik Sekali") {
-          cell.font = { name: "Arial", size: 9, bold: true, color: { argb: "FF047857" } };
+          cell.font = { name: FONT_FAMILY, size: 9.5, bold: true, color: { argb: "FF047857" } };
+        } else if (textVal === "Baik") {
+          cell.font = { name: FONT_FAMILY, size: 9.5, bold: true, color: { argb: "FF059669" } };
+        } else if (textVal === "Sedang") {
+          cell.font = { name: FONT_FAMILY, size: 9.5, bold: true, color: { argb: "FFD97706" } };
         } else if (textVal === "Kurang") {
-          cell.font = { name: "Arial", size: 9, bold: true, color: { argb: "FFB91C1C" } };
+          cell.font = { name: FONT_FAMILY, size: 9.5, bold: true, color: { argb: "FFDC2626" } };
         }
       } else {
         cell.alignment = { vertical: "middle" };
@@ -139,29 +254,29 @@ export async function exportPenilaianToExcel(
   });
 
   // Baris Catatan / Temuan
-  const catatanValues: any[] = ["-", "Catatan / Temuan", "Keterangan lapangan"];
+  const catatanValues: any[] = ["-", "Catatan / Temuan", "Keterangan evaluasi lapangan"];
   entries.forEach((entry) => {
     catatanValues.push(entry.catatan || "-");
   });
   const catatanRow = sheet.getRow(curRow);
   catatanRow.values = catatanValues;
-  catatanRow.height = 36;
+  catatanRow.height = 30;
   for (let c = 1; c <= headerCols.length; c++) {
     const cell = catatanRow.getCell(c);
-    cell.font = { name: "Arial", size: 9, italic: true };
+    cell.font = { name: FONT_FAMILY, size: 9, italic: true, color: { argb: "FF475569" } };
     cell.border = {
-      top: { style: "thin" },
-      left: { style: "thin" },
-      bottom: { style: "thin" },
-      right: { style: "thin" },
+      top: { style: "thin", color: { argb: "FFE2E8F0" } },
+      left: { style: "thin", color: { argb: "FFE2E8F0" } },
+      bottom: { style: "thin", color: { argb: "FFE2E8F0" } },
+      right: { style: "thin", color: { argb: "FFE2E8F0" } },
     };
     cell.alignment = { vertical: "middle", wrapText: true };
   }
   curRow += 2;
 
-  // ── 4. Bagian Mengetahui ──
+  // ── 4. Bagian Status Persetujuan (Mengetahui) dengan Kode QR ──
   sheet.getCell(`A${curRow}`).value = "STATUS PERSETUJUAN (MENGETAHUI)";
-  sheet.getCell(`A${curRow}`).font = { name: "Arial", size: 11, bold: true };
+  sheet.getCell(`A${curRow}`).font = { name: FONT_FAMILY, size: 11, bold: true, color: { argb: "FF0F172A" } };
   curRow++;
 
   const mgt = data.mengetahui || {};
@@ -169,67 +284,131 @@ export async function exportPenilaianToExcel(
   const purchasingRow = mgt.purchasing || { nama: "", nik: "", tanggal: "" };
   const sfoRow = mgt.sfo || { nama: "", nik: "", tanggal: "" };
 
-  const approvalHeader = ["Jabatan / Otoritas", "Status", "Nama Petugas", "NIK", "Tanggal Persetujuan"];
+  const approvalHeader = [
+    "Jabatan / Otoritas",
+    "Status",
+    "Nama Petugas",
+    "NIK",
+    "Tanggal Persetujuan",
+    "Kode QR Verifikasi",
+  ];
   const mgtHeaderRow = sheet.getRow(curRow);
   mgtHeaderRow.values = approvalHeader;
+  mgtHeaderRow.height = 24;
+
   for (let c = 1; c <= approvalHeader.length; c++) {
     const cell = mgtHeaderRow.getCell(c);
-    cell.font = { name: "Arial", size: 9, bold: true };
+    cell.font = { name: FONT_FAMILY, size: 9.5, bold: true, color: { argb: "FF1E293B" } };
     cell.fill = {
       type: "pattern",
       pattern: "solid",
       fgColor: { argb: "FFE2E8F0" },
     };
+    cell.alignment = { horizontal: "center", vertical: "middle" };
     cell.border = {
-      top: { style: "thin" },
-      left: { style: "thin" },
-      bottom: { style: "thin" },
-      right: { style: "thin" },
+      top: { style: "thin", color: { argb: "FFCBD5E1" } },
+      left: { style: "thin", color: { argb: "FFCBD5E1" } },
+      bottom: { style: "thin", color: { argb: "FFCBD5E1" } },
+      right: { style: "thin", color: { argb: "FFCBD5E1" } },
     };
   }
   curRow++;
 
-  const approverRowsData = [
-    ["Pengawas Dept", pengawasRow.nama ? "DISETUJUI" : "MENUNGGU", pengawasRow.nama || "-", pengawasRow.nik || "-", pengawasRow.tanggal || "-"],
-    ["Purchasing", purchasingRow.nama ? "DISETUJUI" : "MENUNGGU", purchasingRow.nama || "-", purchasingRow.nik || "-", purchasingRow.tanggal || "-"],
-    ["SFO", sfoRow.nama ? "DISETUJUI" : "MENUNGGU", sfoRow.nama || "-", sfoRow.nik || "-", sfoRow.tanggal || "-"],
+  const approverList = [
+    {
+      roleTitle: "Pengawas Dept",
+      roleKey: "pengawasDept",
+      row: pengawasRow,
+    },
+    {
+      roleTitle: "Purchasing",
+      roleKey: "purchasing",
+      row: purchasingRow,
+    },
+    {
+      roleTitle: "SFO",
+      roleKey: "sfo",
+      row: sfoRow,
+    },
   ];
 
-  for (const rData of approverRowsData) {
+  for (const approver of approverList) {
+    const hasApproved = Boolean(approver.row.nama && approver.row.nama.trim() !== "");
+    const formattedTgl = hasApproved ? formatTanggalDDMMYYYY(approver.row.tanggal) : "-";
+
+    const rData = [
+      approver.roleTitle,
+      hasApproved ? "DISETUJUI" : "MENUNGGU",
+      approver.row.nama || "-",
+      approver.row.nik || "-",
+      formattedTgl,
+      hasApproved ? "" : "Belum Tersedia",
+    ];
+
     const row = sheet.getRow(curRow);
     row.values = rData;
-    row.height = 20;
+    row.height = hasApproved ? 58 : 26;
+
     for (let c = 1; c <= approvalHeader.length; c++) {
       const cell = row.getCell(c);
-      cell.font = { name: "Arial", size: 9 };
+      cell.font = { name: FONT_FAMILY, size: 9.5 };
+      cell.alignment = { vertical: "middle", horizontal: c === 1 ? "left" : "center" };
       cell.border = {
-        top: { style: "thin" },
-        left: { style: "thin" },
-        bottom: { style: "thin" },
-        right: { style: "thin" },
+        top: { style: "thin", color: { argb: "FFE2E8F0" } },
+        left: { style: "thin", color: { argb: "FFE2E8F0" } },
+        bottom: { style: "thin", color: { argb: "FFE2E8F0" } },
+        right: { style: "thin", color: { argb: "FFE2E8F0" } },
       };
+
       if (c === 2) {
-        cell.alignment = { horizontal: "center" };
         cell.font = {
-          name: "Arial",
-          size: 9,
+          name: FONT_FAMILY,
+          size: 9.5,
           bold: true,
-          color: { argb: rData[1] === "DISETUJUI" ? "FF059669" : "FFD97706" },
+          color: { argb: hasApproved ? "FF059669" : "FFD97706" },
         };
       }
+      if (c === 6 && !hasApproved) {
+        cell.font = { name: FONT_FAMILY, size: 8.5, italic: true, color: { argb: "FF94A3B8" } };
+      }
     }
+
+    // Sisipkan QR Code ke kolom 6 (F) jika sudah disetujui
+    if (hasApproved) {
+      try {
+        const verifyUrl = getVerifyUrl(meta.id_form, approver.roleKey);
+        const qrBase64 = await makeQR(verifyUrl, 160);
+        const imageId = workbook.addImage({
+          base64: qrBase64,
+          extension: "png",
+        });
+
+        // Letakkan di kolom F (col index 5 dalam 0-based), di baris saat ini (curRow - 1 dalam 0-based)
+        sheet.addImage(imageId, {
+          tl: { col: 5.25, row: curRow - 1 + 0.1 },
+          ext: { width: 68, height: 68 },
+        });
+      } catch (qrErr) {
+        console.error("Gagal menyisipkan QR Excel:", qrErr);
+      }
+    }
+
     curRow++;
   }
 
-  // Atur lebar kolom
-  sheet.getColumn(1).width = 6;
-  sheet.getColumn(2).width = 30;
-  sheet.getColumn(3).width = 40;
-  for (let i = 4; i <= headerCols.length; i++) {
-    sheet.getColumn(i).width = 18;
+  // ── Atur Lebar Kolom yang Pas & Rapi ──
+  sheet.getColumn(1).width = 22; // No / Info label / Jabatan
+  sheet.getColumn(2).width = 32; // Item Pengecekan / Status
+  sheet.getColumn(3).width = 38; // Keterangan / Nama Petugas
+  sheet.getColumn(4).width = 18; // H-1 / NIK
+  sheet.getColumn(5).width = 20; // H-2 / Tanggal
+  sheet.getColumn(6).width = 18; // H-3 / QR Code
+
+  for (let i = 7; i <= headerCols.length; i++) {
+    sheet.getColumn(i).width = 14;
   }
 
-  // Trigger download
+  // Trigger download di browser
   const buffer = await workbook.xlsx.writeBuffer();
   const blob = new Blob([buffer], {
     type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -244,9 +423,9 @@ export async function exportPenilaianToExcel(
   URL.revokeObjectURL(url);
 }
 
-/**
- * Ekspor Lampiran Penilaian Sub Kontraktor ke PDF (.pdf) menggunakan jsPDF
- */
+// ═══════════════════════════════════════════════════════════════════
+// 2. EKSPOR KE PDF (.pdf)
+// ═══════════════════════════════════════════════════════════════════
 export async function exportPenilaianToPdf(
   meta: FormExportMeta,
   data: PenilaianSubkontraktorData
@@ -258,116 +437,144 @@ export async function exportPenilaianToPdf(
     format: "a4",
   });
 
+  const fontName = await loadArialNarrow(doc);
+
   const pageWidth = doc.internal.pageSize.getWidth();
   let curY = 16;
 
-  // Header Title
-  doc.setFont("helvetica", "bold");
+  // ── Header Title & Document Number ──
+  doc.setFont(fontName, "bold");
   doc.setFontSize(14);
-  doc.setTextColor(15, 23, 42);
+  doc.setTextColor(15, 23, 42); // slate-900
   doc.text("FORM PENILAIAN SUB KONTRAKTOR", pageWidth / 2, curY, { align: "center" });
 
   curY += 5;
-  doc.setFontSize(9);
-  doc.setFont("helvetica", "bold");
-  doc.setTextColor(100, 116, 139);
+  doc.setFontSize(9.5);
+  doc.setFont(fontName, "bold");
+  doc.setTextColor(71, 85, 105); // slate-600
   doc.text("JAI/F-08/P.SHE-19 Rev. 1", pageWidth / 2, curY, { align: "center" });
 
-  curY += 5;
-  doc.setFontSize(9);
-  doc.setFont("helvetica", "normal");
-  doc.text("Lampiran Evaluasi & Pengawasan Ijin Kerja Eksternal", pageWidth / 2, curY, {
+  curY += 4.5;
+  doc.setFontSize(8.5);
+  doc.setFont(fontName, "normal");
+  doc.setTextColor(100, 116, 139); // slate-500
+  doc.text("Lampiran Evaluasi & Pengawasan Ijin Kerja Eksternal — PT. Jatim Autocomp Indonesia", pageWidth / 2, curY, {
     align: "center",
   });
 
-  curY += 8;
-  doc.setDrawColor(226, 232, 240);
+  curY += 6;
+
+  // Garis Aksen Ganda Elegan
+  doc.setDrawColor(5, 150, 105); // emerald-600
+  doc.setLineWidth(0.6);
   doc.line(14, curY, pageWidth - 14, curY);
+  doc.setDrawColor(226, 232, 240); // slate-200
+  doc.setLineWidth(0.2);
+  doc.line(14, curY + 1, pageWidth - 14, curY + 1);
 
-  curY += 7;
+  curY += 6;
 
-  // Metadata Box
-  doc.setFontSize(9);
-  doc.setTextColor(30, 41, 59);
+  // ── Metadata Box ──
+  const startX = 14;
+  const boxWidth = pageWidth - 28;
+  const boxHeight = 24;
 
-  const leftX = 14;
-  const col2X = 58;
+  doc.setFillColor(248, 250, 252); // slate-50
+  doc.setDrawColor(226, 232, 240); // slate-200
+  doc.roundedRect(startX, curY, boxWidth, boxHeight, 2, 2, "FD");
 
-  const infoList = [
+  const periodeText = formatPeriodeDDMMYYYY(
+    meta.izin_kerja_tanggal_dari,
+    meta.izin_kerja_tanggal_sampai
+  );
+
+  const infoListLeft = [
     ["No. Ijin Kerja Eksternal", meta.id_form],
     ["Nama Sub Kontraktor", meta.nama_kontraktor_pekerja || "-"],
+  ];
+  const infoListRight = [
     ["Lokasi Pekerjaan", meta.lokasi_pekerjaan || "-"],
-    [
-      "Periode Pelaksanaan",
-      `${meta.izin_kerja_tanggal_dari || "-"} s/d ${meta.izin_kerja_tanggal_sampai || "-"}`,
-    ],
+    ["Periode Pelaksanaan", periodeText],
   ];
 
-  infoList.forEach(([lbl, val]) => {
-    doc.setFont("helvetica", "bold");
-    doc.text(lbl, leftX, curY);
-    doc.setFont("helvetica", "normal");
-    doc.text(`:  ${val}`, col2X, curY);
-    curY += 5;
+  let metaY = curY + 5.5;
+  doc.setFontSize(8.5);
+
+  infoListLeft.forEach(([lbl, val]) => {
+    doc.setFont(fontName, "bold");
+    doc.setTextColor(30, 41, 59);
+    doc.text(lbl, startX + 4, metaY);
+    doc.setFont(fontName, "normal");
+    doc.text(`:  ${val}`, startX + 42, metaY);
+    metaY += 6;
   });
 
-  curY += 4;
+  metaY = curY + 5.5;
+  const rightColX = startX + boxWidth / 2 + 2;
+  infoListRight.forEach(([lbl, val]) => {
+    doc.setFont(fontName, "bold");
+    doc.setTextColor(30, 41, 59);
+    doc.text(lbl, rightColX, metaY);
+    doc.setFont(fontName, "normal");
+    doc.text(`:  ${val}`, rightColX + 34, metaY);
+    metaY += 6;
+  });
 
-  // Summary Table of Evaluations
+  curY += boxHeight + 6;
+
+  // ── Tabel Hasil Penilaian Harian ──
   const entries = data.entries || [];
   const entriesCount = entries.length;
 
-  doc.setFont("helvetica", "bold");
+  doc.setFont(fontName, "bold");
   doc.setFontSize(10);
   doc.setTextColor(15, 23, 42);
-  doc.text(`Hasil Penilaian Harian (${entriesCount} Waktu Inspeksi)`, 14, curY);
+  doc.text(`Hasil Penilaian Harian (${entriesCount} Hari Evaluasi)`, 14, curY);
 
-  curY += 4;
+  curY += 3.5;
 
-  // Simple Table Rendering
-  const startX = 14;
-  const itemColW = 55;
-  const descColW = 45;
-  const remainW = pageWidth - 28 - itemColW - descColW;
+  // Ukuran Kolom Tabel
+  const itemColW = 58;
+  const descColW = 46;
+  const remainW = boxWidth - itemColW - descColW;
   const dayColW = entriesCount > 0 ? remainW / entriesCount : remainW;
 
   // Header row
-  doc.setFillColor(30, 41, 59);
-  doc.rect(startX, curY, pageWidth - 28, 7, "F");
+  doc.setFillColor(30, 41, 59); // slate-800
+  doc.rect(startX, curY, boxWidth, 7, "F");
 
-  doc.setFontSize(7.5);
-  doc.setFont("helvetica", "bold");
+  doc.setFontSize(8);
+  doc.setFont(fontName, "bold");
   doc.setTextColor(255, 255, 255);
-  doc.text("Item Pengecekan", startX + 2, curY + 4.5);
-  doc.text("Keterangan", startX + itemColW + 2, curY + 4.5);
+  doc.text("Item Pengecekan", startX + 3, curY + 4.8);
+  doc.text("Keterangan / Standar", startX + itemColW + 3, curY + 4.8);
 
-  entries.forEach((e, i) => {
+  // Menggunakan "H-1", "H-2", ... tanpa teks tanggal yang bertumpuk
+  entries.forEach((_, i) => {
     const x = startX + itemColW + descColW + i * dayColW;
-    doc.text(`H-${i + 1} (${e.tanggal?.slice(5) || "-"})`, x + dayColW / 2, curY + 4.5, {
-      align: "center",
-    });
+    doc.text(`H-${i + 1}`, x + dayColW / 2, curY + 4.8, { align: "center" });
   });
 
   curY += 7;
 
-  // Rows
+  // Rows Data Checklist
   ITEM_LABELS.forEach((item, idx) => {
-    const rowH = 7;
+    const rowH = 6.8;
     if (idx % 2 === 1) {
       doc.setFillColor(248, 250, 252);
-      doc.rect(startX, curY, pageWidth - 28, rowH, "F");
+      doc.rect(startX, curY, boxWidth, rowH, "F");
     }
 
     doc.setDrawColor(226, 232, 240);
-    doc.rect(startX, curY, pageWidth - 28, rowH);
+    doc.rect(startX, curY, boxWidth, rowH);
 
     doc.setFontSize(7.5);
-    doc.setFont("helvetica", "normal");
+    doc.setFont(fontName, "normal");
     doc.setTextColor(15, 23, 42);
-    doc.text(item.label, startX + 2, curY + 4.5);
+    doc.text(item.label, startX + 3, curY + 4.5);
 
     doc.setTextColor(100, 116, 139);
-    doc.text(item.desc ? item.desc.slice(0, 26) : "-", startX + itemColW + 2, curY + 4.5);
+    doc.text(item.desc ? item.desc.slice(0, 28) : "-", startX + itemColW + 3, curY + 4.5);
 
     entries.forEach((entry, i) => {
       const val = entry.items?.[item.key] || "";
@@ -375,11 +582,17 @@ export async function exportPenilaianToPdf(
       const x = startX + itemColW + descColW + i * dayColW + dayColW / 2;
 
       if (val === "baik_sekali" || val === "baik") {
-        doc.setTextColor(5, 150, 105);
+        doc.setFont(fontName, "bold");
+        doc.setTextColor(5, 150, 105); // emerald
+      } else if (val === "sedang") {
+        doc.setFont(fontName, "bold");
+        doc.setTextColor(217, 119, 6); // amber
       } else if (val === "kurang") {
-        doc.setTextColor(185, 28, 28);
+        doc.setFont(fontName, "bold");
+        doc.setTextColor(220, 38, 38); // rose
       } else {
-        doc.setTextColor(100, 116, 139);
+        doc.setFont(fontName, "normal");
+        doc.setTextColor(148, 163, 184);
       }
       doc.text(textVal, x, curY + 4.5, { align: "center" });
     });
@@ -387,11 +600,11 @@ export async function exportPenilaianToPdf(
     curY += rowH;
   });
 
-  curY += 8;
+  curY += 7;
 
-  // Mengetahui / Signatures
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(9.5);
+  // ── Verifikasi dan Persetujuan (Digital) dengan Kode QR ──
+  doc.setFont(fontName, "bold");
+  doc.setFontSize(10);
   doc.setTextColor(15, 23, 42);
   doc.text("Verifikasi dan Persetujuan (Digital)", 14, curY);
 
@@ -401,65 +614,107 @@ export async function exportPenilaianToPdf(
   const signBoxes = [
     {
       title: "Pengawas Dept",
+      roleKey: "pengawasDept",
       data: mgt.pengawasDept || mgt.picDept || { nama: "", nik: "", tanggal: "" },
     },
     {
       title: "Purchasing",
+      roleKey: "purchasing",
       data: mgt.purchasing || { nama: "", nik: "", tanggal: "" },
     },
     {
       title: "SFO",
+      roleKey: "sfo",
       data: mgt.sfo || { nama: "", nik: "", tanggal: "" },
     },
   ];
 
-  const boxW = (pageWidth - 28 - 10) / 3;
-  signBoxes.forEach((box, i) => {
-    const x = startX + i * (boxW + 5);
-    const hasApproved = Boolean(box.data.nama);
+  const cardGap = 4;
+  const cardW = (boxWidth - cardGap * 2) / 3;
+  const cardH = 38; // Lebih tinggi agar QR code dan informasi tertata rapi
 
+  for (let i = 0; i < signBoxes.length; i++) {
+    const box = signBoxes[i];
+    const x = startX + i * (cardW + cardGap);
+    const hasApproved = Boolean(box.data.nama && box.data.nama.trim() !== "");
+
+    // Bingkai Card
     doc.setDrawColor(203, 213, 225);
     doc.setFillColor(hasApproved ? 255 : 248, hasApproved ? 255 : 250, hasApproved ? 255 : 252);
-    doc.roundedRect(x, curY, boxW, 26, 2, 2, "FD");
+    doc.roundedRect(x, curY, cardW, cardH, 2, 2, "FD");
+
+    // Header Strip Card
+    doc.setFillColor(241, 245, 249);
+    doc.roundedRect(x, curY, cardW, 6.5, 2, 2, "F");
+    doc.setDrawColor(226, 232, 240);
+    doc.line(x, curY + 6.5, x + cardW, curY + 6.5);
 
     doc.setFontSize(8.5);
-    doc.setFont("helvetica", "bold");
+    doc.setFont(fontName, "bold");
     doc.setTextColor(30, 41, 59);
-    doc.text(box.title, x + boxW / 2, curY + 5, { align: "center" });
+    doc.text(box.title, x + cardW / 2, curY + 4.6, { align: "center" });
 
-    doc.setFontSize(7.5);
     if (hasApproved) {
-      doc.setFont("helvetica", "bold");
-      doc.setTextColor(5, 150, 105);
-      doc.text("✓ DISETUJUI", x + boxW / 2, curY + 11, { align: "center" });
+      // ── Sisipkan QR Code Verifikasi ──
+      const qrSize = 18;
+      const qrX = x + 4;
+      const qrY = curY + 10;
 
-      doc.setFont("helvetica", "normal");
-      doc.setTextColor(51, 65, 85);
-      doc.text(box.data.nama || "-", x + boxW / 2, curY + 16, { align: "center" });
+      try {
+        const verifyUrl = getVerifyUrl(meta.id_form, box.roleKey);
+        const qrDataUrl = await makeQR(verifyUrl, 180);
+        doc.addImage(qrDataUrl, "PNG", qrX, qrY, qrSize, qrSize);
+      } catch (err) {
+        console.error("Gagal menyisipkan QR PDF:", err);
+      }
+
+      // ── Teks Keterangan di Samping QR ──
+      const textX = qrX + qrSize + 3;
+      const textMaxW = cardW - qrSize - 9;
+
+      doc.setFontSize(7.5);
+      doc.setFont(fontName, "bold");
+      doc.setTextColor(5, 150, 105); // emerald-600
+      doc.text("✓ DISETUJUI", textX, curY + 13);
+
+      doc.setFont(fontName, "bold");
+      doc.setFontSize(7.5);
+      doc.setTextColor(15, 23, 42);
+      const displayName = box.data.nama.length > 14 ? box.data.nama.slice(0, 13) + "…" : box.data.nama;
+      doc.text(displayName, textX, curY + 18);
+
+      doc.setFont(fontName, "normal");
       doc.setFontSize(6.5);
       doc.setTextColor(100, 116, 139);
-      doc.text(
-        `NIK: ${box.data.nik || "-"} • ${box.data.tanggal || "-"}`,
-        x + boxW / 2,
-        curY + 21,
-        { align: "center" }
-      );
-    } else {
-      doc.setFont("helvetica", "italic");
-      doc.setTextColor(148, 163, 184);
-      doc.text("Menunggu Persetujuan", x + boxW / 2, curY + 14, { align: "center" });
-    }
-  });
+      if (box.data.nik) {
+        doc.text(`NIK: ${box.data.nik}`, textX, curY + 22.5);
+      }
+      const tglFormatted = formatTanggalDDMMYYYY(box.data.tanggal);
+      doc.text(`Tgl: ${tglFormatted}`, textX, curY + 26.5);
 
-  // Footer note
+      // Verifikasi Digital Badge
+      doc.setFontSize(5.5);
+      doc.setTextColor(148, 163, 184);
+      doc.text("Verifikasi Digital", textX, curY + 30.5);
+    } else {
+      // Menunggu Persetujuan
+      doc.setFontSize(7.5);
+      doc.setFont(fontName, "italic");
+      doc.setTextColor(148, 163, 184);
+      doc.text("Belum Disetujui", x + cardW / 2, curY + 19, { align: "center" });
+      doc.setFontSize(6.5);
+      doc.text("(Menunggu Otorisasi)", x + cardW / 2, curY + 23.5, { align: "center" });
+    }
+  }
+
+  // ── Footer Note ──
   doc.setFontSize(7);
+  doc.setFont(fontName, "normal");
   doc.setTextColor(148, 163, 184);
   doc.text(
-    `Dokumen resmi diverifikasi secara digital oleh PT. JAI Permit System pada ${new Date().toLocaleString(
-      "id-ID"
-    )}`,
+    `Dokumen resmi diverifikasi secara digital oleh PT. JAI Form Permit System • JAI/F-08/P.SHE-19 Rev. 1`,
     pageWidth / 2,
-    285,
+    286,
     { align: "center" }
   );
 

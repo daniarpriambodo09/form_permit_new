@@ -28,6 +28,20 @@
   color-scheme: dark;
 }
 
+html {
+  zoom: 0.8;
+}
+
+html.no-zoom {
+  zoom: 1 !important;
+}
+
+@media print {
+  html {
+    zoom: 1 !important;
+  }
+}
+
 body {
   background-color: var(--background);
   color: var(--foreground);
@@ -275,10 +289,29 @@ body {
 /* ── 8. Wadah Tanda Tangan Digital Resmi (Kebal Dark Mode - Tetap Terang/Putih Bersih) ── */
 .signature-display-box,
 .dark .signature-display-box,
-[data-theme="dark"] .signature-display-box {
+[data-theme="dark"] .signature-display-box,
+.signature-pad-canvas-container,
+.signature-pad-canvas-container canvas,
+.dark .signature-pad-canvas-container,
+.dark .signature-pad-canvas-container canvas {
   background-color: #ffffff !important;
   background: #ffffff !important;
-  border-color: #cbd5e1 !important;
+  border-color: #94a3b8 !important;
+}
+
+/* Gambar tanda tangan digital otomatis diberi latar putih bersih di dark mode */
+.dark img[alt*="TTD"],
+.dark img[alt*="Tanda Tangan"],
+.dark img[alt*="signature"],
+.dark img[alt*="Signature"],
+.dark img[src*="/signatures/"],
+.dark img[src*="signature"],
+.signature-img-preview,
+.dark .signature-img-preview {
+  background-color: #ffffff !important;
+  border-radius: 8px;
+  padding: 4px 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
 }
 
 .signature-outer-box,

@@ -26,15 +26,13 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     // 1. Cek preference yang tersimpan di localStorage
     const savedTheme = localStorage.getItem("theme") as Theme | null;
-    if (savedTheme === "dark" || savedTheme === "light") {
-      setThemeState(savedTheme);
-      applyTheme(savedTheme);
+    if (savedTheme === "dark") {
+      setThemeState("dark");
+      applyTheme("dark");
     } else {
-      // 2. Default ke system preference jika belum pernah diatur
-      const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-      const initial = prefersDark ? "dark" : "light";
-      setThemeState(initial);
-      applyTheme(initial);
+      // Default selalu "light" (tema terang) jika belum pernah diatur atau bernilai "light"
+      setThemeState("light");
+      applyTheme("light");
     }
     setMounted(true);
   }, []);
